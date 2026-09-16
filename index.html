@@ -125,7 +125,7 @@
       <button class="btn sec" id="bHelp">How to play</button>
     </div>
     <div class="bar"><div class="silver"><img src="assets/icons/icon_silver.png" alt=""><b id="silv1">0</b></div></div>
-    <div class="build">build 16.09 · 14</div>
+    <div class="build">build 16.09 · 15</div>
   </div>
 
   <!-- ВЫБОР УРОВНЯ -->
@@ -835,7 +835,7 @@ class Shot{
       this.dur=Math.max(0.35,Math.hypot(o.tx-x,o.ty-y)/420);
     }
     this.speed = kind==='arrow'?560:400;
-    this.ang=0;
+    if(kind!=='spear') this.ang=0;      // у копья угол задан при выстреле и сбрасывать его нельзя
   }
   update(dt){
     if(this.kind==='spear'){
@@ -1896,10 +1896,10 @@ function drawHud(){
     txt('Sandbox: spawn enemies',px+12,PY+20,13,'#cfe0ea','left',true);
     const list=['raider','scout','shield','raven','shaman','berserk','jarl','draugr','fenrir'];
     list.forEach((t,i)=>{
-      const bx=px+10+(i%5)*62, by=PY+28+Math.floor(i/5)*28;
-      btn('sp_'+t,bx,by,58,24,ENEMIES[t].name.split(' ')[0].slice(0,7),{fs:11,c1:'#44606f',c2:'#2c4451'});
+      const bx=px+10+(i%5)*62, by=PY+28+Math.floor(i/5)*30;
+      btn('sp_'+t,bx,by,58,26,ENEMIES[t].name.split(' ')[0].slice(0,7),{fs:11,c1:'#44606f',c2:'#2c4451'});
     });
-    btn('sp_clear',px+10+3*62,PY+84,120,22,'Clear field',{fs:11,c1:'#6a4750',c2:'#4a2f36'});
+    btn('sp_clear',px+10+4*62,PY+58,58,26,'Clear',{fs:11,c1:'#6a4750',c2:'#4a2f36'});
   } else {
     if(g.waveState==='idle'){
       txt('Next wave in '+Math.ceil(g.waveTimer)+'s',px+12,PY+26,14,'#cfe0ea','left',true);

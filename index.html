@@ -26,9 +26,9 @@
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   html,body{margin:0;height:100%;overflow:hidden;background:#0a141b;font-family:var(--f);color:var(--snow)}
-  #wrap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+  #wrap{position:fixed;inset:0;overflow:hidden;
         background:radial-gradient(120% 90% at 50% 0%,#1b3446 0%,#0a141b 70%)}
-  #stage{position:relative;width:960px;height:640px;transform-origin:center center;overflow:hidden;
+  #stage{position:absolute;left:0;top:0;width:960px;height:640px;transform-origin:center center;overflow:hidden;
          border-radius:10px;box-shadow:0 24px 70px rgba(0,0,0,.6)}
   canvas{display:block;width:960px;height:640px;touch-action:none;border-radius:10px}
   .screen{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;
@@ -106,13 +106,10 @@
   ul.help b{color:var(--rune)}
 
   .back .btn{min-width:0;min-height:44px;padding:10px 20px;font-size:15px;margin:0}
-  #rotate{display:none;position:fixed;left:0;right:0;bottom:0;padding:10px;text-align:center;
-          background:rgba(14,28,37,.92);color:#cfe0ea;font-size:14px;pointer-events:none;z-index:60}
-  @media (orientation:portrait){ #rotate{display:block} }
+
 </style>
 </head>
 <body>
-<div id="rotate">Turn your phone sideways to see the whole battlefield</div>
 <div id="wrap"><div id="stage">
   <canvas id="cv" width="960" height="640"></canvas>
 
@@ -128,7 +125,7 @@
       <button class="btn sec" id="bHelp">How to play</button>
     </div>
     <div class="bar"><div class="silver"><img src="assets/icons/icon_silver.png" alt=""><b id="silv1">0</b></div></div>
-    <div class="build">build 16.09 · 13</div>
+    <div class="build">build 16.09 · 14</div>
   </div>
 
   <!-- ВЫБОР УРОВНЯ -->
@@ -1973,20 +1970,32 @@ function drawTowerIcon(k,x,y){
 }
 
 /* ---------- 9. ВВОД ----------------------------------------------------- */
-let scale=1, offX=0, offY=0;
+/* Вписываем поле в экран вручную. На вертикальном телефоне поворачиваем всю сцену
+   на 90°, чтобы игра занимала весь экран, а не узкую полоску посередине. */
+let VIEW={s:1, rot:0, vw:960, vh:640};
 function fit(){
-  const w=window.innerWidth, h=window.innerHeight;
-  scale=Math.min(w/W, h/H);
+  const vv = window.visualViewport;
+  const vw = Math.round(vv? vv.width : window.innerWidth);
+  const vh = Math.round(vv? vv.height : window.innerHeight);
+  const portrait = vh > vw*1.04;
+  const availW = portrait ? vh : vw;
+  const availH = portrait ? vw : vh;
+  const s = Math.min(availW/W, availH/H);
+  VIEW={s, rot: portrait?90:0, vw, vh};
   const st=document.getElementById('stage');
-  st.style.transform='scale('+scale+')';
+  st.style.transformOrigin='0 0';
+  st.style.transform='translate('+(vw/2)+'px,'+(vh/2)+'px) rotate('+VIEW.rot+'deg) scale('+s+') translate('+(-W/2)+'px,'+(-H/2)+'px)';
 }
-window.addEventListener('resize',fit); window.addEventListener('orientationchange',()=>setTimeout(fit,200));
+window.addEventListener('resize',fit);
+window.addEventListener('orientationchange',()=>setTimeout(fit,250));
+if(window.visualViewport){ visualViewport.addEventListener('resize',fit); }
 
 function toGame(ev){
-  const r=cv.getBoundingClientRect();
   const cx=(ev.touches? ev.touches[0].clientX : ev.clientX);
   const cy=(ev.touches? ev.touches[0].clientY : ev.clientY);
-  return { x:(cx-r.left)/scale, y:(cy-r.top)/scale };
+  let dx=cx-VIEW.vw/2, dy=cy-VIEW.vh/2;
+  if(VIEW.rot===90){ const t=dx; dx=dy; dy=-t; }   // обратный поворот сцены
+  return { x: dx/VIEW.s + W/2, y: dy/VIEW.s + H/2 };
 }
 function hitBtn(p){ for(let i=uiBtns.length-1;i>=0;i--){ const b=uiBtns[i];
   if(p.x>=b.x&&p.x<=b.x+b.w&&p.y>=b.y&&p.y<=b.y+b.h) return b; } return null; }

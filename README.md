@@ -2,7 +2,7 @@
 
 A tower defence game about holding a Norse village against raiders. It runs in any browser, works with touch and mouse, and needs nothing installed.
 
-**[Play it here](https://yourname.github.io/fjord-defence/)**
+**[Play it here](https://tevton128.github.io/fjord-defence/)**
 
 ![Fjord Defence](assets/thumbnail.webp)
 

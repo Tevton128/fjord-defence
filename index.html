@@ -1,0 +1,2321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>Fjord Defence</title>
+<script>
+/* SDK Playables нужен только внутри YouTube (игра там открывается во фрейме).
+   На обычном хостинге ничего не грузим — публичная демо-ссылка остаётся без внешних запросов. */
+(function(){
+  try{
+    if(window.self === window.top) return;
+    var sc=document.createElement('script');
+    sc.src='https://www.youtube.com/game_api/v1';
+    sc.onerror=function(){ window.__noYT=1; };
+    document.head.appendChild(sc);
+  }catch(e){}
+})();
+</script>
+<style>
+  :root{
+    --night:#10202b; --night2:#183040; --wood:#6b4a2f; --wood-d:#412c1b;
+    --stone:#8a97a3; --snow:#e9f0f4; --rune:#e7b74e; --rune-d:#8e6a1f;
+    --blood:#b5423c; --ice:#79cbe8; --moss:#3f6b4a;
+    --f: "Trebuchet MS","Segoe UI",system-ui,-apple-system,sans-serif;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;overflow:hidden;background:#0a141b;font-family:var(--f);color:var(--snow)}
+  #wrap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+        background:radial-gradient(120% 90% at 50% 0%,#1b3446 0%,#0a141b 70%)}
+  #stage{position:relative;width:960px;height:640px;transform-origin:center center;overflow:hidden;
+         border-radius:10px;box-shadow:0 24px 70px rgba(0,0,0,.6)}
+  canvas{display:block;width:960px;height:640px;touch-action:none;border-radius:10px}
+  .screen{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;
+          background:linear-gradient(180deg,rgba(9,20,28,.93),rgba(9,20,28,.97));border-radius:10px;padding:26px;text-align:center}
+  .screen.scroll{justify-content:flex-start;overflow-y:auto;overflow-x:hidden;padding:76px 26px 34px;
+                 -webkit-overflow-scrolling:touch;scrollbar-width:thin;scrollbar-color:#3d5f72 transparent}
+  .screen.scroll::-webkit-scrollbar{width:10px}
+  .screen.scroll::-webkit-scrollbar-thumb{background:#3d5f72;border-radius:5px}
+  .back{position:sticky;top:-64px;align-self:flex-start;z-index:5}
+  .bar{position:sticky;top:-64px;align-self:flex-end;z-index:5}
+  .screen.on{display:flex}
+  h1{font-size:62px;margin:0;letter-spacing:.04em;line-height:.95;
+     color:var(--snow);text-shadow:0 5px 0 #0c1a24, 0 0 34px rgba(231,183,78,.28)}
+  h1 small{display:block;font-size:30px;letter-spacing:.34em;color:var(--rune);margin-top:12px;font-weight:bold;text-indent:.34em;text-shadow:0 3px 0 #0c1a24}
+  h2{font-size:34px;margin:0 0 6px}
+  p.sub{color:#9fb3c0;font-size:15px;max-width:520px;line-height:1.5;margin:10px 0 22px}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-width:230px;min-height:54px;padding:14px 26px;margin:7px;
+       font-family:var(--f);font-size:18px;font-weight:bold;color:#241708;cursor:pointer;border:0;
+       background:linear-gradient(180deg,#f0c766,#cf9a2f);border-radius:8px;
+       box-shadow:0 4px 0 #7d5a15, 0 8px 18px rgba(0,0,0,.35);transition:transform .07s, box-shadow .07s}
+  .btn:active{transform:translateY(3px);box-shadow:0 1px 0 #7d5a15}
+  .btn.sec{background:linear-gradient(180deg,#44606f,#2c4451);color:var(--snow);box-shadow:0 4px 0 #17262e,0 8px 18px rgba(0,0,0,.35)}
+  .btn.sec:active{box-shadow:0 1px 0 #17262e}
+  .btn.ad{background:linear-gradient(180deg,#5fbf72,#2f8a48);color:#062211;box-shadow:0 4px 0 #1c5a2c,0 8px 18px rgba(0,0,0,.35)}
+  .btn.ad:active{box-shadow:0 1px 0 #1c5a2c}
+  .btn[disabled]{filter:grayscale(.8) brightness(.7);pointer-events:none}
+  .row{display:flex;flex-wrap:wrap;justify-content:center;align-items:center}
+  .levels{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;width:100%;max-width:680px;margin:16px 0 10px}
+  .lv{position:relative;height:96px;border-radius:9px;cursor:pointer;border:2px solid #2f4a5a;
+      background:linear-gradient(180deg,#223a48,#162833);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px}
+  .lv:hover{border-color:var(--rune)}
+  .lv b{font-size:26px}
+  .lv span{font-size:11px;color:#8ea6b5;letter-spacing:.06em}
+  .lv .st{font-size:13px;color:var(--rune);letter-spacing:2px;height:14px}
+  .lv.lock{opacity:.42;cursor:not-allowed;border-color:#2a3a45}
+  .lv.lock:hover{border-color:#2a3a45}
+  .perks{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;width:100%;max-width:700px;margin:14px 0}
+  .perk{background:#162833;border:2px solid #2f4a5a;border-radius:9px;padding:12px 14px;text-align:left}
+  .hdr{position:sticky;top:-70px;z-index:6;display:flex;justify-content:space-between;align-items:center;
+        width:100%;padding:10px 0 4px;background:linear-gradient(180deg,rgba(9,20,28,.98) 70%,rgba(9,20,28,0))}
+  .hdr .btn{min-width:0;min-height:44px;padding:10px 20px;font-size:15px;margin:0}
+  .perk{display:flex;flex-direction:column}
+  .perk .top{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+  .perk .top img,.perk .top svg{width:42px;height:42px;flex:0 0 42px;filter:drop-shadow(0 2px 3px rgba(0,0,0,.5))}
+  .perk h3{margin:0;font-size:17px}
+  .perk p{margin:0 0 10px;font-size:13px;color:#93a8b6;line-height:1.35;min-height:34px}
+  .cnt{display:flex;justify-content:space-between;align-items:baseline;margin:2px 0 8px}
+  .cnt .num{font-size:22px;font-weight:bold;color:var(--rune)}
+  .cnt .pr{font-size:12px;color:#8ea6b5}
+  .danger{border:2px solid #5d2f2f;background:linear-gradient(180deg,#2a1a1c,#1d1416);border-radius:10px;padding:14px 16px;text-align:left}
+  .danger .top{display:flex;gap:12px;align-items:flex-start}
+  .danger .top img{width:54px;height:54px;flex:0 0 54px}
+  .danger .dtext b{display:block;font-size:16px;color:#e59a95;margin-bottom:4px}
+  .danger .dtext span{display:block;font-size:12.5px;color:#a88b8b;line-height:1.45;margin-bottom:10px}
+  .btn.danger-btn{width:100%;min-width:0;margin:0;background:linear-gradient(180deg,#b5423c,#7d2a26);
+       color:#ffe9e7;box-shadow:0 4px 0 #4d1a17,0 8px 18px rgba(0,0,0,.35)}
+  .btn.danger-btn:active{box-shadow:0 1px 0 #4d1a17}
+  .pips{display:flex;gap:4px;margin-bottom:8px}
+  .pip{width:26px;height:7px;border-radius:3px;background:#28414f}
+  .pip.on{background:var(--rune)}
+  .perk .btn{min-width:0;min-height:46px;width:100%;padding:10px;font-size:15px;margin:0}
+  #scMenu .bar{position:absolute;top:16px;right:18px}
+  .bar{display:flex;gap:14px;align-items:center;font-size:15px}
+  .silver{display:inline-flex;align-items:center;gap:7px;color:var(--snow);background:#162833;border:1px solid #33505f;padding:5px 14px 5px 7px;border-radius:20px}
+  .silver img{width:26px;height:26px}
+  .silver b{color:#cfe2ee}
+  .stars{font-size:40px;letter-spacing:8px;color:var(--rune);margin:4px 0 2px;height:46px}
+  .stars .off{color:#2c4452}
+  #adOv{background:rgba(4,9,13,.96);z-index:50}
+  #adBox{width:420px;max-width:86%;border:2px solid #33505f;border-radius:10px;padding:26px;background:#0f1e28}
+  #adTimer{font-size:46px;color:var(--rune);margin:10px 0}
+  .build{position:absolute;left:14px;bottom:10px;font-size:11px;color:#41596a;letter-spacing:.06em}
+  .tiny{font-size:12px;color:#7d94a3;margin-top:14px;line-height:1.5}
+  ul.help{text-align:left;max-width:560px;font-size:14.5px;line-height:1.65;color:#b9cbd6}
+  ul.help b{color:var(--rune)}
+
+  .back .btn{min-width:0;min-height:44px;padding:10px 20px;font-size:15px;margin:0}
+  #rotate{display:none;position:fixed;left:0;right:0;bottom:0;padding:10px;text-align:center;
+          background:rgba(14,28,37,.92);color:#cfe0ea;font-size:14px;pointer-events:none;z-index:60}
+  @media (orientation:portrait){ #rotate{display:block} }
+</style>
+</head>
+<body>
+<div id="rotate">Turn your phone sideways to see the whole battlefield</div>
+<div id="wrap"><div id="stage">
+  <canvas id="cv" width="960" height="640"></canvas>
+
+  <!-- ГЛАВНОЕ МЕНЮ -->
+  <div class="screen on" id="scMenu" style="background-image:linear-gradient(180deg,rgba(9,20,28,.72),rgba(9,20,28,.93)),url(assets/splash.webp);background-size:cover;background-position:center">
+    <h1>FJORD<small>DEFENCE</small></h1>
+    <p class="sub">Raider longships have entered the bay. Line the path with towers, hold the village gates and let no berserker through.</p>
+    <div class="row">
+      <button class="btn" id="bPlay">Play</button>
+    </div>
+    <div class="row">
+      <button class="btn sec" id="bPerks">Forge</button>
+      <button class="btn sec" id="bHelp">How to play</button>
+    </div>
+    <div class="bar"><div class="silver"><img src="assets/icons/icon_silver.png" alt=""><b id="silv1">0</b></div></div>
+    <div class="build">build 16.09 · 12</div>
+  </div>
+
+  <!-- ВЫБОР УРОВНЯ -->
+  <div class="screen scroll" id="scLevels">
+    <div class="hdr"><button class="btn sec" data-go="scMenu">&larr; Back</button><div class="silver"><img src="assets/icons/icon_silver.png" alt=""><b class="silvv">0</b></div></div>
+    <h2>Choose a fjord</h2>
+    <div class="row" id="diffRow" style="margin:2px 0 -4px"></div>
+    <p class="sub" id="livesLine" style="margin:8px 0 0"></p>
+    <div class="row"><button class="btn sec" id="bSandbox" style="min-width:260px">Sandbox: everything unlocked</button></div>
+    <p class="sub" id="diffHint" style="margin:8px 0 0"></p>
+    <div class="levels" id="lvGrid"></div>
+  </div>
+
+  <!-- ПОДГОТОВКА К БОЮ -->
+  <div class="screen scroll" id="scPrep">
+    <div class="hdr"><button class="btn sec" data-go="scLevels">&larr; Back</button>
+      <div class="silver"><img src="assets/icons/icon_silver.png" alt=""><b class="silvv">0</b></div></div>
+    <h2 id="prepTitle">Prepare</h2>
+    <p class="sub" id="prepLine" style="margin:6px 0 0"></p>
+    <div class="perks" id="prepGrid"></div>
+    <div class="row"><button class="btn" id="bStart">March out</button>
+      <button class="btn sec" id="bEndless" style="display:none">Endless raid</button></div>
+    <p class="tiny" id="prepCost"></p>
+  </div>
+
+  <!-- КУЗНИЦА -->
+  <div class="screen scroll" id="scPerks">
+    <div class="hdr"><button class="btn sec" data-go="scMenu">&larr; Back</button><div class="silver"><img src="assets/icons/icon_silver.png" alt=""><b class="silvv">0</b></div></div>
+    <h2>Forge</h2>
+    <p class="sub" style="margin:6px 0 0">Everything here belongs to the difficulty you are playing. Switching difficulty switches profiles.</p>
+    <div class="perk" style="width:100%;max-width:700px" id="livesCard"></div>
+    <div id="resetBox" style="width:100%;max-width:700px;margin:18px 0 6px"></div>
+    <h2 style="font-size:24px;margin:10px 0 0">Workshop</h2>
+    <p class="sub" style="margin:4px 0 0">Rank I unlocks the weapon so you can build it. Rank II and III unlock its in-battle upgrades. Archers come with rank I.</p>
+    <div class="perks" id="mastGrid" style="grid-template-columns:repeat(3,1fr)"></div>
+  </div>
+
+  <!-- ПРАВИЛА -->
+  <div class="screen scroll" id="scHelp">
+    <div class="hdr"><button class="btn sec" data-go="scMenu">&larr; Back</button></div>
+    <h2>How to play</h2>
+    <ul class="help">
+      <li>Pick a tower at the bottom of the screen and place it on free ground beside the path.</li>
+      <li>Tap a built tower to <b>upgrade</b> or <b>sell</b> it.</li>
+      <li><b>Shieldmen and jarls wear armour</b> that cuts the damage of every shot. Archers are weak against them; use the catapult and Thor's totem.</li>
+      <li><b>Ravens fly.</b> The catapult and the fire altar cannot reach them.</li>
+      <li><b>Shamans heal</b> nearby allies and can briefly disable a tower. Kill them first.</li>
+      <li>The frost rune barely hurts but slows. <b>Rune of Return</b> does not kill: it throws enemies back down the path, costing a whole wave half its progress.</li>
+      <li><b>Ballista</b> spears everyone in its firing line: place it looking along a long straight stretch.</li>
+      <li>You start with archers only. Every other weapon has to be bought in the Workshop for silver: rank I lets you build it, rank II and III unlock its in-battle upgrades. Silver comes from cleared fjords, so replay an easy one if you are short.</li>
+      <li><b>Shieldmen lock into a shield wall:</b> standing three or more together they gain extra armour, and each one splits into two raiders when it dies. Break the group up with splash damage.</li>
+      <li><b>Berserkers charge.</b> Every few seconds they burst forward at more than double speed &mdash; a slow tower alone will not stop them.</li>
+      <li><b>Shamans sabotage.</b> Besides healing, they knock out the nearest tower for a couple of seconds. A dark tower with green sparks is disabled.</li>
+      <li>Trees and boulders occupy a cell: you cannot build on them, but they show where the path is tight.</li>
+      <li>The “Call wave early” button pays gold for every second you save.</li>
+    </ul>
+  </div>
+
+  <!-- ИТОГ УРОВНЯ -->
+  <div class="screen" id="scResult">
+    <h2 id="resTitle">Fjord Held</h2>
+    <div class="stars" id="resStars"></div>
+    <p class="sub" id="resText"></p>
+    <div class="row" id="resBtns"></div>
+  </div>
+
+  <!-- РЕКЛАМА (заглушка) -->
+  <div class="screen" id="adOv">
+    <div id="adBox">
+      <h2 id="adTitle">Advertisement</h2>
+      <div id="adTimer">5</div>
+      <p class="sub" style="margin:0">Demo spot. In the YouTube Playables build this calls the real ytgame.ads.</p>
+      <button class="btn sec" id="adSkip" style="margin-top:16px">Skip</button>
+    </div>
+  </div>
+</div></div>
+
+<script>
+"use strict";
+/* =======================================================================
+   ФЬОРД: ОБОРОНА — tower defense, один файл, без внешних запросов.
+   Разделы: 0 хранилище · 1 реклама · 2 звук · 3 данные · 4 карты
+            5 волны · 6 сущности · 7 логика · 8 отрисовка · 9 ввод · 10 экраны
+   ======================================================================= */
+
+/* ---------- 0. ХРАНИЛИЩЕ ------------------------------------------------
+   Порядок: YouTube Playables SDK → window.storage (артефакты Claude) →
+   localStorage → память. Ни один вариант не обязателен — игра работает всегда. */
+const memStore = {};
+const Store = {
+  async get(k){
+    try{ if(window.ytgame && ytgame.game && ytgame.game.loadData){
+      const s = await ytgame.game.loadData(); if(s) return JSON.parse(s)[k] ?? null; } }catch(e){}
+    try{ if(window.storage){ const r = await window.storage.get(k,false); if(r) return r.value; } }catch(e){}
+    try{ const v = localStorage.getItem(k); if(v!=null) return v; }catch(e){}
+    return memStore[k] ?? null;
+  },
+  async set(k,v){
+    try{ if(window.ytgame && ytgame.game && ytgame.game.saveData){
+      await ytgame.game.saveData(JSON.stringify({[k]:v})); return; } }catch(e){}
+    try{ if(window.storage){ await window.storage.set(k,v,false); return; } }catch(e){}
+    try{ localStorage.setItem(k,v); return; }catch(e){}
+    memStore[k]=v;
+  }
+};
+
+function newProfile(){ return { silver:0, lives:20, mast:{archer:1}, stars:{}, hints:{} }; }
+let save = { diff:0, sound:true, prof:{0:newProfile(),1:newProfile(),2:newProfile()} };
+const P = () => save.prof[save.diff||0] || (save.prof[save.diff||0]=newProfile());
+async function loadSave(){
+  const raw = await Store.get('fjord_save_v1');
+  if(raw){ try{ const d = JSON.parse(raw); save = Object.assign(save,d);
+    P().lives = (d.lives==null? 20 : d.lives);
+    P().mast = d.mast||{archer:1}; if(!P().mast.archer) P().mast.archer=1; P().hints = d.hints||{}; }catch(e){} }
+}
+let saveTimer=null;
+function persist(){ clearTimeout(saveTimer); saveTimer=setTimeout(()=>Store.set('fjord_save_v2',JSON.stringify(save)),250); }
+
+/* ---------- 1. РЕКЛАМА --------------------------------------------------
+   Один слой над всеми показами. Сейчас — демо-ролик 5 секунд.
+   Чтобы включить настоящую монетизацию YouTube Playables, раскомментируй
+   блоки ytgame ниже (SDK подключается тегом <script src="https://www.youtube.com/game_api/v1">
+   в head — только в сборке для Playables). Сторонние сети (AdMob и т.п.)
+   на Playables запрещены. */
+const Ads = {
+  available(){ return !!(window.ytgame && ytgame.ads); },
+
+  async interstitial(){                             // между уровнями
+    if(this.available()){
+      try{ if(game) game.paused=true; await ytgame.ads.requestInterstitialAd(); }
+      catch(e){}
+      finally{ if(game) game.paused=false; }
+      return true;
+    }
+    return this._demo('Advertisement', 5);
+  },
+
+  async rewarded(id, title){                        // за награду
+    if(this.available()){
+      try{ await ytgame.ads.requestRewardedAd(id); return true; }
+      catch(e){ return false; }
+    }
+    return this._demo(title || 'Rewarded video', 5);
+  },
+
+  _demo(title, secs){
+    return new Promise(res=>{
+      const ov=$('#adOv'); $('#adTitle').textContent=title; ov.classList.add('on');
+      let t=secs; $('#adTimer').textContent=t; $('#adSkip').disabled=true;
+      const iv=setInterval(()=>{
+        t--; $('#adTimer').textContent=Math.max(t,0);
+        if(t<=0){ clearInterval(iv); $('#adSkip').disabled=false; $('#adTimer').textContent='Done'; }
+      },1000);
+      $('#adSkip').onclick=()=>{ clearInterval(iv); ov.classList.remove('on'); res(true); };
+    });
+  }
+};
+
+/* ---------- 2. ЗВУК ------------------------------------------------------
+   Всё синтезируется на лету через WebAudio: ни одного чужого сэмпла,
+   вопрос авторских прав закрыт по построению. */
+let actx=null, master=null, windNode=null, sfxBudget=0;
+function audio(){
+  if(actx) return actx;
+  try{
+    actx=new (window.AudioContext||window.webkitAudioContext)();
+    master=actx.createGain(); master.gain.value=0.9; master.connect(actx.destination);
+  }catch(e){ actx=null; }
+  return actx;
+}
+function noiseBuf(sec){
+  const n=Math.floor(audio().sampleRate*sec), b=actx.createBuffer(1,n,actx.sampleRate), d=b.getChannelData(0);
+  for(let i=0;i<n;i++) d[i]=Math.random()*2-1;
+  return b;
+}
+function env(node, vol, dur, delay){
+  const g=actx.createGain(), t=actx.currentTime+(delay||0);
+  g.gain.setValueAtTime(0.0001,t);
+  g.gain.exponentialRampToValueAtTime(vol,t+0.008);
+  g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+  node.connect(g); g.connect(master);
+  return t;
+}
+function tone(freq,freq2,dur,type,vol,delay){
+  if(!save.sound||!audio()) return;
+  const o=actx.createOscillator(); o.type=type||'sine';
+  const t=env(o,vol||0.08,dur,delay);
+  o.frequency.setValueAtTime(freq,t);
+  if(freq2) o.frequency.exponentialRampToValueAtTime(Math.max(20,freq2),t+dur);
+  o.start(t); o.stop(t+dur+0.02);
+}
+function noise(dur,f0,f1,q,vol,type,delay){
+  if(!save.sound||!audio()) return;
+  const src=actx.createBufferSource(); src.buffer=noiseBuf(Math.max(dur,0.05));
+  const bp=actx.createBiquadFilter(); bp.type=type||'bandpass'; bp.Q.value=q||1;
+  const t=actx.currentTime+(delay||0);
+  bp.frequency.setValueAtTime(f0,t);
+  if(f1) bp.frequency.exponentialRampToValueAtTime(Math.max(40,f1),t+dur);
+  src.connect(bp); env(bp,vol||0.08,dur,delay);
+  src.start(t); src.stop(t+dur+0.02);
+}
+function startWind(){                      // тихий ветер фьорда под боем
+  if(!save.sound||!audio()||windNode) return;
+  const src=actx.createBufferSource(); src.buffer=noiseBuf(4); src.loop=true;
+  const lp=actx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=380; lp.Q.value=0.6;
+  const g=actx.createGain(); g.gain.value=0.035;
+  const lfo=actx.createOscillator(); lfo.frequency.value=0.07;
+  const lfoG=actx.createGain(); lfoG.gain.value=160;
+  lfo.connect(lfoG); lfoG.connect(lp.frequency);
+  src.connect(lp); lp.connect(g); g.connect(master);
+  src.start(); lfo.start();
+  windNode={src,lfo,g};
+}
+function stopWind(){ if(windNode){ try{ windNode.src.stop(); windNode.lfo.stop(); }catch(e){} windNode=null; } }
+const SFX={
+  bow(){ if(sfxBudget-- <0) return; noise(0.09,2600,700,1.6,0.05); tone(300,140,0.07,'triangle',0.03); },
+  spear(){ if(sfxBudget-- <0) return; noise(0.14,1400,320,1.2,0.07); tone(160,70,0.12,'sawtooth',0.04); },
+  thud(){ if(sfxBudget-- <0) return; tone(120,45,0.22,'sine',0.11); noise(0.13,600,140,0.8,0.05); },
+  boom(){ if(sfxBudget-- <0) return; noise(0.42,900,90,0.7,0.12,'lowpass'); tone(80,35,0.34,'sine',0.09); },
+  zap(){ if(sfxBudget-- <0) return; noise(0.12,5200,2200,3,0.05,'highpass');
+         tone(1400,420,0.1,'square',0.04); tone(900,260,0.16,'square',0.03,0.03); },
+  ice(){ if(sfxBudget-- <0) return; tone(1700,1200,0.16,'sine',0.045); tone(2550,2100,0.13,'sine',0.028,0.02); },
+  flame(){ if(sfxBudget-- <0) return; noise(0.25,700,320,0.5,0.03,'lowpass'); },
+  die(){ if(sfxBudget-- <0) return; noise(0.16,520,150,0.9,0.05,'lowpass'); tone(200,90,0.12,'triangle',0.035); },
+  build(){ tone(420,420,0.05,'square',0.05); tone(300,180,0.12,'triangle',0.05,0.06); },
+  up(){ tone(520,520,0.07,'triangle',0.05); tone(780,780,0.09,'triangle',0.05,0.07); tone(1040,1040,0.14,'triangle',0.05,0.15); },
+  sell(){ tone(300,150,0.16,'sawtooth',0.05); },
+  no(){ tone(150,120,0.09,'square',0.05); },
+  coin(){ tone(1180,1180,0.05,'sine',0.04); tone(1760,1760,0.08,'sine',0.035,0.04); },
+  wave(){                                   // рог: пила с обертонами и мягкой атакой
+    if(!save.sound||!audio()) return;
+    [110,165,220].forEach((f,i)=>tone(f,f*0.98,0.9,'sawtooth',0.05-i*0.012,i*0.02));
+    noise(0.5,300,160,0.7,0.02,'lowpass',0.05);
+  },
+  boss(){ [70,105,140].forEach((f,i)=>tone(f,f*0.96,1.5,'sawtooth',0.06-i*0.014,i*0.05));
+          noise(1.0,220,90,0.6,0.04,'lowpass'); },
+  leak(){ tone(90,55,0.45,'sawtooth',0.1); noise(0.3,400,120,0.6,0.06,'lowpass'); },
+  win(){ [523,659,784,1047].forEach((f,i)=>tone(f,f,0.3,'triangle',0.06,i*0.13)); },
+  lose(){ [330,262,196,147].forEach((f,i)=>tone(f,f*0.97,0.45,'sawtooth',0.06,i*0.16)); }
+};
+/* ---------- 3. ДАННЫЕ --------------------------------------------------- */
+const W=960,H=640,TS=48,COLS=20,ROWS=10,BY=56,PY=536;   // поле: y 56..536, панель 536..640
+const F="'Trebuchet MS','Segoe UI',system-ui,sans-serif";
+
+const TOWERS = {
+  archer:{ build:3, name:'Archers', short:'Archers', air:true, unlock:1, color:'#caa84f',
+    tip:'Fast arrows, hits air. Weak against armour.',
+    L:[ {cost:80,  range:112, dmg:14, cd:0.55, ab:'One arrow per shot.'},
+        {cost:70,  range:126, dmg:24, cd:0.48, ab:'Longer range, harder hits.'},
+        {cost:155, range:142, dmg:36, cd:0.40, twin:true, ab:'Volley of two arrows.'} ] },
+  frost:{ build:4, name:'Frost Rune', short:'Frost Rune', air:true, unlock:2, color:'#6fc0e0',
+    tip:'Low damage, heavy slow. Place early on the path.',
+    L:[ {cost:105,  range:118, dmg:6,  cd:1.0, slow:.35, slowT:1.5, ab:'Slows by 35%.'},
+        {cost:115,  range:130, dmg:13, cd:0.9, slow:.45, slowT:1.9, ab:'Slows by 45%.'},
+        {cost:245, range:145, dmg:22, cd:0.8, slow:.55, slowT:2.4, aoe:40, freeze:.9,
+         ab:'Cold splashes and sometimes freezes the target.'} ] },
+  catapult:{ build:5, name:'Catapult', short:'Catapult', air:false, unlock:3, color:'#9a6b3f', splash:true,
+    tip:'Splash boulder, pierces armour. Cannot hit ravens.',
+    L:[ {cost:145, range:150, dmg:32, cd:1.9, splash:42, pierce:4, ab:'Area blast.'},
+        {cost:180, range:162, dmg:54, cd:1.75,splash:52, pierce:6, ab:'Wider blast, more damage.'},
+        {cost:340, range:180, dmg:86, cd:1.6, splash:62, pierce:9, stun:.5,
+         ab:'Stuns everything in the blast.'} ] },
+  ballista:{ build:5, name:'Gungnir Ballista', short:'Ballista', air:true, unlock:4, color:'#b0b7a6',
+    tip:'The bolt pierces everyone in line. Very long range.',
+    L:[ {cost:195, range:200, dmg:58, cd:2.4, ab:'Spears up to 2 enemies in the firing line.'},
+        {cost:220, range:215, dmg:92, cd:2.2, pierce:3, ab:'Heavier bolt, up to 3 in a line.'},
+        {cost:430, range:235, dmg:140,cd:2.0, pierce:5, pierceAll:true, ab:'Up to 5 in a line and ignores armour.'} ] },
+  flame:{ build:4, name:'Fire Altar', short:'Altar', air:false, unlock:5, color:'#e0733a',
+    tip:'Continuous cone of flame, burns and melts armour.',
+    L:[ {cost:130, range:88,  dps:26, burn:8,  melt:2, ab:'Burns up to 2 enemies at once, armour -2.'},
+        {cost:155, range:96,  dps:46, burn:14, melt:4, max:3, ab:'Burns up to 3 at once, armour -4.'},
+        {cost:325, range:108, dps:74, burn:24, melt:8, max:4, ab:'Burns up to 4 at once, armour -8, longer flame.'} ] },
+  rune:{ build:5, name:'Rune of Return', short:'Return', air:true, unlock:6, color:'#7fa6e0',
+    tip:'Does not kill, it throws enemies back down the path. Strong against crowds.',
+    L:[ {cost:180, range:112, cd:5.0, push:80,  dmg:12, ab:'Throws up to 4 enemies back 80 steps.'},
+        {cost:210, range:126, cd:4.4, push:130, dmg:24, maxT:6, ab:'Throws up to 6 enemies back 130.'},
+        {cost:415, range:142, cd:3.8, push:190, dmg:40, freeze:.7, maxT:8,
+         ab:'Throws up to 8 back 190 and freezes them.'} ] },
+  totem:{ build:6, name:'Thor\'s Totem', short:'Totem', air:true, unlock:7, color:'#b58ce0',
+    tip:'Lightning jumps between targets and ignores armour. Expensive.',
+    L:[ {cost:235, range:140, dmg:42, cd:1.7, chain:3, ab:'Chains to 3 targets.'},
+        {cost:285, range:152, dmg:64, cd:1.55,chain:4, ab:'Chains to 4 targets.'},
+        {cost:520, range:168, dmg:96, cd:1.4, chain:6, ab:'Chains to 6 targets.'} ] }
+};
+const TKEYS = Object.keys(TOWERS);
+
+const ENEMIES = {
+  raider:{ name:'Raider', hp:62,  speed:44, armor:0,  gold:8,  r:13, col:'#8c5a3c', leak:1 },
+  scout: { name:'Scout', hp:40,  speed:82, armor:0,  gold:7,  r:11, col:'#6f8f5a', leak:1 },
+  shield:{ name:'Shieldman',hp:112, speed:34, armor:5,  gold:14, r:15, col:'#5d6b7a', leak:1, wall:true, split:true },
+  raven: { name:'Raven',    hp:58,  speed:74, armor:1,  gold:10, r:12, col:'#4a4457', leak:1, flying:true },
+  shaman:{ name:'Shaman',    hp:95,  speed:40, armor:2,  gold:16, r:13, col:'#3f7f6e', leak:1, heal:true, sabotage:true },
+  berserk:{name:'Berserker',  hp:215, speed:48, armor:3,  gold:24, r:16, col:'#a33a33', leak:2, rage:true, charge:true },
+  jarl:  { name:'Jarl Hrafn',      hp:1350,speed:30, armor:10, gold:180,r:25, col:'#d0a13a', leak:6, boss:true },
+  draugr:{ name:'Draugr Hrothgeir', hp:1600,speed:24, armor:15, gold:210,r:25, col:'#7f8c93', leak:6, boss:true },
+  fenrir:{ name:'Fenrir Packlord',   hp:1300,speed:44, armor:5,  gold:210,r:27, col:'#6b5a4a', leak:6, boss:true }
+};
+
+const DIFFS = [
+  {n:'Chieftain', hp:1.0,  sp:1.0,  cnt:1.0,  silver:1.0,  gold:1.15,  d:'A calm run: enemies as designed, 15% more gold in battle.'},
+  {n:'Viking',  hp:1.3,  sp:1.08, cnt:1.12, silver:1.4,  gold:1.0,  d:'Tougher, faster enemies, normal gold, 1.4x silver.'},
+  {n:'Berserker', hp:1.5,  sp:1.14, cnt:1.15, silver:2.0,  gold:0.85,  d:'Brutal: 15% less gold in battle, double silver. Expect to lose a lot.'}
+];
+const ICON=n=>'<img src="assets/icons/'+n+'.png" alt="">';
+const PERK_ICON={ gold:ICON('icon_chest'), life:ICON('icon_gates'), dmg:ICON('icon_whetstone'), cost:ICON('icon_hammer') };
+const PERKS = [
+  {k:'gold', name:'War Chest',   desc:'Start this fjord with extra gold.',        val:110, cost:55, fmt:v=>'+'+v+' gold'},
+  {k:'life', name:'Reinforced Gates', desc:'Extra village lives for this fjord.',  val:4,   cost:70, fmt:v=>'+'+v+' lives'},
+  {k:'dmg',  name:'Whetstone',   desc:'Every tower hits harder this fjord.',       val:10,  cost:80, fmt:v=>'+'+v+'% damage'},
+  {k:'cost', name:'Carpenters',  desc:'Building and upgrading is cheaper here.',   val:10,  cost:65, fmt:v=>'-'+v+'% cost'}
+];
+let loadout = {gold:0,life:0,dmg:0,cost:0};                 // выбрано перед текущим боем
+const PERK_MAX = 5;
+function perkPrice(k,n){                                     // каждая следующая штука дороже
+  const base=PERKS.find(x=>x.k===k).cost * (1 + 0.3*(save.diff||0));
+  return Math.round(base*Math.pow(1.6,n)/5)*5;
+}
+function loadoutCost(l){ let t=0; for(const k in l) for(let i=0;i<l[k];i++) t+=perkPrice(k,i); return t; }
+// ранг I — право строить, II — улучшать до второго уровня, III — до третьего.
+// цена привязана к силе башни
+const MAST_COST=k=>{ const b=TOWERS[k].L[0].cost; return [Math.round(b*1.0/10)*10, Math.round(b*1.7/10)*10, Math.round(b*3.0/10)*10]; };
+const mastRank = k => (P().mast && P().mast[k]) || 0;
+
+const goldMul = () => (DIFFS[save.diff||0].gold||1);
+const livesMax = () => 20;   // предел запаса деревни; расходник даёт жизни сверх него на один бой
+const perkVal = k => { const p=PERKS.find(p=>p.k===k); return (loadout[k]||0)*p.val; };
+
+/* ---------- 4. КАРТЫ ---------------------------------------------------- */
+const LEVELS = [
+  {n:'Hrafn Bay',  theme:'grass', waves:8,  lives:20, gold:220,
+   paths:[[[-1,5],[4,5],[4,2],[10,2],[10,7],[16,7],[16,4],[20,4]]]},
+  {n:'Wolf Trail',   theme:'grass', waves:8,  lives:20, gold:250,
+   paths:[[[-1,1],[6,1],[6,8],[13,8],[13,2],[20,2]]]},
+  {n:'Skadi Pass', theme:'snow',  waves:9,  lives:20, gold:280,
+   paths:[[[10,-1],[10,3],[3,3],[3,7],[16,7],[16,2],[20,2]]]},
+  {n:'Ice Gate',theme:'snow',  waves:10, lives:20, gold:310,
+   paths:[[[-1,8],[2,8],[2,2],[7,2],[7,8],[12,8],[12,2],[17,2],[17,6],[20,6]]]},
+  {n:'Two Rivers',      theme:'grass', waves:10, lives:22, gold:350, boss:1, bossType:'jarl',
+   paths:[[[-1,2],[5,2],[5,5],[20,5]],[[-1,8],[5,8],[5,5],[20,5]]]},
+  {n:'Black Forest',    theme:'grass', waves:10, lives:20, gold:370,
+   paths:[[[1,-1],[1,8],[6,8],[6,1],[11,1],[11,8],[16,8],[16,3],[20,3]]]},
+  {n:'Ash Slope',theme:'ash',  waves:11, lives:20, gold:400,
+   paths:[[[-1,4],[3,4],[3,0],[8,0],[8,9],[13,9],[13,4],[20,4]]]},
+  {n:'Fenrir\'s Pincers', theme:'ash',   waves:11, lives:22, gold:430, boss:2, bossType:'draugr',
+   paths:[[[-1,1],[8,1],[8,4],[20,4]],[[-1,8],[8,8],[8,4],[20,4]]]},
+  {n:'Barrows',       theme:'snow',  waves:12, lives:20, gold:460,
+   paths:[[[10,-1],[10,2],[2,2],[2,7],[9,7],[9,4],[15,4],[15,8],[20,8]]]},
+  {n:'Gates of Valhalla',theme:'ash',  waves:12, lives:25, gold:540, boss:3, bossType:'fenrir',
+   paths:[[[-1,2],[4,2],[4,7],[10,7],[10,2],[15,2],[15,6],[20,6]],[[-1,8],[10,8],[10,2],[15,2],[15,6],[20,6]]]}
+,
+  // 11: спираль внутрь и выход вверх — башни в центре простреливают три витка
+  {n:'Runestone Field', theme:'snow', waves:13, lives:20, gold:340,
+   paths:[[[-1,0],[18,0],[18,8],[1,8],[1,3],[14,3],[14,5],[6,5],[6,-1]]]},
+  // 12: клещи — одна тропа слева, вторая сверху, сходятся на середине
+  {n:'Whale Bay',       theme:'grass',waves:12, lives:22, gold:450, boss:2, bossType:'draugr',
+   paths:[[[-1,1],[7,1],[7,6],[13,6],[13,2],[20,2]],
+          [[3,-1],[3,6],[7,6],[13,6],[13,2],[20,2]]]},
+  // 13: змейка в пять колен, длинный путь и мало места под башни
+  {n:'Ember Rift',      theme:'ash',  waves:13, lives:22, gold:420,
+   paths:[[[-1,9],[2,9],[2,1],[6,1],[6,8],[10,8],[10,1],[14,1],[14,8],[18,8],[18,2],[20,2]]]},
+  // 14: кольцо вокруг острова — внутренняя площадка простреливает обе стороны
+  {n:'Frozen Falls',    theme:'snow', waves:13, lives:22, gold:470,
+   paths:[[[-1,4],[4,4],[4,1],[15,1],[15,8],[4,8],[4,5],[16,5],[16,3],[20,3]],
+          [[8,-1],[8,1],[15,1],[15,8],[4,8],[4,5],[16,5],[16,3],[20,3]]]},
+  // 15: три входа сходятся в один коридор перед воротами
+  {n:'Ragnarok Gate',   theme:'ash',  waves:14, lives:26, gold:570, boss:3, bossType:'fenrir',
+   paths:[[[-1,2],[6,2],[6,5],[10,5],[10,8],[17,8],[17,3],[20,3]],
+          [[10,-1],[10,5],[10,8],[17,8],[17,3],[20,3]],
+          [[-1,9],[6,9],[6,5],[10,5],[10,8],[17,8],[17,3],[20,3]]]}
+];
+const THEMES = {
+  grass:{a:'#3c6647',b:'#41704c',path:'#8a6a45',pathLit:'#a3855e',edge:'#5a4228',deco:'#5f9468',rock:'#6b7683'},
+  snow :{a:'#c6d3dd',b:'#d3dee6',path:'#8d8071',pathLit:'#a3978a',edge:'#5f564a',deco:'#f2f8fc',rock:'#8a97a3'},
+  ash  :{a:'#4a444a',b:'#544d54',path:'#6d5b4c',pathLit:'#836e5c',edge:'#41332a',deco:'#6b6370',rock:'#6a6169'}
+};
+
+const tx = c => c*TS+TS/2;
+const ty = r => BY + r*TS + TS/2;
+
+/* ---------- 5. ВОЛНЫ ---------------------------------------------------- */
+function mkRng(seed){ let s=(seed*2654435761)>>>0; return ()=>{ s=(s*1664525+1013904223)>>>0; return s/4294967296; }; }
+function poolFor(lv){
+  const p=['raider'];
+  if(lv>=2) p.push('scout');
+  if(lv>=3) p.push('shield');
+  if(lv>=4) p.push('raven');
+  if(lv>=6) p.push('shaman');
+  if(lv>=7) p.push('berserk');
+  return p;
+}
+function makeWave(lvIdx, w){
+  const L=LEVELS[lvIdx], lv=lvIdx+1, rnd=mkRng(lv*977), pool=poolFor(lv), np=L.paths.length;
+  {
+
+    const D=DIFFS[save.diff||0];
+    const hpMul=(1+0.15*(lv-1))*(1+0.13*w)*D.hp;
+    const spMul=Math.min(1.5, 1+0.02*(lv-1)+0.02*w)*D.sp;
+    const last = (w===L.waves-1) || (w>=L.waves && (w+1)%8===0);   // в рейде босс каждые 8 волн
+    const groups=[];
+    const bossN = (w>=L.waves) ? 1+Math.floor(w/24) : L.boss;
+    if(last && bossN){
+      for(let b=0;b<bossN;b++)
+        groups.push({type:(L.bossType||['jarl','draugr','fenrir'][w%3]),count:1,gap:1,delay:b*5,hpMul:hpMul*(0.56+0.06*bossN),spMul:1,path:b%np});
+      groups.push({type:'shield',count:4+Math.floor(lv/2),gap:1.1,delay:3,hpMul,spMul,path:0});
+      if(np>1) groups.push({type:'raider',count:6+lv,gap:.8,delay:4,hpMul,spMul,path:1});
+    }else{
+      // бюджет волны в «очках здоровья»: сильные враги приходят малым числом
+      const n = 1 + (w>2?1:0) + (w>6?1:0);
+      const budget = (290 + w*225 + lv*38) * (np>1 ? 0.68 : 1) * D.cnt;
+      const used=[]; let flyers=0;
+      for(let g=0; g<n; g++){
+        // внутри уровня враги открываются постепенно: сильные типы — только к концу
+        const prog = L.waves>1 ? w/(L.waves-1) : 1;
+        const easy = pool.slice(0, clamp(Math.ceil(pool.length*(0.4+0.6*prog)),2,pool.length));
+        let type = easy[Math.floor(rnd()*easy.length)];
+        for(let tryN=0; tryN<8; tryN++){            // без дублей типов и не больше одной летучей группы
+          const bad = used.includes(type) || (ENEMIES[type].flying && flyers>0);
+          if(!bad) break;
+          type = easy[Math.floor(rnd()*easy.length)];
+        }
+        used.push(type); if(ENEMIES[type].flying) flyers++;
+        const base = ENEMIES[type];
+        const heavy = base.hp>110 || base.heal;
+        const count = clamp(Math.round(budget/n/base.hp), 3, 18);
+        groups.push({ type, count, gap: heavy?1.0:0.62, delay: g*2.4 + rnd()*1.2,
+                      hpMul, spMul, path: np>1 ? (w<3 ? 0 : (g+w)%np) : 0 });
+      }
+    }
+
+    return {groups, boss: last && !!L.boss};
+  }
+}
+
+function buildWaves(lvIdx){
+  const out=[];
+  for(let w=0; w<LEVELS[lvIdx].waves; w++) out.push(makeWave(lvIdx,w));
+  return out;
+}
+
+/* ---------- 6. СУЩНОСТИ ------------------------------------------------- */
+let game=null;
+
+class Enemy{
+  constructor(type, pathIdx, hpMul, spMul){
+    const d=ENEMIES[type];
+    this.d=d; this.type=type;
+    this.maxHp=Math.round(d.hp*hpMul); this.hp=this.maxHp;
+    this.baseSpeed=d.speed*spMul; this.armor=d.armor; this.gold=Math.round(d.gold*0.8*(1+hpMul*0.13)*goldMul());
+    this.flying=!!d.flying; this.r=d.r; this.leak=d.leak;
+    this.pi=pathIdx; this.wp=1; this.dist=0;
+    const p=game.paths[pathIdx];
+    this.x=tx(p[0][0]); this.y=ty(p[0][1]); this.dir=0;
+    this.slowF=1; this.slowT=0; this.burnT=0; this.burnDps=0; this.stunT=0; this.meltT=0; this.melt=0; this.tp=0; this.noFreezeT=0; this.steam=0; this.wall=false; this.chargeCd=4+Math.random()*3; this.charge=0; this.sabCd=9+Math.random()*5;
+    if(d.boss) hint('boss'); else if(HINTS[type]) hint(type);
+    this.healCd=0; this.anim=Math.random()*9; this.phase=Math.random()*6.28; this.face=1; this.hit=0; this.dead=false; this.escaped=false;
+  }
+  take(dmg, ignoreArmor){
+    if(this.dead) return;
+    const arm = Math.max(0, this.armor + (this.wall?3:0) - (this.meltT>0 ? this.melt : 0));
+    let d = ignoreArmor ? dmg : Math.max(dmg*0.28, dmg-arm);
+    this.hp -= d; this.hit=0.12;
+    if(this.hp<=0){
+      this.dead=true; game.gold+=this.gold; game.killed++;
+      if(this.d.split && !this.escaped){
+        for(let i=0;i<2;i++){
+          const c=new Enemy('raider', this.pi, 1, 1);
+          c.maxHp=Math.round(this.maxHp*0.22); c.hp=c.maxHp;
+          c.baseSpeed=this.baseSpeed*1.15; c.gold=Math.round(this.gold*0.25);
+          c.x=this.x+(i?10:-10); c.y=this.y+(i?6:-6); c.wp=this.wp; c.dist=this.dist; c.dir=this.dir;
+          c.r=11; c.face=this.face;
+          for(let q=0;q<5;q++) particle(c.x,c.y,'#cfd8de');
+          game.enemies.push(c);
+        }
+      }
+      if(this.d.split && !this.escaped) floatText(this.x,this.y-26,'Split!','#cfe0ea');
+      const eb=esprite(this);
+      game.corpses.push({base:eb, frames:ART.has(eb+'_death_0'), x:this.x, y:this.y,
+                         face:(Math.cos(this.dir)<0?-1:1), r:this.r, boss:!!this.d.boss,
+                         fly:this.flying, t:0, dir:(Math.random()<.5?-1:1)});
+      floatText(this.x,this.y-14,'+'+this.gold,'#e7b74e');
+      for(let i=0;i<8;i++) particle(this.x,this.y,this.d.col);
+      if(this.d.boss){ for(let i=0;i<26;i++) particle(this.x,this.y,'#e7b74e'); SFX.win(); }
+    }
+  }
+  // ЛЁД ПРОТИВ ОГНЯ: горящего врага не заморозить, пока пламя не собьют
+  chill(){
+    if(this.noFreezeT>0) return false;
+    if(this.burnT>0){ this.burnT=0; this.noFreezeT=2.2; this.steam=0.5;
+      for(let i=0;i<7;i++) particle(this.x,this.y-6,'#dfe9ef');
+      floatText(this.x,this.y-20,'steam','#cfe0ea'); return false; }
+    return true;
+  }
+  slowBy(f,t){ if(!this.chill()) return; if(1-f<=this.slowF+0.001){ this.slowF=1-f; this.slowT=Math.max(this.slowT,t); } }
+  stun(t,force){ if(!force && !this.chill()) return; if(this.d.boss) t*=0.4; this.stunT=Math.max(this.stunT,t); }
+  // ОГОНЬ ПРОТИВ ЛЬДА: пламя размораживает цель, но бьёт по ней сильнее
+  ignite(dps,melt){
+    const frozen = this.slowT>0 || this.stunT>0;
+    if(frozen){ this.slowT=0; this.slowF=1; this.stunT=0;
+      for(let i=0;i<6;i++) particle(this.x,this.y-6,'#dfe9ef'); this.steam=0.4; }
+    this.burnT=0.9; this.burnDps=dps; if(melt) this.meltArmor(melt,1.2);
+    return frozen;
+  }
+  meltArmor(v,t){ this.melt=Math.max(this.melt,v); this.meltT=Math.max(this.meltT,t); }
+  moveBack(px){
+    if(this.d.boss) px*=0.45;
+    const p=game.paths[this.pi]; this.tp=0.3;
+    while(px>0 && this.wp>=1){
+      const gx=tx(p[this.wp-1][0]), gy=ty(p[this.wp-1][1]);
+      const dx=gx-this.x, dy=gy-this.y, d=Math.hypot(dx,dy)||0.0001;
+      if(d<=px){ this.x=gx; this.y=gy; px-=d; this.dist-=d;
+        if(this.wp-1<=0) break; this.wp--; }
+      else { this.x+=dx/d*px; this.y+=dy/d*px; this.dist-=px; px=0; }
+    }
+    if(this.dist<0) this.dist=0;
+  }
+  update(dt){
+    this.anim+=dt; if(this.hit>0) this.hit-=dt;
+    const vis=this.baseSpeed*this.slowF*(this.stunT>0?0:1);
+    this.phase += dt*(vis/22);                       // шаг привязан к скорости, а не к кадрам
+    // на вертикальных участках смотрим в сторону ближайшего поворота, а не «вбок наугад»
+    let fx=Math.cos(this.dir)*40;
+    if(Math.abs(fx)<12){
+      const p=game.paths[this.pi];
+      for(let i=this.wp;i<p.length;i++){
+        const dxx=tx(p[i][0])-this.x;
+        if(Math.abs(dxx)>10){ fx=dxx; break; }
+      }
+    }
+    if(fx>6) this.face=1; else if(fx<-6) this.face=-1;
+    if(this.slowT>0){ this.slowT-=dt; if(this.slowT<=0) this.slowF=1; }
+    if(this.meltT>0){ this.meltT-=dt; if(this.meltT<=0) this.melt=0; }
+    if(this.tp>0) this.tp-=dt;
+    if(this.noFreezeT>0) this.noFreezeT-=dt;
+    if(this.steam>0) this.steam-=dt;
+    if(this.burnT>0){ this.burnT-=dt; this.take(this.burnDps*dt, true); if(this.dead) return; }
+    if(this.d.wall){                                   // строй щитов
+      let n=0;
+      for(const e of game.enemies) if(e!==this && !e.dead && e.d.wall && dist2(e,this)<58*58) n++;
+      this.wall = n>=2;
+    }
+    if(this.d.charge){                                 // таран: рывок вперёд
+      if(this.charge>0){ this.charge-=dt; }
+      else { this.chargeCd-=dt;
+        if(this.chargeCd<=0 && this.stunT<=0){ this.chargeCd=6.5; this.charge=1.5;
+          floatText(this.x,this.y-22,'CHARGE','#e08b3a');
+          for(let i=0;i<8;i++) particle(this.x,this.y,'#c9a06a'); } }
+    }
+    if(this.d.sabotage){                               // шаман гасит башню
+      this.sabCd-=dt;
+      if(this.sabCd<=0){
+        this.sabCd=15+Math.random()*6;
+        let best=null,bd=1e9;
+        for(const t of game.towers){ const d2=dist2(t,this); if(d2<150*150 && d2<bd && t.dis<=0){ bd=d2; best=t; } }
+        if(best){ best.dis=2.5; hint('disabled');
+          game.fx.push({kind:'bolt',pts:[{x:this.x,y:this.y-14},{x:best.x,y:best.y-20}],life:.3,max:.3});
+          floatText(best.x,best.y-34,'tower disabled','#8ef0c0'); }
+      }
+    }
+    if(this.d.heal){
+      this.healCd-=dt;
+      if(this.healCd<=0){ this.healCd=1.8;
+        let n=0;
+        for(const e of game.enemies){
+          if(e===this || e.dead || e.d.heal || e.hp>=e.maxHp) continue;   // шаманы не лечат шаманов
+          if(dist2(e,this)>90*90) continue;
+          e.hp=Math.min(e.maxHp, e.hp+e.maxHp*0.05); floatText(e.x,e.y-16,'+','#6fe0a8');
+          if(++n>=5) break;                                              // не больше 5 целей за тик
+        }
+      }
+    }
+    if(this.stunT>0){ this.stunT-=dt; return; }
+    let sp=this.baseSpeed*this.slowF*(this.charge>0?2.3:1);
+    if(this.d.rage && this.hp<this.maxHp*0.4) sp*=1.45;
+    let step=sp*dt;
+    const p=game.paths[this.pi];
+    while(step>0 && this.wp<p.length){
+      const gx=tx(p[this.wp][0]), gy=ty(p[this.wp][1]);
+      const dx=gx-this.x, dy=gy-this.y, d=Math.hypot(dx,dy)||0.0001;
+      this.dir=Math.atan2(dy,dx);
+      if(d<=step){ this.x=gx; this.y=gy; this.dist+=d; step-=d; this.wp++; }
+      else { this.x+=dx/d*step; this.y+=dy/d*step; this.dist+=step; step=0; }
+    }
+    if(this.wp>=p.length && !this.escaped){
+      this.escaped=true; this.dead=true;
+      game.lives-=this.leak; SFX.leak(); game.shake=0.35;
+      floatText(480,BY+30,'-'+this.leak+' lives','#e06060');
+    }
+  }
+}
+
+class Tower{
+  constructor(key,c,r){ this.key=key; this.c=c; this.r=r; this.lvl=0;
+    this.x=tx(c); this.y=ty(r); this.cd=0; this.ang=-Math.PI/2; this.spent=0; this.dis=0;
+    this.bt=TOWERS[key].build||3; this.btMax=this.bt; this.upPaid=0;   // стройка занимает время
+    this.fireAnim=0; this.beamTarget=null; }
+  get def(){ return TOWERS[this.key]; }
+  get st(){ return TOWERS[this.key].L[this.lvl]; }
+  get dmgMul(){ return 1 + perkVal('dmg')/100; }
+  canHit(e){ return this.def.air || !e.flying; }
+  target(){
+    let best=null, bd=-1; const R=this.st.range;
+    for(const e of game.enemies){
+      if(e.dead || !this.canHit(e)) continue;
+      if(dist2(e,this) <= R*R && e.dist>bd){ bd=e.dist; best=e; }
+    }
+    return best;
+  }
+  update(dt){
+    const s=this.st;
+    if(this.bt>0){ this.bt-=dt; this.beamTarget=null;
+      if(this.bt<=0){ this.bt=0; this.upPaid=0; SFX.up(); for(let i=0;i<8;i++) particle(this.x,this.y,'#caa84f'); }
+      return; }
+    if(this.dis>0){ this.dis-=dt; this.beamTarget=null; return; }
+    if(this.key==='flame'){
+      const t=this.target(); this.beamTarget=t;
+      if(t){
+        this.ang=Math.atan2(t.y-this.y,t.x-this.x); this.fireAnim+=dt;
+        let hitN=0;
+        for(const e of game.enemies){
+          if(hitN>=(s.max||3)) break;                 // пламя охватывает лишь несколько целей
+          if(e.dead||e.flying) continue;
+          if(dist2(e,this)>s.range*s.range) continue;
+          const a=Math.atan2(e.y-this.y,e.x-this.x);
+          if(Math.abs(angDiff(a,this.ang))<0.52){
+            hitN++;
+            const frozen = e.slowT>0 || e.stunT>0;          // тепловой удар по льду
+            e.take(s.dps*this.dmgMul*dt*(frozen?1.8:1), false);
+            if(e.dead) continue;
+            e.ignite(s.burn*this.dmgMul, s.melt);
+          }
+        }
+      }
+      return;
+    }
+    this.cd-=dt;
+    if(this.cd>0) return;
+    const t=this.target(); if(!t) return;
+    this.ang=Math.atan2(t.y-this.y,t.x-this.x);
+    this.cd=s.cd; this.fireAnim=0.16;
+    const dmg=(s.dmg||0)*this.dmgMul;
+    if(this.key==='archer'){
+      SFX.bow();
+      game.shots.push(new Shot('arrow',this.x,this.y,t,dmg,{}));
+      if(s.twin) game.shots.push(new Shot('arrow',this.x+Math.cos(this.ang+1.5)*9,this.y+Math.sin(this.ang+1.5)*9,t,dmg,{}));
+    }
+    else if(this.key==='catapult'){
+      const lead=0.55, px=t.x+Math.cos(t.dir)*t.baseSpeed*t.slowF*lead, py=t.y+Math.sin(t.dir)*t.baseSpeed*t.slowF*lead;
+      SFX.thud();
+      game.shots.push(new Shot('rock',this.x,this.y,null,dmg,{tx:px,ty:py,splash:s.splash,pierce:s.pierce,stun:s.stun}));
+    }
+    else if(this.key==='frost') game.shots.push(new Shot('ice',this.x,this.y,t,dmg,{slow:s.slow,slowT:s.slowT,aoe:s.aoe,freeze:s.freeze}));
+    else if(this.key==='ballista'){
+      game.shots.push(new Shot('spear',this.x,this.y,null,dmg,
+        {ang:this.ang, range:s.range, pierce:s.pierce||3, pierceAll:!!s.pierceAll}));
+      SFX.spear();
+    }
+    else if(this.key==='rune'){
+      let any=false, pushed=0;
+      for(const e of game.enemies){
+        if(pushed>=(s.maxT||6)) break;                // руна отбрасывает ограниченное число врагов
+        if(e.dead || dist2(e,this)>s.range*s.range) continue;
+        pushed++;
+        e.take(dmg,true); if(e.dead) continue;
+        const ox=e.x, oy=e.y;
+        e.moveBack(s.push); if(s.freeze) e.stun(s.freeze); any=true;
+        game.fx.push({kind:'tp', x0:ox, y0:oy, x1:e.x, y1:e.y, r:e.r, life:.55, max:.55});
+        for(let i=0;i<5;i++) particle(ox,oy,'#9fc4ff');
+        for(let i=0;i<5;i++) particle(e.x,e.y,'#9fc4ff');
+      }
+      if(any) SFX.ice();
+    }
+    else if(this.key==='totem'){
+      // цепная молния: прыгает по ближайшим целям, броня не учитывается
+      const pts=[{x:this.x,y:this.y-16}]; let cur=t; const hitSet=new Set();
+      for(let i=0;i<s.chain && cur;i++){
+        cur.take(dmg,true); hitSet.add(cur); pts.push({x:cur.x,y:cur.y});
+        let nx=null,nd=1e9;
+        for(const e of game.enemies){
+          if(e.dead||hitSet.has(e)||!this.canHit(e)) continue;
+          const d=dist2(e,cur); if(d<95*95 && d<nd){ nd=d; nx=e; }
+        }
+        cur=nx;
+      }
+      game.fx.push({kind:'bolt',pts,life:0.18,max:0.18});
+      SFX.zap();
+    }
+  }
+  upCost(){ const nx=TOWERS[this.key].L[this.lvl+1]; return nx? Math.round(nx.cost*(1-perkVal('cost')/100)) : 0; }
+  canUp(){ return this.lvl<2 && (game.sandbox || mastRank(this.key) >= this.lvl+2); }
+  cancelable(){ return this.bt>0 && (this.btMax-this.bt)<5; }
+  sellValue(){
+    if(this.cancelable()) return this.upPaid ? this.upPaid : this.spent;   // отмена: только то, что заплачено сейчас
+    return Math.floor(this.spent*0.6);
+  }
+}
+
+class Shot{
+  constructor(kind,x,y,target,dmg,o){
+    this.kind=kind; this.x=x; this.y=y-14; this.target=target; this.dmg=dmg; this.o=o||{};
+    this.dead=false; this.t=0;
+    if(kind==='spear'){
+      this.ang=o.ang; this.x=x+Math.cos(o.ang)*14; this.y=y-12+Math.sin(o.ang)*14;
+      this.travel=0; this.hitSet=new Set();
+    }
+    if(kind==='rock'){
+      this.sx=x; this.sy=y-14; this.ex=o.tx; this.ey=o.ty;
+      this.dur=Math.max(0.35,Math.hypot(o.tx-x,o.ty-y)/420);
+    }
+    this.speed = kind==='arrow'?560:400;
+    this.ang=0;
+  }
+  update(dt){
+    if(this.kind==='spear'){
+      const step=760*dt;
+      this.x+=Math.cos(this.ang)*step; this.y+=Math.sin(this.ang)*step;
+      this.travel+=step;
+      for(const e of game.enemies){
+        if(e.dead||this.hitSet.has(e)) continue;
+        const dx=e.x-this.x, dy=e.y-this.y;
+        if(dx*dx+dy*dy <= (e.r+11)*(e.r+11)){
+          this.hitSet.add(e); e.take(this.dmg, this.o.pierceAll);
+          for(let i=0;i<4;i++) particle(this.x,this.y,'#e8dcc0');
+          if(this.hitSet.size>=this.o.pierce){ this.dead=true; return; }
+        }
+      }
+      if(this.travel>this.o.range || this.x<-40||this.x>W+40||this.y<BY-40||this.y>PY+40) this.dead=true;
+      return;
+    }
+    if(this.kind==='rock'){
+      this.t+=dt; const k=Math.min(1,this.t/this.dur);
+      this.x=this.sx+(this.ex-this.sx)*k; this.y=this.sy+(this.ey-this.sy)*k - Math.sin(k*Math.PI)*70;
+      if(k>=1){
+        this.dead=true;
+        const R=this.o.splash;
+        for(const e of game.enemies){
+          if(e.dead||e.flying) continue;
+          const d=Math.hypot(e.x-this.ex,e.y-this.ey);
+          if(d<=R+e.r){ const f=1-0.45*(d/R); e.take(this.dmg*f + (this.o.pierce||0), false);
+            if(this.o.stun) e.stun(this.o.stun); }
+        }
+        game.fx.push({kind:'boom',x:this.ex,y:this.ey,r:R,life:.3,max:.3});
+        for(let i=0;i<10;i++) particle(this.ex,this.ey,'#c9a06a');
+        SFX.boom(); game.shake=Math.max(game.shake,0.12);
+        return;
+      }
+      return;
+    }
+    const t=this.target;
+    if(!t || t.dead){ this.dead=true; return; }
+    const dx=t.x-this.x, dy=t.y-this.y, d=Math.hypot(dx,dy)||0.001;
+    this.ang=Math.atan2(dy,dx);
+    const step=this.speed*dt;
+    if(d<=step+t.r*0.6){
+      this.dead=true;
+      if(this.kind==='ice'){
+        const burning = t.burnT>0;                          // осколок гасит пламя с усиленным уроном
+        t.take(this.dmg*(burning?1.6:1),false);
+        t.slowBy(this.o.slow,this.o.slowT);
+        if(this.o.freeze && Math.random()<0.3) t.stun(this.o.freeze);
+        if(this.o.aoe){ for(const e of game.enemies){ if(!e.dead && e!==t && dist2(e,t)<this.o.aoe*this.o.aoe) e.slowBy(this.o.slow*0.8,this.o.slowT*0.7); } }
+        for(let i=0;i<5;i++) particle(t.x,t.y,'#9fe0f5');
+      }else{
+        t.take(this.dmg,false);
+        for(let i=0;i<3;i++) particle(t.x,t.y,'#e8dcc0');
+      }
+      return;
+    }
+    this.x+=dx/d*step; this.y+=dy/d*step;
+  }
+}
+
+function particle(x,y,col){ game.parts.push({x,y,vx:(Math.random()-.5)*90,vy:(Math.random()-.5)*90-30,life:.45,max:.45,col,r:2+Math.random()*2}); }
+const HINTS={
+  build:'Pick a tower below, then tap free ground next to the path. Greyed weapons are not bought yet — the Workshop in the main menu unlocks them for silver.',
+  shield:'Shieldmen wear armour and lock into a shield wall when they march together. Each one splits in two when it dies — splash damage first.',
+  raven:'Ravens fly. Catapults and fire altars cannot reach them; archers, runes, ballistae and the totem can.',
+  shaman:'Shamans heal every wounded ally around them and knock out a tower for a few seconds. Kill them first.',
+  berserk:'Berserkers charge: every few seconds they burst forward at double speed.',
+  boss:'A boss is coming. It carries heavy armour — lightning and the ballista ignore armour.',
+  disabled:'That tower was sabotaged and is dark for a moment. It cannot fire.',
+  building:'Towers take a few seconds to raise — a catapult needs five. Build before a wave lands, not while it runs.',
+  freeze:'Fire melts frost and frost puts out fire. Do not stack a frost rune next to a fire altar.'
+};
+function hint(id){
+  if(!game || P().hints[id]) return;
+  P().hints[id]=1; persist();
+  game.hints.push({text:HINTS[id]||'', t:7.5});
+}
+function floatText(x,y,txt,col){ game.texts.push({x,y,txt,col,life:.9,max:.9}); }
+const dist2=(a,b)=>{ const dx=a.x-b.x, dy=a.y-b.y; return dx*dx+dy*dy; };
+function angDiff(a,b){ let d=a-b; while(d>Math.PI)d-=2*Math.PI; while(d<-Math.PI)d+=2*Math.PI; return d; }
+const clamp=(v,a,b)=>v<a?a:v>b?b:v;
+
+/* ---------- 7. ЛОГИКА УРОВНЯ -------------------------------------------- */
+function startLevel(idx, sandbox, endless){
+  screen(null);                       // закрываем меню сразу, что бы дальше ни случилось
+  const L=LEVELS[idx];
+  game={
+    idx, L, theme:THEMES[L.theme], paths:L.paths,
+    blocked:new Set(), towers:[], enemies:[], shots:[], parts:[], texts:[], fx:[], corpses:[], hints:[],
+    gold: Math.round((L.gold+60)*goldMul()) + perkVal('gold'),
+    livesIn: Math.min(P().lives, livesMax()),
+    lives: Math.min(P().lives, livesMax()) + perkVal('life'),   // запас деревни плюс расходник
+    maxLives: livesMax() + perkVal('life'),
+    waves: buildWaves(idx), wave:0, waveState:'idle', waveTimer:6,
+    spawnQ:[], killed:0, running:true, paused:false, speed:1,
+    sel:null, selTower:null, hoverC:-1, hoverR:-1,
+    adGold:true, adRevive:true, shake:0, time:0, over:null, sandbox:!!sandbox, endless:!!endless
+  };
+  for(const p of L.paths){
+    for(let i=0;i<p.length-1;i++){
+      let [c1,r1]=p[i], [c2,r2]=p[i+1];
+      const dc=Math.sign(c2-c1), dr=Math.sign(r2-r1);
+      let c=c1,r=r1;
+      game.blocked.add(c+','+r);
+      while(c!==c2||r!==r2){ c+=dc; r+=dr; game.blocked.add(c+','+r); }
+    }
+  }
+  // деревья и валуны: занимают клетку, строить на них нельзя
+  game.decor=[];
+  const dr=mkRng((idx+1)*4231); let tries=0;
+  const want=9+(idx%4);
+  while(game.decor.length<want && tries++<500){
+    const c=Math.floor(dr()*COLS), r=Math.floor(dr()*ROWS);
+    if(game.blocked.has(c+','+r)) continue;
+    let touchesPath=false;
+    for(let dx=-1;dx<=1;dx++) for(let dy=-1;dy<=1;dy++)
+      if(game.blocked.has((c+dx)+','+(r+dy))) touchesPath=true;
+    if(touchesPath) continue;                       // рядом с тропой место под башни не занимаем
+    const kind = dr()<0.62?'tree':'rock';
+    game.decor.push({c,r,kind, v:1+Math.floor(dr()*(kind==='tree'?3:2)), s:0.85+dr()*0.35});
+    game.blocked.add(c+','+r);
+  }
+  game.decor.sort((a,b)=>a.r-b.r);
+  game.bgImg=null; game.roadImg=null; loadLevelBg(idx);
+  preloadLevelBg(Math.min(idx+1, LEVELS.length-1));
+  if(sandbox){ game.gold=99999; game.lives=999; game.maxLives=999; game.waveState='sand'; }
+  game.hints=[]; hint('build');
+  if(save.sound) startWind();
+  screen(null);
+}
+function towerCost(key){ return Math.round(TOWERS[key].L[0].cost*(1-perkVal('cost')/100)); }
+function buildable(c,r){
+  if(c<0||r<0||c>=COLS||r>=ROWS) return false;
+  if(game.blocked.has(c+','+r)) return false;
+  return !game.towers.some(t=>t.c===c&&t.r===r);
+}
+function startWave(bonus){
+  const w=game.waves[game.wave];
+  if(bonus && game.waveTimer>0){ const b=Math.round(Math.ceil(game.waveTimer)*(2+game.wave*0.35)*goldMul()); game.gold+=b; floatText(480,BY+40,'+'+b+' gold for rushing','#e7b74e'); }
+  game.spawnQ=[];
+  for(const g of w.groups)
+    for(let i=0;i<g.count;i++)
+      game.spawnQ.push({t:g.delay+i*g.gap, type:g.type, path:g.path, hpMul:g.hpMul, spMul:g.spMul});
+  game.spawnQ.sort((a,b)=>a.t-b.t);
+  game.spawnT=0; game.waveState='spawning';
+  if(w.boss){ SFX.boss(); floatText(480,BY+60,'THE JARL COMES','#e06060'); } else SFX.wave();
+}
+function update(dt){
+  const g=game; if(!g||!g.running||g.paused) return;
+  g.time+=dt;
+  sfxBudget=4;
+  if(g.shake>0) g.shake-=dt;
+  if(g.bgWait>0 && !g.bgImg){ g.bgWait-=dt;
+    if(g.bgWait<=0 && !g.bg) buildTerrain(); }        // фон так и не пришёл — собираем процедурный
+
+  if(g.waveState==='sand'){ /* полигон: волны не идут */ }
+  else if(g.waveState==='idle'){
+    g.waveTimer-=dt;
+    if(g.waveTimer<=0) startWave(false);
+  }else if(g.waveState==='spawning'){
+    g.spawnT+=dt;
+    while(g.spawnQ.length && g.spawnQ[0].t<=g.spawnT){
+      const s=g.spawnQ.shift();
+      g.enemies.push(new Enemy(s.type,s.path,s.hpMul,s.spMul));
+    }
+    if(!g.spawnQ.length) g.waveState='clearing';
+  }else if(g.waveState==='clearing'){
+    if(!g.enemies.length){
+      const bonus=Math.round((22+g.wave*4)*goldMul());
+      g.gold+=bonus; floatText(480,BY+40,'Wave cleared +'+bonus,'#9fe0a8');
+      g.wave++;
+      if(g.wave>=g.waves.length){
+        if(g.endless){ g.waves.push(makeWave(g.idx, g.wave)); }   // рейд не кончается
+        else { finish(true); return; }
+      }
+      g.waveState='idle'; g.waveTimer=11;
+    }
+  }
+
+  for(const t of g.towers){ t.update(dt); if(t.fireAnim>0&&t.key!=='flame') t.fireAnim-=dt; }
+  for(const e of g.enemies) e.update(dt);
+  for(const s of g.shots) s.update(dt);
+  for(const p of g.parts){ p.life-=dt; p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=180*dt; }
+  for(const t of g.texts){ t.life-=dt; t.y-=26*dt; }
+  for(const f of g.fx) f.life-=dt;
+  for(const cse of g.corpses) cse.t+=dt;
+  for(const h of g.hints) h.t-=dt;
+  g.hints=g.hints.filter(h=>h.t>0);
+  g.corpses=g.corpses.filter(cse=>cse.t < (cse.frames?2.8:1.1));
+  g.enemies=g.enemies.filter(e=>!e.dead);
+  g.shots=g.shots.filter(s=>!s.dead);
+  g.parts=g.parts.filter(p=>p.life>0);
+  g.texts=g.texts.filter(t=>t.life>0);
+  g.fx=g.fx.filter(f=>f.life>0);
+
+  if(g.lives<=0){ g.lives=0; finish(false); }
+}
+function finish(win){
+  stopWind();
+  game.running=false; game.over=win?'win':'lose';
+  if(win) SFX.win(); else SFX.lose();
+  showResult(win);
+}
+
+/* ---------- 8. ОТРИСОВКА ------------------------------------------------ */
+const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
+function rr(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+function txt(s,x,y,size,col,align,bold){ ctx.fillStyle=col; ctx.font=(bold?'bold ':'')+size+'px '+F; ctx.textAlign=align||'left'; ctx.textBaseline='middle'; ctx.fillText(s,x,y); }
+const hash=(c,r)=>{ let h=(c*73856093)^(r*19349663); h=(h^(h>>13))>>>0; return (h%1000)/1000; };
+
+let uiBtns=[];
+function btn(id,x,y,w,h,label,opt){
+  opt=opt||{}; uiBtns.push({id,x,y,w,h,on:opt.on!==false});
+  const dis=opt.on===false;
+  ctx.save(); ctx.globalAlpha=dis?0.42:1;
+  const c1=opt.c1||'#3a5766', c2=opt.c2||'#24404e';
+  const grd=ctx.createLinearGradient(0,y,0,y+h); grd.addColorStop(0,c1); grd.addColorStop(1,c2);
+  ctx.fillStyle=grd; rr(x,y,w,h,6); ctx.fill();
+  ctx.strokeStyle='rgba(255,255,255,.14)'; ctx.lineWidth=1; ctx.stroke();
+  txt(label,x+w/2,y+h/2+1,opt.fs||14,opt.tc||'#e9f0f4','center',true);
+  ctx.restore();
+}
+
+function draw(){
+  const g=game;
+  ctx.clearRect(0,0,W,H);
+  ctx.save();
+  if(g&&g.shake>0){ const s=g.shake*7; ctx.translate((Math.random()-.5)*s,(Math.random()-.5)*s); }
+  if(!g){ ctx.restore(); return; }
+  drawBoard(); drawPath(); drawRange(); drawDecor(); drawTowers(); drawEnemies(); drawShots(); drawFx();
+  ctx.restore();
+  drawHud();
+}
+/* Графика: атласы художника из assets/atlases/*.webp. Индекс кадров встроен прямо
+   в файл, поэтому игра открывается и по file:// без единого сетевого запроса.
+   Нет папки assets — всё рисуется векторными фигурами, игра работает как прежде. */
+const ATLAS_FILES=["tower_0", "tower_1", "enemy_0", "boss_0", "terrain_0", "fx_0", "ui_0", "v3_0", "v3_1"];
+// [атлас,x,y,w,h, bx,by,bw,bh, cx — опора; обломки вне основной фигуры отрезаны]
+const ATLAS_DATA={"icon_tower_archer_1":[0,2,2,128,128,17,3,69,122,34.8],"icon_tower_archer_2":[0,132,2,128,128,23,3,68,122,29.8],"icon_tower_archer_3":[0,262,2,128,128,14,3,99,122,48.8],"icon_tower_ballista_1":[0,392,2,128,128,14,3,99,121,52.1],"icon_tower_ballista_2":[0,522,2,128,128,5,3,113,122,48.4],"icon_tower_ballista_3":[0,652,2,128,128,11,8,114,111,60.9],"icon_tower_catapult_1":[0,782,2,128,128,3,8,111,112,50.2],"icon_tower_catapult_2":[0,912,2,128,128,4,3,102,122,42.8],"icon_tower_catapult_3":[0,1042,2,128,128,10,3,108,122,49.8],"icon_tower_flame_1":[0,1172,2,128,128,3,16,107,99,51.7],"icon_tower_flame_2":[0,1302,2,128,128,15,4,89,121,33.9],"icon_tower_flame_3":[0,1432,2,128,128,16,7,109,113,55.1],"icon_tower_frost_1":[0,1562,2,128,128,6,3,80,120,39.1],"icon_tower_frost_2":[0,1692,2,128,128,12,3,87,122,36.8],"icon_tower_frost_3":[0,1822,2,128,128,28,11,97,97,48.1],"icon_tower_rune_1":[0,2,132,128,128,6,3,114,122,54.6],"icon_tower_rune_2":[0,132,132,128,128,15,3,96,122,47.3],"icon_tower_rune_3":[0,262,132,128,128,7,3,113,122,56.3],"icon_tower_totem_1":[0,392,132,128,128,28,3,61,122,30.5],"icon_tower_totem_2":[0,522,132,128,128,31,3,51,122,23.8],"icon_tower_totem_3":[0,652,132,128,128,16,3,96,122,44.8],"tower_archer_1":[0,782,132,192,256,9,16,128,228,65.5],"tower_archer_2":[0,976,132,192,256,18,12,130,232,57.4],"tower_archer_3":[0,1170,132,192,256,24,12,144,232,67.2],"tower_ballista_1":[0,1364,132,192,256,9,33,174,210,91.3],"tower_ballista_2":[0,1558,132,192,256,9,63,168,181,72.2],"tower_ballista_3":[0,1752,132,192,256,9,31,174,213,89.5],"tower_catapult_1":[0,2,390,192,256,9,85,159,159,72.0],"tower_catapult_2":[1,778,2,192,256,9,67,148,177,62.3],"tower_catapult_3":[1,778,260,192,256,11,12,168,232,79.1],"tower_flame_1":[1,778,518,192,256,9,102,153,142,73.9],"tower_flame_2":[1,972,518,192,256,9,28,157,216,60.5],"tower_flame_3":[1,1166,518,192,256,9,16,174,228,87.6],"tower_frost_1":[1,1360,518,192,256,10,61,120,180,58.0],"tower_frost_2":[1,1554,518,192,256,9,39,147,205,62.4],"tower_frost_3":[1,1748,518,192,256,9,13,174,231,86.2],"tower_rune_1":[1,2,776,192,256,9,59,173,184,83.2],"tower_rune_2":[1,196,776,192,256,10,25,172,218,84.1],"tower_rune_3":[1,390,776,192,256,12,12,168,232,84.6],"tower_totem_1":[1,584,776,192,256,28,12,117,232,58.5],"tower_totem_2":[1,778,776,192,256,33,12,98,232,45.8],"tower_totem_3":[1,972,776,192,256,37,12,102,232,47.5],"tower_catapult_1_dir4":[1,2,2,192,192,57,6,77,180,38.3],"tower_catapult_1_dir5":[1,196,2,192,192,47,6,98,180,55.7],"tower_catapult_1_dir6":[1,390,2,192,192,55,6,94,180,48.7],"tower_catapult_1_dir7":[1,584,2,192,192,60,6,83,180,37.9],"tower_catapult_2_base":[1,972,2,192,128,15,6,138,116,58.8],"tower_catapult_2_dir0":[1,1166,2,192,192,40,6,111,180,55.0],"tower_catapult_2_dir1":[1,1360,2,192,192,35,6,121,180,60.8],"tower_catapult_2_dir2":[1,1554,2,192,192,34,6,124,180,62.0],"tower_catapult_2_dir3":[1,1748,2,192,192,31,6,129,180,67.3],"tower_catapult_2_dir4":[1,2,260,192,192,37,6,117,180,58.0],"tower_catapult_2_dir5":[1,196,260,192,192,32,6,127,180,60.0],"tower_catapult_2_dir6":[1,390,260,192,192,35,6,121,180,59.2],"tower_catapult_2_dir7":[1,584,260,192,192,36,6,119,180,60.4],"tower_catapult_3_base":[1,972,260,192,128,24,6,143,116,67.1],"tower_catapult_3_dir0":[1,1166,260,192,192,46,6,81,180,40.6],"tower_catapult_3_dir1":[1,1360,260,192,192,41,6,87,180,43.8],"tower_catapult_3_dir2":[1,1554,260,192,192,43,6,106,180,45.8],"tower_catapult_3_dir3":[1,1748,260,192,192,41,6,109,180,51.7],"tower_catapult_3_dir4":[1,2,518,192,192,47,6,86,180,42.7],"tower_catapult_3_dir5":[1,196,518,192,192,40,6,98,180,47.6],"tower_catapult_3_dir6":[1,390,518,192,192,41,6,109,180,49.8],"tower_catapult_3_dir7":[1,584,518,192,192,47,6,97,180,44.7],"enemy_berserk_move":[2,2,2,128,128,4,4,120,121,50.8],"enemy_jarl_move":[2,132,2,192,192,5,15,182,172,91.1],"enemy_raider_move":[2,326,2,128,128,13,4,101,121,54.3],"enemy_raven_move":[2,456,2,128,128,3,51,121,74,45.0],"enemy_scout_move":[2,586,2,128,128,11,4,105,121,58.0],"enemy_shaman_move":[2,716,2,128,128,3,16,121,109,55.0],"enemy_shield_move":[2,846,2,128,128,15,4,97,121,51.7],"boss_draugr_move":[3,2,2,192,192,6,25,181,162,100.5],"boss_fenrir_move":[3,196,2,192,192,5,64,182,123,99.0],"boss_jarl_move":[3,390,2,192,192,5,22,182,165,97.0],"deco_ash_bush_1":[4,2,2,192,256,30,62,145,187,91.4],"deco_ash_bush_2":[4,196,2,192,256,17,89,108,160,31.5],"deco_ash_rock_1":[4,390,2,192,256,69,116,101,133,65.9],"deco_ash_rock_2":[4,584,2,192,256,16,35,151,215,54.0],"deco_ash_rock_3":[4,778,2,192,256,16,86,160,164,93.8],"deco_ash_stump_1":[4,972,2,192,256,97,56,79,194,53.0],"deco_ash_stump_2":[4,1166,2,192,256,16,70,159,180,56.8],"deco_ash_tree_1":[4,1360,2,192,256,5,67,120,183,59.8],"deco_ash_tree_2":[4,1554,2,192,256,58,79,115,171,54.1],"deco_ash_tree_3":[4,1748,2,192,256,75,165,112,85,55.2],"deco_ash_tree_4":[4,2,260,192,256,5,142,80,108,36.1],"deco_gate":[4,196,260,192,256,17,6,157,245,74.1],"deco_grass_bush_1":[4,390,260,192,256,26,122,139,128,80.7],"deco_grass_bush_2":[4,584,260,192,256,27,114,137,135,66.1],"deco_grass_rock_1":[4,778,260,192,256,27,63,137,187,83.9],"deco_grass_rock_2":[4,972,260,192,256,27,86,138,164,84.8],"deco_grass_rock_3":[4,1166,260,192,256,27,62,137,188,83.6],"deco_grass_stump_1":[4,1360,260,192,256,27,74,137,176,79.4],"deco_grass_stump_2":[4,1554,260,192,256,27,98,137,152,72.5],"deco_grass_tree_1":[4,1748,260,192,256,12,7,168,243,114.9],"deco_grass_tree_2":[4,2,518,192,256,42,7,136,243,72.6],"deco_grass_tree_3":[4,196,518,192,256,16,7,160,243,85.0],"deco_grass_tree_4":[4,390,518,192,256,26,7,139,243,70.8],"deco_snow_bush_1":[4,584,518,192,256,31,135,113,115,50.1],"deco_snow_bush_2":[4,778,518,192,256,35,140,122,110,55.3],"deco_snow_rock_1":[4,972,518,192,256,34,87,123,163,70.5],"deco_snow_rock_2":[4,1166,518,192,256,88,84,72,166,42.5],"deco_snow_rock_3":[4,1360,518,192,256,32,67,90,183,35.4],"deco_snow_stump_1":[4,1554,518,192,256,31,90,102,160,43.6],"deco_snow_stump_2":[4,1748,518,192,256,32,134,113,116,46.3],"deco_snow_tree_1":[4,2,776,192,256,14,7,141,243,72.4],"deco_snow_tree_2":[4,196,776,192,256,7,7,113,243,35.9],"deco_snow_tree_3":[4,390,776,192,256,71,30,116,220,60.0],"deco_snow_tree_4":[4,584,776,192,256,5,128,182,122,90.5],"tile_ash_ground_a":[4,778,776,128,128,0,0,128,128,63.5],"tile_ash_ground_b":[4,908,776,128,128,0,0,128,128,63.5],"tile_ash_ground_c":[4,1038,776,128,128,0,0,128,128,63.5],"tile_ash_ground_d":[4,1168,776,128,128,0,0,128,128,63.5],"tile_ash_path":[4,1298,776,128,128,0,0,128,128,63.5],"tile_ash_path_alt":[4,1428,776,128,128,0,0,128,128,63.5],"tile_ash_path_corner":[4,1558,776,128,128,0,0,128,128,63.5],"tile_ash_path_in":[4,1688,776,128,128,0,0,128,128,63.5],"tile_ash_path_out":[4,1818,776,128,128,0,0,128,128,63.5],"tile_ash_path_t":[4,2,1034,128,128,0,0,128,128,63.5],"tile_grass_ground_a":[4,132,1034,128,128,0,0,128,128,63.5],"tile_grass_ground_b":[4,262,1034,128,128,0,0,128,128,63.5],"tile_grass_ground_c":[4,392,1034,128,128,0,0,128,128,63.5],"tile_grass_ground_d":[4,522,1034,128,128,0,0,128,128,63.5],"tile_grass_path":[4,652,1034,128,128,0,0,128,128,63.5],"tile_grass_path_alt":[4,782,1034,128,128,0,0,128,128,63.5],"tile_grass_path_corner":[4,912,1034,128,128,0,0,128,128,63.5],"tile_grass_path_in":[4,1042,1034,128,128,0,0,128,128,63.5],"tile_grass_path_out":[4,1172,1034,128,128,0,0,128,128,63.5],"tile_grass_path_t":[4,1302,1034,128,128,0,0,128,128,63.5],"tile_snow_ground_a":[4,1432,1034,128,128,0,0,128,128,63.5],"tile_snow_ground_b":[4,1562,1034,128,128,0,0,128,128,63.5],"tile_snow_ground_c":[4,1692,1034,128,128,0,0,128,128,63.5],"tile_snow_ground_d":[4,1822,1034,128,128,0,0,128,128,63.5],"tile_snow_path":[4,2,1164,128,128,0,0,128,128,63.5],"tile_snow_path_alt":[4,132,1164,128,128,0,0,128,128,63.5],"tile_snow_path_corner":[4,262,1164,128,128,0,0,128,128,63.5],"tile_snow_path_in":[4,392,1164,128,128,0,0,128,128,63.5],"tile_snow_path_out":[4,522,1164,128,128,0,0,128,128,63.5],"tile_snow_path_t":[4,652,1164,128,128,0,0,128,128,63.5],"fx_explosion_0":[5,2,2,256,256,5,59,245,137,123.7],"fx_explosion_1":[5,260,2,256,256,5,45,245,165,116.6],"fx_explosion_2":[5,518,2,256,256,5,34,245,187,128.2],"fx_explosion_3":[5,776,2,256,256,5,18,245,219,116.8],"fx_explosion_4":[5,1034,2,256,256,7,26,243,203,119.0],"fx_explosion_5":[5,1292,2,256,256,5,41,245,174,118.5],"fx_explosion_6":[5,1550,2,256,256,5,50,245,155,121.5],"fx_explosion_7":[5,2,260,256,256,5,66,244,125,125.6],"fx_flame_0":[5,260,260,256,256,7,40,243,176,119.9],"fx_flame_1":[5,518,260,256,256,5,52,245,151,107.5],"fx_flame_2":[5,776,260,256,256,5,42,245,171,117.1],"fx_flame_3":[5,1034,260,256,256,5,45,244,166,117.4],"fx_flame_4":[5,1292,260,256,256,5,49,244,159,118.8],"fx_flame_5":[5,1550,260,256,256,5,54,245,147,119.9],"fx_frost_ring_0":[5,2,518,256,256,5,66,244,123,125.8],"fx_frost_ring_1":[5,260,518,256,256,5,62,245,132,109.5],"fx_frost_ring_2":[5,518,518,256,256,5,52,244,151,115.9],"fx_frost_ring_3":[5,776,518,256,256,5,52,245,152,124.5],"fx_frost_ring_4":[5,1034,518,256,256,20,58,230,140,123.8],"fx_frost_ring_5":[5,1292,518,256,256,5,56,245,143,141.6],"fx_lightning_0":[5,1550,518,256,256,6,73,244,110,91.6],"fx_lightning_1":[5,2,776,256,256,5,74,245,108,119.0],"fx_lightning_2":[5,260,776,256,256,5,74,245,100,116.4],"fx_lightning_3":[5,518,776,256,256,5,73,244,109,139.1],"fx_rune_ring_0":[5,776,776,256,256,5,61,245,133,121.9],"fx_rune_ring_1":[5,1034,776,256,256,5,61,245,133,120.9],"fx_rune_ring_2":[5,1292,776,256,256,7,29,243,197,138.1],"fx_rune_ring_3":[5,1550,776,256,256,5,18,245,220,108.5],"fx_rune_ring_4":[5,2,1034,256,256,5,12,245,231,155.8],"fx_rune_ring_5":[5,260,1034,256,256,5,25,245,205,138.2],"fx_rune_ring_6":[5,518,1034,256,256,5,28,245,199,123.2],"fx_rune_ring_7":[5,776,1034,256,256,10,5,235,245,114.8],"fx_thaw_steam_0":[5,1034,1034,256,256,7,13,243,230,119.1],"fx_thaw_steam_1":[5,1292,1034,256,256,6,11,242,234,120.8],"fx_thaw_steam_2":[5,1550,1034,256,256,5,42,244,171,128.5],"fx_thaw_steam_3":[5,2,1292,256,256,7,29,243,198,106.8],"fx_thaw_steam_4":[5,260,1292,256,256,6,37,244,182,75.8],"fx_thaw_steam_5":[5,518,1292,256,256,5,53,245,149,94.4],"proj_arrow":[5,776,1292,64,20,26,1,10,19,6.8],"proj_boulder":[5,842,1292,32,32,4,1,20,29,8.5],"proj_fire":[5,876,1292,48,48,9,2,29,45,22.3],"proj_ice":[5,926,1292,32,24,8,1,16,23,6.5],"proj_spear":[5,960,1292,72,18,30,1,11,17,6.4],"icon_boss_fenrir":[6,2,2,256,256,23,5,209,245,88.5],"icon_boss_jarl":[6,260,2,256,256,22,5,211,245,80.1],"ui_btn_blue":[6,518,2,240,56,1,1,238,54,118.7],"ui_btn_gold":[6,760,2,240,56,1,1,238,54,118.7],"ui_btn_green":[6,1002,2,240,56,1,1,238,54,118.7],"ui_coin":[6,1244,2,32,32,2,1,28,30,9.9],"ui_heart":[6,1278,2,32,32,4,1,20,30,10.7],"ui_level_node":[6,1312,2,96,96,8,2,80,92,25.0],"ui_lock":[6,1410,2,32,32,3,1,25,30,8.3],"ui_panel":[6,1444,2,320,160,1,1,318,158,158.7],"ui_silver":[6,1766,2,32,32,2,1,28,30,9.2],"ui_star_off":[6,1800,2,48,48,3,1,36,46,13.6],"ui_star_on":[6,1850,2,48,48,3,1,42,46,13.9],"tower_archer_1_a3":[7,2,2,125,246,0,0,125,246,62.6],"tower_archer_1_a5":[7,129,2,118,246,0,0,118,246,58.6],"tower_archer_2_a1":[7,249,2,126,246,0,0,126,246,60.3],"tower_archer_2_a3":[7,377,2,128,246,0,0,128,246,64.2],"tower_archer_2_a5":[7,507,2,128,246,0,0,128,246,63.3],"tower_archer_2_a7":[7,637,2,128,246,0,0,128,246,62.4],"tower_archer_3_a5":[7,767,2,134,246,0,0,134,246,67.7],"tower_ballista_3_a6":[7,903,2,175,246,0,0,175,246,89.0],"tower_archer_1_a1":[7,1080,2,123,245,0,0,123,245,60.8],"tower_archer_1_a4":[7,1205,2,124,245,0,0,124,245,58.6],"tower_archer_1_a7":[7,1331,2,123,245,0,0,123,245,62.8],"tower_archer_2_a4":[7,1456,2,128,245,0,0,128,245,62.2],"tower_archer_2_a0":[7,1586,2,128,244,0,0,128,244,64.4],"tower_archer_2_a2":[7,1716,2,123,244,0,0,123,244,61.5],"tower_archer_3_a1":[7,1841,2,130,244,0,0,130,244,66.7],"tower_archer_3_a3":[7,2,250,131,244,0,0,131,244,64.6],"tower_archer_3_a6":[7,135,250,133,244,0,0,133,244,66.4],"tower_ballista_2_a6":[7,270,250,172,244,0,0,172,244,86.5],"tower_archer_3_a2":[7,444,250,131,243,0,0,131,243,65.7],"tower_archer_3_a4":[7,577,250,132,243,0,0,132,243,66.6],"tower_archer_3_a7":[7,711,250,132,243,0,0,132,243,67.7],"tower_ballista_3_a5":[7,845,250,171,243,0,0,171,243,87.1],"tower_ballista_3_a7":[7,1018,250,173,243,0,0,173,243,88.3],"tower_archer_3_a0":[7,1193,250,135,242,0,0,135,242,69.6],"tower_ballista_3_a3":[7,1330,250,171,241,0,0,171,241,86.2],"tower_archer_1_a0":[7,1503,250,119,240,0,0,119,240,59.7],"tower_archer_1_a2":[7,1624,250,104,239,0,0,104,239,51.7],"tower_archer_1_a6":[7,1730,250,106,239,0,0,106,239,52.2],"tower_ballista_3_a1":[7,1838,250,173,239,0,0,173,239,88.4],"tower_archer_2_a6":[7,2,496,121,238,0,0,121,238,59.5],"tower_ballista_3_a2":[7,125,496,174,237,0,0,174,237,88.1],"tower_catapult_3_a5":[7,301,496,158,236,0,0,158,236,76.6],"tower_catapult_3_a7":[7,461,496,155,236,0,0,155,236,75.9],"tower_ballista_1_a6":[7,618,496,175,234,0,0,175,234,105.7],"tower_catapult_3_a1":[7,795,496,178,232,13,0,165,232,81.0],"tower_catapult_3_a3":[7,975,496,182,232,0,0,166,232,83.6],"tower_catapult_3_a2":[7,1159,496,134,230,0,0,134,230,66.5],"tower_catapult_3_a6":[7,1295,496,129,230,0,0,129,230,63.8],"tower_ballista_1_a7":[7,1426,496,162,227,0,0,162,227,94.9],"tower_ballista_1_a5":[7,1590,496,165,224,0,0,165,224,97.7],"tower_ballista_1_a1":[7,1757,496,164,219,0,0,164,219,94.8],"tower_ballista_3_a0":[7,2,736,181,218,0,0,181,218,87.1],"tower_ballista_1_a2":[7,185,736,179,217,0,0,179,217,107.3],"tower_ballista_1_a3":[7,366,736,160,217,0,0,160,217,90.9],"tower_ballista_2_a7":[7,528,736,160,217,0,0,160,217,74.9],"tower_ballista_1_a0":[7,690,736,177,216,0,0,177,216,87.7],"tower_ballista_1_a4":[7,869,736,182,216,0,0,182,216,113.7],"tower_ballista_3_a4":[7,1053,736,181,216,0,0,181,216,95.2],"tower_ballista_2_a2":[7,1236,736,182,213,0,0,182,213,89.8],"tower_ballista_2_a5":[7,1420,736,165,213,0,0,165,213,89.2],"tower_catapult_2_a2":[7,1587,736,126,213,0,0,126,213,62.4],"tower_ballista_2_a3":[7,1715,736,160,212,0,0,160,212,74.8],"tower_catapult_2_a6":[7,1877,736,126,211,0,0,126,211,62.2],"tower_ballista_2_a1":[7,2,956,157,209,0,0,157,209,79.2],"tower_catapult_3_a0":[7,161,956,145,207,0,0,145,207,69.8],"tower_catapult_3_a4":[7,308,956,145,207,0,0,145,207,74.1],"tower_ballista_2_a4":[7,455,956,176,206,0,0,176,206,98.8],"tower_catapult_2_a3":[7,633,956,159,206,0,0,159,206,95.7],"tower_ballista_2_a0":[7,794,956,172,205,0,0,172,205,75.2],"tower_catapult_2_a7":[7,968,956,179,205,0,0,179,205,80.6],"tower_catapult_2_a5":[7,1149,956,174,201,0,0,174,201,96.0],"tower_catapult_2_a1":[7,1325,956,155,200,0,0,155,200,60.4],"tower_catapult_2_a0":[7,1482,956,182,186,0,0,182,186,63.1],"tower_catapult_2_a4":[7,1666,956,181,186,0,0,181,186,116.1],"boss_jarl_death_0":[7,1849,956,139,182,0,0,139,182,72.0],"tower_catapult_1_a5":[7,2,1167,169,180,0,0,169,180,95.8],"boss_draugr_move_s":[7,173,1167,136,180,0,0,136,180,74.8],"boss_jarl_move_n":[7,311,1167,121,180,0,0,121,180,55.9],"tower_catapult_1_a7":[7,434,1167,181,179,0,0,181,179,77.9],"boss_draugr_move_n":[7,617,1167,149,178,0,0,149,178,90.9],"boss_draugr_move_ne":[7,768,1167,119,178,0,0,119,178,71.6],"tower_catapult_1_a6":[7,889,1167,127,177,0,0,127,177,62.9],"boss_jarl_move_ne":[7,1018,1167,127,176,0,0,127,176,48.4],"boss_jarl_move_s":[7,1147,1167,120,176,0,0,120,176,58.5],"boss_draugr_move_se":[7,1269,1167,152,175,0,0,152,175,88.7],"boss_draugr_move_e":[7,1423,1167,154,174,0,0,154,174,82.4],"boss_fenrir_death_0":[7,1579,1167,182,174,0,0,182,174,70.8],"boss_jarl_move_se":[7,1763,1167,143,174,0,0,143,174,81.0],"tower_catapult_1_a3":[7,2,1349,173,173,0,0,173,173,94.0],"boss_jarl_move_e":[7,177,1349,141,172,0,0,141,172,77.1],"tower_catapult_1_a2":[7,320,1349,128,171,0,0,128,171,63.4],"boss_draugr_death_0":[7,450,1349,150,171,0,0,150,171,68.9],"boss_jarl_death_1":[7,602,1349,129,169,0,0,129,169,53.2],"tower_catapult_1_a1":[7,733,1349,182,168,0,0,182,168,79.7],"tower_catapult_1_a4":[7,917,1349,174,157,0,0,174,157,96.1],"boss_jarl_death_2":[7,1093,1349,149,156,0,0,149,156,73.1],"boss_fenrir_death_1":[7,1244,1349,147,155,0,0,147,155,92.0],"boss_fenrir_death_3":[7,1393,1349,155,155,0,0,155,155,74.8],"tower_catapult_1_a0":[7,1550,1349,180,154,0,0,180,154,73.3],"boss_draugr_death_1":[7,1732,1349,120,151,0,0,120,151,36.3],"boss_fenrir_death_2":[7,1854,1349,133,147,0,0,133,147,76.1],"boss_fenrir_move_s":[7,2,1524,73,147,0,0,73,147,31.3],"boss_fenrir_move_se":[7,77,1524,141,146,0,0,141,146,103.3],"boss_fenrir_move_n":[7,220,1524,66,141,0,0,66,141,33.4],"boss_fenrir_move_ne":[7,288,1524,134,139,0,0,134,139,42.6],"boss_draugr_death_2":[7,424,1524,134,133,0,0,134,133,90.2],"boss_fenrir_move_e":[7,560,1524,180,126,0,0,180,126,96.7],"enemy_berserk_death_0":[7,742,1524,79,122,0,0,79,122,46.2],"enemy_jarl_death_0":[7,823,1524,73,122,0,0,73,122,43.5],"enemy_raider_death_0":[7,898,1524,87,122,0,0,87,122,44.1],"enemy_raven_death_0":[7,987,1524,105,122,0,0,105,122,37.6],"enemy_scout_death_0":[7,1094,1524,86,122,0,0,86,122,56.2],"enemy_shaman_death_0":[7,1182,1524,85,122,0,0,85,122,43.8],"enemy_shield_death_0":[7,1269,1524,79,122,0,0,79,122,43.2],"enemy_berserk_move_ne":[7,1350,1524,81,120,0,0,81,120,29.5],"enemy_jarl_move_n":[7,1433,1524,81,120,0,0,81,120,37.5],"enemy_raider_move_n":[7,1516,1524,70,120,0,0,70,120,27.7],"enemy_raider_move_ne":[7,1588,1524,73,120,0,0,73,120,22.8],"enemy_scout_move_n":[7,1663,1524,75,120,0,0,75,120,41.8],"enemy_scout_move_ne":[7,1740,1524,83,120,0,0,83,120,39.1],"enemy_scout_move_s":[7,1825,1524,79,120,0,0,79,120,39.6],"enemy_shaman_move_n":[7,1906,1524,78,120,0,0,78,120,39.4],"enemy_shaman_move_ne":[7,2,1673,75,120,0,0,75,120,30.5],"enemy_shaman_move_s":[7,79,1673,80,120,0,0,80,120,33.9],"enemy_shield_move_n":[7,161,1673,66,120,0,0,66,120,38.3],"enemy_shield_move_ne":[7,229,1673,75,120,0,0,75,120,36.2],"enemy_jarl_death_1":[7,306,1673,94,119,0,0,94,119,32.0],"enemy_scout_move_se":[7,402,1673,93,119,0,0,93,119,59.5],"enemy_berserk_move_n":[7,497,1673,75,118,0,0,75,118,35.4],"enemy_raider_move_s":[7,574,1673,70,118,0,0,70,118,32.2],"enemy_scout_move_e":[7,646,1673,85,118,0,0,85,118,54.7],"enemy_berserk_move_s":[7,733,1673,74,117,0,0,74,117,37.1],"enemy_shield_move_s":[7,809,1673,72,117,0,0,72,117,31.9],"enemy_shield_move_se":[7,883,1673,73,117,0,0,73,117,36.0],"enemy_jarl_move_ne":[7,958,1673,92,116,0,0,92,116,50.4],"enemy_raider_move_se":[7,1052,1673,76,116,0,0,76,116,49.8],"enemy_jarl_move_s":[7,1130,1673,73,115,0,0,73,115,36.6],"enemy_jarl_move_se":[7,1205,1673,81,115,0,0,81,115,49.1],"enemy_berserk_move_se":[7,1288,1673,87,114,0,0,87,114,54.6],"boss_jarl_death_3":[7,1377,1673,143,114,0,0,143,114,79.9],"enemy_shield_move_e":[7,1522,1673,78,114,0,0,78,114,40.3],"enemy_berserk_move_e":[7,1602,1673,88,113,0,0,88,113,47.5],"enemy_raider_move_e":[7,1692,1673,74,113,0,0,74,113,40.6],"enemy_raven_death_1":[7,1768,1673,113,112,0,0,113,112,47.2],"enemy_shield_death_1":[7,1883,1673,77,112,0,0,77,112,40.6],"boss_fenrir_death_4":[7,2,1795,178,111,0,0,178,111,109.7],"enemy_jarl_move_e":[7,182,1795,74,111,0,0,74,111,42.9],"enemy_shaman_move_se":[7,258,1795,98,110,0,0,98,110,50.6],"enemy_jarl_death_2":[7,358,1795,94,109,0,0,94,109,46.5],"enemy_shaman_move_e":[7,454,1795,102,109,0,0,102,109,47.7],"enemy_raider_death_1":[7,558,1795,77,106,0,0,77,106,30.5],"enemy_scout_death_1":[7,637,1795,86,106,0,0,86,106,63.4],"enemy_shaman_death_1":[7,725,1795,88,106,0,0,88,106,42.1],"enemy_berserk_death_1":[7,815,1795,84,105,0,0,84,105,53.3],"enemy_shaman_death_2":[7,901,1795,97,97,0,0,97,97,50.2],"boss_draugr_death_5":[7,1000,1795,128,92,0,0,128,92,86.4],"boss_jarl_death_4":[7,1130,1795,151,91,0,0,151,91,105.2],"enemy_raider_death_2":[7,1283,1795,92,91,0,0,92,91,44.6],"enemy_raven_death_2":[7,1377,1795,108,90,0,0,108,90,59.8],"enemy_berserk_death_2":[7,1487,1795,84,88,0,0,84,88,48.8],"boss_draugr_death_4":[7,1573,1795,182,88,0,0,182,88,118.2],"boss_draugr_death_3":[7,1757,1795,131,86,0,0,131,86,59.1],"enemy_shield_death_2":[7,1890,1795,90,83,0,0,90,83,45.1],"enemy_jarl_death_3":[7,2,1908,95,82,0,0,95,82,46.4],"enemy_shaman_death_3":[7,99,1908,80,78,0,0,80,78,34.4],"enemy_raven_move_ne":[7,181,1908,92,77,0,0,92,77,53.5],"boss_jarl_death_5":[7,275,1908,163,75,0,0,163,75,109.0],"boss_fenrir_death_5":[7,440,1908,171,74,0,0,171,74,118.3],"enemy_raven_move_se":[7,613,1908,90,73,0,0,90,73,62.9],"enemy_scout_death_2":[7,705,1908,87,73,0,0,87,73,66.7],"enemy_raven_death_3":[7,794,1908,112,72,0,0,112,72,68.0],"enemy_raven_move_s":[7,908,1908,106,71,0,0,106,71,53.1],"enemy_raven_move_e":[7,1016,1908,97,70,0,0,97,70,32.9],"enemy_raider_death_3":[7,1115,1908,102,69,0,0,102,69,65.5],"enemy_raven_move_n":[7,1219,1908,120,69,0,0,120,69,59.9],"enemy_shield_death_3":[7,1341,1908,92,69,0,0,92,69,65.5],"enemy_shaman_death_4":[7,1435,1908,95,68,0,0,95,68,44.6],"enemy_berserk_death_3":[7,1532,1908,100,65,0,0,100,65,54.5],"enemy_berserk_death_4":[7,1634,1908,78,65,0,0,78,65,36.8],"enemy_shaman_death_5":[7,1714,1908,102,64,0,0,102,64,66.9],"enemy_jarl_death_5":[7,1818,1908,112,58,0,0,112,58,88.8],"enemy_jarl_death_4":[7,1932,1908,89,57,0,0,89,57,65.2],"enemy_shield_death_4":[8,2,2,87,56,0,0,87,56,59.3],"enemy_scout_death_3":[8,91,2,99,54,0,0,99,54,86.8],"enemy_raider_death_4":[8,192,2,90,52,0,0,90,52,73.9],"enemy_raven_death_4":[8,284,2,117,49,0,0,117,49,55.8],"enemy_shield_death_5":[8,403,2,106,48,0,0,106,48,86.8],"enemy_raider_death_5":[8,511,2,105,47,0,0,105,47,90.6],"enemy_raven_death_5":[8,618,2,116,47,0,0,116,47,55.6],"enemy_berserk_death_5":[8,736,2,103,42,0,0,103,42,52.5],"enemy_scout_death_4":[8,841,2,94,42,0,0,94,42,34.5],"enemy_scout_death_5":[8,937,2,102,41,0,0,102,41,58.8]};
+const ART={ base:'assets/atlases/', img:[], n:0,
+  init(){ if(typeof Image==='undefined') return;
+    ATLAS_FILES.forEach((f,i)=>{ const im=new Image();
+      im.onload=()=>{ ART.img[i]=im; ART.n++; }; im.onerror=()=>{}; im.src=ART.base+f+'.webp'; }); },
+  f(n){ const d=ATLAS_DATA[n]; return (d && this.img[d[0]]) ? d : null; },
+  has(n){ return !!this.f(n); } };
+ART.init();
+/* sprite рисует по ГАБАРИТАМ СОДЕРЖИМОГО: targetH — высота самой фигуры на экране,
+   yFeet — точка, где стоят ноги. Так башни, враги и деревья согласованы по масштабу
+   независимо от пустых полей внутри кадра. */
+function sprite(name,x,yFeet,targetH,maxW){
+  const d=ART.f(name); if(!d) return false;
+  const bw=d[7]||d[3], bh=d[8]||d[4];
+  let k=targetH/bh;
+  if(maxW && bw*k>maxW){ k=maxW/bw; targetH=bh*k; }   // не даём широким объектам залезать на соседние клетки
+  const cx=(d[9]!=null? d[9] : bw/2)*k;              // выравниваем по опоре, а не по габаритам
+  ctx.drawImage(ART.img[d[0]], d[1]+d[5], d[2]+d[6], bw, bh,
+                x-cx, yFeet-targetH, bw*k, targetH);
+  return true;
+}
+/* Рисует кадр в том же пиксельном масштабе, что и эталонный кадр эталонной высоты.
+   Нужно для смерти: лежащее тело низкое и широкое, и масштабировать его по высоте нельзя. */
+function spriteScaled(name,x,yFeet,refName,refH){
+  const d=ART.f(name), r=ART.f(refName); if(!d||!r) return false;
+  const k=refH/(r[8]||r[4]);
+  const bw=(d[7]||d[3])*k, bh=(d[8]||d[4])*k;
+  const cx=(d[9]!=null? d[9]*k : bw/2);
+  ctx.drawImage(ART.img[d[0]], d[1]+d[5], d[2]+d[6], d[7]||d[3], d[8]||d[4],
+                x-cx, yFeet-bh, bw, bh);
+  return true;
+}
+function spriteW(name,x,yFeet,targetW){
+  const d=ART.f(name); if(!d) return false;
+  const bw=d[7]||d[3], bh=d[8]||d[4];
+  return sprite(name,x,yFeet,targetW*bh/bw);
+}
+function spriteC(name,x,y,w){                      // якорь: центр
+  const d=ART.f(name); if(!d) return false;
+  const hh=w*d[4]/d[3];
+  ctx.drawImage(ART.img[d[0]], d[1],d[2],d[3],d[4], x-w/2, y-hh/2, w, hh); return true;
+}
+function tileDraw(name,x,y,sz){
+  const d=ART.f(name); if(!d) return false;
+  ctx.drawImage(ART.img[d[0]], d[1],d[2],d[3],d[4], x, y, sz, sz); return true;
+}
+const BOSS_SPR={jarl:'boss_jarl', draugr:'boss_draugr', fenrir:'boss_fenrir'};
+// у катапульты ковш в кадре отведён назад: машина бьёт в сторону, противоположную плечу
+const AZ_OFFSET={catapult:4, ballista:0};        // у башни лучников азимутов не берём — она не крутится
+// индивидуальная посадка: высота фигуры на экране, предел ширины (в клетках), сдвиг «ног»
+const FIT={ archer:[54,1.05,18], frost:[46,0.88,22], catapult:[50,1.12,18], ballista:[52,1.10,18],
+            flame:[48,1.00,20], rune:[50,0.95,20], totem:[54,0.95,18] };
+/* Тайлы художника не бесшовные: уложенные в сетку 48px они дают рябь и швы.
+   Поэтому подложку собираем один раз коллажем из крупных штампов с размытыми
+   краями, а тропу рисуем линией, залитой землёй из центра дорожного тайла. */
+/* Фоны уровней грузим заранее — на экране подготовки, — и держим в кэше.
+   В бой уходим только с готовой картинкой, поэтому заглушки не видно даже в первый раз. */
+const BGCACHE={};
+function preloadLevelBg(idx){
+  if(BGCACHE[idx]) return BGCACHE[idx];
+  const n=String(idx+1).padStart(2,'0');
+  const rec={bg:null, road:null, bgDone:false, roadDone:false};
+  BGCACHE[idx]=rec;
+  if(typeof Image==='undefined'){ rec.bgDone=rec.roadDone=true; return rec; }
+  const im=new Image();
+  im.onload=()=>{ rec.bg=im; rec.bgDone=true; };
+  im.onerror=()=>{ rec.bgDone=true; };
+  im.src='assets/bg/bg_level_'+n+'.webp';
+  const rd=new Image();
+  rd.onload=()=>{ rec.road=rd; rec.roadDone=true; };
+  rd.onerror=()=>{
+    const rp=new Image();
+    rp.onload=()=>{ rec.road=rp; rec.roadDone=true; };
+    rp.onerror=()=>{ rec.roadDone=true; };
+    rp.src='assets/bg/road_level_'+n+'.png';
+  };
+  rd.src='assets/bg/road_level_'+n+'.webp';
+  return rec;
+}
+const bgReady = idx => { const r=BGCACHE[idx]; return !!(r && r.bgDone && r.roadDone); };
+function loadLevelBg(idx){
+  const rec=preloadLevelBg(idx);
+  const apply=()=>{
+    if(!game || game.idx!==idx) return;
+    if(rec.bg){ game.bgImg=rec.bg; buildRoadOverlay(); }
+    if(rec.road) { game.roadImg=rec.road; game.roadFx=null; }
+    if(!rec.bg && rec.bgDone && !game.bg) buildTerrain();
+  };
+  apply();
+  if(!bgReady(idx)){ const iv=setInterval(()=>{ apply(); if(bgReady(idx)) clearInterval(iv); },120); setTimeout(()=>clearInterval(iv),8000); }
+}
+function buildTerrain(){
+  game.bg=null;
+  if(typeof document==='undefined') return;
+  const th=game.L.theme;
+  if(!ART.has('tile_'+th+'_ground_a')) return;
+  try{
+    const BH=ROWS*TS;
+    const cn=document.createElement('canvas'); cn.width=W; cn.height=BH;
+    const g2=cn.getContext('2d');
+    g2.fillStyle=game.theme.a; g2.fillRect(0,0,W,BH);
+    const stamps=['a','b','c','d'].map(v=>{
+      const d=ART.f('tile_'+th+'_ground_'+v); if(!d) return null;
+      const sc=document.createElement('canvas'); sc.width=sc.height=160;
+      const s2=sc.getContext('2d');
+      s2.drawImage(ART.img[d[0]],d[1],d[2],d[3],d[4],0,0,160,160);
+      s2.globalCompositeOperation='destination-in';
+      const gr=s2.createRadialGradient(80,80,16,80,80,80);
+      gr.addColorStop(0,'rgba(0,0,0,1)'); gr.addColorStop(.6,'rgba(0,0,0,.96)'); gr.addColorStop(1,'rgba(0,0,0,0)');
+      s2.fillStyle=gr; s2.fillRect(0,0,160,160);
+      return sc;
+    }).filter(Boolean);
+    if(!stamps.length) return;
+    const rnd=mkRng(game.idx*7919+13);
+    for(let i=0;i<200;i++){
+      const sc=stamps[Math.floor(rnd()*stamps.length)], sz=110+rnd()*80;
+      g2.save(); g2.translate(rnd()*(W+140)-70, rnd()*(BH+140)-70);
+      g2.rotate(rnd()*6.283); g2.globalAlpha=.72+rnd()*.28;
+      g2.drawImage(sc,-sz/2,-sz/2,sz,sz); g2.restore();
+    }
+    const line=(w)=>{ g2.lineWidth=w; g2.lineCap='round'; g2.lineJoin='round';
+      for(const p of game.paths){ g2.beginPath();
+        p.forEach((pt,i)=> i? g2.lineTo(tx(pt[0]),ty(pt[1])-BY) : g2.moveTo(tx(pt[0]),ty(pt[1])-BY)); g2.stroke(); } };
+    g2.save();
+    try{ g2.filter='blur(6px)'; }catch(e){}
+    g2.strokeStyle='rgba(20,14,8,.7)'; line(TS+4);
+    g2.restore();
+    const pd=ART.f('tile_'+th+'_path');
+    if(pd){
+      const pc=document.createElement('canvas'); pc.width=pc.height=76;
+      const p2=pc.getContext('2d');
+      p2.drawImage(ART.img[pd[0]], pd[1]+pd[3]*0.28, pd[2]+pd[4]*0.30, pd[3]*0.44, pd[4]*0.40, 0,0,76,76);
+      g2.strokeStyle=g2.createPattern(pc,'repeat');
+    } else g2.strokeStyle=game.theme.path;
+    line(TS-12);
+    g2.save(); g2.globalAlpha=.35;
+    try{ g2.filter='blur(3px)'; }catch(e){}
+    g2.strokeStyle='rgba(18,12,6,.9)'; g2.lineWidth=3;
+    for(const p of game.paths){ g2.beginPath();
+      p.forEach((pt,i)=> i? g2.lineTo(tx(pt[0]),ty(pt[1])-BY) : g2.moveTo(tx(pt[0]),ty(pt[1])-BY));
+      g2.stroke(); }
+    g2.restore();
+    game.bg=cn;
+  }catch(e){ game.bg=null; }
+}
+const esprite=e=>BOSS_SPR[e.type]||('enemy_'+e.type);
+/* Пять ракурсов движения: e, ne, n, se, s. Западные получаем зеркалированием. */
+function moveDir(ang){
+  const deg=ang*180/Math.PI;                 // 0 — вправо, +90 — вниз экрана
+  if(deg>=-22.5 && deg<=22.5)  return ['e',  false];
+  if(deg>22.5   && deg<67.5)   return ['se', false];
+  if(deg>=67.5  && deg<=112.5) return ['s',  false];
+  if(deg>112.5  && deg<157.5)  return ['se', true];
+  if(deg>=157.5 || deg<=-157.5)return ['e',  true];
+  if(deg>-157.5 && deg<-112.5) return ['ne', true];
+  if(deg>=-112.5&& deg<=-67.5) return ['n',  false];
+  return ['ne', false];
+}
+const OUT='#152430';
+function ol(w,c){ ctx.strokeStyle=c||OUT; ctx.lineWidth=w||2.4; ctx.lineJoin='round'; ctx.lineCap='round'; ctx.stroke(); }
+function shadow(x,y,rx,ry){ ctx.fillStyle='rgba(8,16,22,.32)'; ctx.beginPath(); ctx.ellipse(x,y,rx,ry,0,0,7); ctx.fill(); }
+
+function drawBoard(){
+  const th=game.theme;
+  if(!game.bgImg && !game.bg){                        // ровная заливка, пока грузится картинка уровня
+    ctx.fillStyle=th.a; ctx.fillRect(0,BY,W,ROWS*TS);
+    ctx.fillStyle='rgba(0,0,0,.18)';
+    for(const p of game.paths){ ctx.lineWidth=TS-12; ctx.lineCap='round'; ctx.lineJoin='round';
+      ctx.strokeStyle='rgba(0,0,0,.2)'; ctx.beginPath();
+      p.forEach((pt,i)=> i? ctx.lineTo(tx(pt[0]),ty(pt[1])) : ctx.moveTo(tx(pt[0]),ty(pt[1]))); ctx.stroke(); }
+    return;
+  }
+  if(game.bgImg){ ctx.drawImage(game.bgImg,0,BY,W,ROWS*TS);
+    if(game.roadImg) ctx.drawImage(game.roadImg,0,BY,W,ROWS*TS);
+    else if(game.roadFx) ctx.drawImage(game.roadFx,0,BY);
+    ctx.strokeStyle='rgba(0,0,0,.35)'; ctx.lineWidth=4; ctx.strokeRect(2,BY+2,W-4,ROWS*TS-4);
+    return; }
+  if(game.bg){ ctx.drawImage(game.bg,0,BY);
+    ctx.strokeStyle='rgba(0,0,0,.35)'; ctx.lineWidth=4; ctx.strokeRect(2,BY+2,W-4,ROWS*TS-4);
+    return; }
+  for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++){
+    const h=hash(c,r), x=c*TS, y=BY+r*TS;
+    if(!tileDraw('tile_'+game.L.theme+'_ground_'+'abcd'[Math.floor(h*4)%4], x, y, TS+1)){
+      ctx.fillStyle = h>0.5 ? th.a : th.b;
+      ctx.fillRect(x,y,TS,TS);
+    } else if(!game.blocked.has(c+','+r)) continue;
+    ctx.fillStyle='rgba(255,255,255,.055)'; ctx.fillRect(x,y,TS,3);            // верхняя грань
+    ctx.fillStyle='rgba(0,0,0,.12)';        ctx.fillRect(x,y+TS-4,TS,4);       // нижняя тень
+    ctx.fillStyle='rgba(0,0,0,.06)';        ctx.fillRect(x+TS-3,y,3,TS);
+    if(!game.blocked.has(c+','+r)){
+      const g2=hash(c+7,r+3);
+      if(g2<0.3){                                                              // трава/снежинки
+        ctx.strokeStyle=th.deco; ctx.globalAlpha=.55; ctx.lineWidth=2;
+        for(let i=0;i<3;i++){ const bx=x+12+i*10+g2*8, by=y+36;
+          ctx.beginPath(); ctx.moveTo(bx,by); ctx.quadraticCurveTo(bx+1,by-5,bx+3,by-9); ctx.stroke(); }
+        ctx.globalAlpha=1;
+      } else if(g2>0.9){                                                       // мелкие камешки
+        ctx.fillStyle=th.rock; ctx.beginPath(); ctx.ellipse(x+18+g2*12,y+32,5,3.5,0,0,7); ctx.fill();
+        ctx.fillStyle='rgba(255,255,255,.18)'; ctx.beginPath(); ctx.ellipse(x+17+g2*12,y+31,3,1.6,0,0,7); ctx.fill();
+      }
+    }
+  }
+  ctx.strokeStyle='rgba(0,0,0,.35)'; ctx.lineWidth=4; ctx.strokeRect(2,BY+2,W-4,ROWS*TS-4);
+}
+
+function samplePath(p,step){
+  const out=[];
+  for(let i=0;i<p.length-1;i++){
+    const ax=tx(p[i][0]), ay=ty(p[i][1]), bx=tx(p[i+1][0]), by=ty(p[i+1][1]);
+    const d=Math.hypot(bx-ax,by-ay), n=Math.max(1,Math.round(d/step));
+    for(let k=0;k<n;k++) out.push([ax+(bx-ax)*k/n, ay+(by-ay)*k/n, i]);
+  }
+  return out;
+}
+function drawPath(){
+  const th=game.theme;
+  if(game.bgImg || game.bg){ drawGates(); return; }
+  ctx.lineCap='round'; ctx.lineJoin='round';
+  if(!game.pathPat && ART.has('tile_'+game.L.theme+'_path') && typeof document!=='undefined'){
+    try{
+      const cn=document.createElement('canvas'); cn.width=cn.height=TS;
+      const c2=cn.getContext('2d'); const d=ART.f('tile_'+game.L.theme+'_path');
+      c2.drawImage(ART.img[d[0]], d[1],d[2],d[3],d[4], 0,0,TS,TS);
+      game.pathPat=ctx.createPattern(cn,'repeat');
+    }catch(e){ game.pathPat=null; }
+  }
+  const band=(w,col)=>{ ctx.strokeStyle=col; ctx.lineWidth=w;
+    for(const p of game.paths){ ctx.beginPath();
+      p.forEach((pt,i)=> i? ctx.lineTo(tx(pt[0]),ty(pt[1])) : ctx.moveTo(tx(pt[0]),ty(pt[1]))); ctx.stroke(); } };
+  band(TS-1, OUT);                                   // контур дороги
+  band(TS-6, th.edge);                               // обочина
+  band(TS-16, game.pathPat || th.path);              // полотно
+  if(!game.pathPat){ ctx.globalAlpha=.5; band(TS-24, th.pathLit||'#a3855e'); ctx.globalAlpha=1; }
+  for(const p of game.paths){ if(game.pathPat) break;   // вросшие камни
+    samplePath(p,26).forEach((pt,i)=>{
+      const h=((i*2654435761)%1000)/1000;
+      if(h>0.62){
+        const ox=(h-0.5)*22, oy=(((i*97)%100)/100-0.5)*20;
+        ctx.fillStyle=th.rock; ctx.beginPath(); ctx.ellipse(pt[0]+ox,pt[1]+oy,4+h*2,3,h*3,0,7); ctx.fill();
+        ctx.fillStyle='rgba(255,255,255,.2)'; ctx.beginPath(); ctx.ellipse(pt[0]+ox-1,pt[1]+oy-1,2.4,1.4,0,0,7); ctx.fill();
+      }
+    });
+  }
+  drawGates();
+}
+function drawGates(){
+  for(const p of game.paths){        // ворота деревни
+    const e=p[p.length-1], bp=p[p.length-2];
+    const x=clamp(tx(e[0]),18,W-18), y=clamp(ty(e[1]),BY+18,BY+ROWS*TS-18);
+    const vert=Math.abs(e[0]-bp[0])>Math.abs(e[1]-bp[1]);
+    ctx.save(); ctx.translate(x,y); if(!vert) ctx.rotate(Math.PI/2);
+    shadow(0,26,20,6);
+    if(sprite('deco_gate',0,30,58)){ ctx.restore(); continue; }
+    ctx.fillStyle='#5b3d26'; rr(-9,-28,18,56,4); ctx.fill(); ol(2.6);
+    ctx.fillStyle='#7a5433'; rr(-6,-25,12,50,3); ctx.fill();
+    ctx.fillStyle='#caa84f'; rr(-7,-6,14,12,3); ctx.fill(); ol(2);
+    ctx.fillStyle='#3a2617'; ctx.fillRect(-9,-30,18,4); ol(1.8);
+    ctx.restore();
+  }
+}
+
+function drawDecor(){
+  const th=game.theme;
+  for(const d of game.decor){
+    const x=tx(d.c), y=ty(d.r)+10, sc=d.s;
+    ctx.save(); ctx.translate(x,y); ctx.scale(sc,sc);
+    shadow(2,2,16,6);
+    if(sprite('deco_'+game.L.theme+'_'+d.kind+'_'+d.v, 0, 10, d.kind==='tree'?64:38, TS*1.3)){ ctx.restore(); continue; }
+    if(d.kind==='tree'){
+      ctx.fillStyle='#4a3324'; rr(-4,-18,8,20,2); ctx.fill(); ol(2.2);
+      const dead = game.L.theme==='ash';
+      if(dead){
+        ctx.strokeStyle='#5c5058'; ctx.lineWidth=4;
+        ctx.beginPath(); ctx.moveTo(0,-16); ctx.lineTo(-11,-30); ctx.moveTo(0,-20); ctx.lineTo(10,-34);
+        ctx.moveTo(0,-14); ctx.lineTo(-8,-22); ctx.stroke();
+        ctx.strokeStyle=OUT; ctx.lineWidth=1.2; ctx.stroke();
+      } else {
+        const c1 = game.L.theme==='snow' ? '#2f5a46' : '#2f6b40';
+        const c2 = game.L.theme==='snow' ? '#3d7057' : '#3d8a51';
+        for(let i=0;i<3;i++){
+          const yy=-16-i*13, wd=22-i*5;
+          ctx.fillStyle=i===2?c2:c1;
+          ctx.beginPath(); ctx.moveTo(-wd,yy); ctx.lineTo(0,yy-20); ctx.lineTo(wd,yy); ctx.closePath();
+          ctx.fill(); ol(2.4);
+          ctx.fillStyle='rgba(255,255,255,.14)';
+          ctx.beginPath(); ctx.moveTo(-wd,yy); ctx.lineTo(0,yy-20); ctx.lineTo(-2,yy); ctx.closePath(); ctx.fill();
+        }
+        if(game.L.theme==='snow'){ ctx.fillStyle='rgba(240,248,252,.85)';
+          ctx.beginPath(); ctx.moveTo(-8,-46); ctx.lineTo(0,-56); ctx.lineTo(8,-46); ctx.closePath(); ctx.fill(); }
+      }
+    } else {
+      ctx.fillStyle=th.rock;
+      ctx.beginPath(); ctx.moveTo(-16,4); ctx.lineTo(-11,-14); ctx.lineTo(2,-22);
+      ctx.lineTo(14,-10); ctx.lineTo(15,4); ctx.closePath(); ctx.fill(); ol(2.6);
+      ctx.fillStyle='rgba(255,255,255,.22)';
+      ctx.beginPath(); ctx.moveTo(-11,-14); ctx.lineTo(2,-22); ctx.lineTo(6,-11); ctx.lineTo(-6,-6); ctx.closePath(); ctx.fill();
+      ctx.fillStyle='rgba(0,0,0,.18)';
+      ctx.beginPath(); ctx.moveTo(6,-11); ctx.lineTo(14,-10); ctx.lineTo(15,4); ctx.lineTo(4,4); ctx.closePath(); ctx.fill();
+      if(game.L.theme==='snow'){ ctx.fillStyle='rgba(240,248,252,.8)';
+        ctx.beginPath(); ctx.moveTo(-11,-14); ctx.lineTo(2,-22); ctx.lineTo(8,-13); ctx.lineTo(-4,-10); ctx.closePath(); ctx.fill(); }
+    }
+    ctx.restore();
+  }
+}
+
+function drawRange(){
+  const g=game;
+  if(g.selTower){                                   // подсветка клетки под фигурой, а не поверх
+    const t=g.selTower, x=t.c*TS, y=BY+t.r*TS;
+    ctx.fillStyle='rgba(231,183,78,.20)'; rr(x+3,y+3,TS-6,TS-6,6); ctx.fill();
+    ctx.strokeStyle='rgba(231,183,78,.85)'; ctx.lineWidth=2.5; rr(x+3,y+3,TS-6,TS-6,6); ctx.stroke();
+  }
+  let show=null,R=0;
+  if(g.selTower){ show=g.selTower; R=g.selTower.st.range; }
+  else if(g.sel && g.hoverC>=0){ show={x:tx(g.hoverC),y:ty(g.hoverR)}; R=TOWERS[g.sel].L[0].range; }
+  if(show){
+    ctx.save(); ctx.beginPath(); ctx.arc(show.x,show.y,R,0,7);
+    ctx.fillStyle='rgba(231,183,78,.10)'; ctx.fill();
+    ctx.strokeStyle='rgba(231,183,78,.6)'; ctx.setLineDash([7,6]); ctx.lineWidth=2; ctx.stroke(); ctx.restore();
+  }
+  if(g.sel && g.hoverC>=0 && !g.selTower){
+    const ok=buildable(g.hoverC,g.hoverR) && g.gold>=towerCost(g.sel);
+    ctx.fillStyle=ok?'rgba(110,220,130,.28)':'rgba(220,90,90,.3)';
+    ctx.fillRect(g.hoverC*TS+3,BY+g.hoverR*TS+3,TS-6,TS-6);
+    ctx.strokeStyle=ok?'rgba(150,240,170,.9)':'rgba(240,120,120,.9)'; ctx.lineWidth=2;
+    ctx.strokeRect(g.hoverC*TS+3,BY+g.hoverR*TS+3,TS-6,TS-6);
+  }
+}
+
+function plinth(){                                    // каменное основание под башню
+  ctx.fillStyle='#6d7682'; ctx.beginPath(); ctx.ellipse(0,12,19,9,0,0,7); ctx.fill(); ol(2.4);
+  ctx.fillStyle='rgba(255,255,255,.16)'; ctx.beginPath(); ctx.ellipse(-3,10,13,5,0,0,7); ctx.fill();
+}
+function drawTowers(){
+  const list=game.towers.slice().sort((a,b)=>a.y-b.y);
+  for(const t of list){
+    const l=t.lvl;
+    ctx.save(); ctx.translate(t.x,t.y);
+    shadow(2,16,20,7);
+    const rot=(t.key==='catapult'||t.key==='ballista');
+    const az='tower_'+t.key+'_'+(t.lvl+1)+'_a'+(((Math.round(t.ang/(Math.PI/4))+(AZ_OFFSET[t.key]||0))%8+8)%8);
+    const tn=(rot && ART.has(az)) ? az : 'tower_'+t.key+'_'+(t.lvl+1);
+    t.hasAzimuth=(tn===az);
+    const fit=FIT[t.key]||[52,1.05,18];
+    if(t.bt>0) ctx.globalAlpha=0.45;
+    if(sprite(tn,0,fit[2],fit[0]+t.lvl*3,TS*fit[1])){
+      ctx.globalAlpha=1;
+      if(t.bt>0) drawBuilding(t);
+      for(let i=0;i<=t.lvl;i++){ ctx.fillStyle='#e7b74e'; ctx.beginPath(); ctx.arc(-8+i*8,19,3,0,7); ctx.fill(); ol(1.4); }
+      ctx.restore();
+      if(t.key==='flame' && t.beamTarget) drawFlameCone(t);
+        continue;
+    }
+    plinth();
+    if(t.key==='archer'){
+      ctx.fillStyle='#4a3220'; rr(-15,-8,30,22,4); ctx.fill(); ol();
+      ctx.fillStyle='#6b4a2f'; rr(-12,-22,24,18,3); ctx.fill(); ol();
+      ctx.fillStyle='rgba(255,255,255,.14)'; rr(-12,-22,9,18,3); ctx.fill();
+      ctx.fillStyle='#b5411f'; ctx.beginPath(); ctx.moveTo(-16,-22); ctx.lineTo(0,-34-l*3); ctx.lineTo(16,-22); ctx.closePath(); ctx.fill(); ol();
+      ctx.fillStyle='rgba(0,0,0,.2)'; ctx.beginPath(); ctx.moveTo(0,-34-l*3); ctx.lineTo(16,-22); ctx.lineTo(4,-22); ctx.closePath(); ctx.fill();
+      ctx.save(); ctx.rotate(t.ang); ctx.fillStyle='#e8dcc0'; rr(3,-17,14+l*2,3,1.5); ctx.fill(); ol(1.6); ctx.restore();
+      if(l>1){ ctx.fillStyle='#e7b74e'; rr(-12,-6,24,3,1.5); ctx.fill(); }
+    } else if(t.key==='catapult'){
+      ctx.fillStyle='#4a3220'; rr(-17,-4,34,18,4); ctx.fill(); ol();
+      ctx.fillStyle='rgba(255,255,255,.12)'; rr(-17,-4,34,5,3); ctx.fill();
+      ctx.save(); ctx.rotate(t.ang);
+      const k=t.fireAnim>0?-1.0:-0.28;
+      ctx.strokeStyle='#8a5f38'; ctx.lineWidth=7+l;
+      ctx.beginPath(); ctx.moveTo(-8,-6); ctx.lineTo(18*Math.cos(k),-10+18*Math.sin(k)); ctx.stroke();
+      ctx.strokeStyle=OUT; ctx.lineWidth=1.6; ctx.stroke();
+      ctx.fillStyle='#8f9aa5'; ctx.beginPath(); ctx.arc(18*Math.cos(k),-10+18*Math.sin(k),6,0,7); ctx.fill(); ol(2);
+      ctx.restore();
+      if(l>1){ ctx.fillStyle='#e7b74e'; rr(-17,-6,34,3,1.5); ctx.fill(); }
+    } else if(t.key==='frost'){
+      ctx.fillStyle='#5d6b7a';
+      ctx.beginPath(); ctx.moveTo(-13,14); ctx.lineTo(-9,-22-l*3); ctx.lineTo(9,-22-l*3); ctx.lineTo(13,14); ctx.closePath(); ctx.fill(); ol();
+      ctx.fillStyle='rgba(255,255,255,.2)';
+      ctx.beginPath(); ctx.moveTo(-13,14); ctx.lineTo(-9,-22-l*3); ctx.lineTo(-2,-22-l*3); ctx.lineTo(-4,14); ctx.closePath(); ctx.fill();
+      const pu=0.5+0.5*Math.sin(game.time*3);
+      ctx.strokeStyle='rgba(121,203,232,'+(0.6+pu*0.4)+')'; ctx.lineWidth=2.6;
+      ctx.beginPath(); ctx.moveTo(-5,-14); ctx.lineTo(5,-4); ctx.moveTo(5,-14); ctx.lineTo(-5,-4); ctx.moveTo(0,-18); ctx.lineTo(0,0); ctx.stroke();
+      if(l>1){ ctx.fillStyle='rgba(121,203,232,'+(0.18+pu*0.18)+')'; ctx.beginPath(); ctx.arc(0,-8,17,0,7); ctx.fill(); }
+    } else if(t.key==='flame'){
+      ctx.fillStyle='#4a444a'; rr(-16,0,32,16,4); ctx.fill(); ol();
+      ctx.fillStyle='#6b6169'; rr(-13,-12,26,14,3); ctx.fill(); ol();
+      ctx.fillStyle='rgba(255,255,255,.14)'; rr(-13,-12,9,14,3); ctx.fill();
+      const f=0.6+0.4*Math.sin(game.time*14);
+      ctx.fillStyle='#c4441f'; ctx.beginPath(); ctx.moveTo(-9,-12); ctx.quadraticCurveTo(0,-30-8*f-l*3,9,-12); ctx.closePath(); ctx.fill();
+      ctx.fillStyle='#e8913a'; ctx.beginPath(); ctx.moveTo(-6,-12); ctx.quadraticCurveTo(0,-23-6*f,6,-12); ctx.closePath(); ctx.fill();
+      ctx.fillStyle='#f7dd86'; ctx.beginPath(); ctx.moveTo(-3,-12); ctx.quadraticCurveTo(0,-17-4*f,3,-12); ctx.closePath(); ctx.fill();
+    } else if(t.key==='totem'){
+      ctx.fillStyle='#4a3220'; rr(-14,-6,28,20,4); ctx.fill(); ol();
+      ctx.fillStyle='#6b5570'; rr(-11,-34-l*2,22,30,5); ctx.fill(); ol();
+      ctx.fillStyle='rgba(255,255,255,.16)'; rr(-11,-34-l*2,8,30,4); ctx.fill();
+      ctx.fillStyle='#e9f0f4'; ctx.beginPath(); ctx.arc(-4,-24,3,0,7); ctx.arc(4,-24,3,0,7); ctx.fill();
+      ctx.fillStyle=OUT; ctx.beginPath(); ctx.arc(-4,-24,1.3,0,7); ctx.arc(4,-24,1.3,0,7); ctx.fill();
+      const p2=0.5+0.5*Math.sin(game.time*5);
+      ctx.strokeStyle='rgba(181,140,224,'+(0.45+p2*0.55)+')'; ctx.lineWidth=2.4;
+      ctx.beginPath(); ctx.moveTo(-7,-16); ctx.lineTo(0,-11); ctx.lineTo(-4,-7); ctx.lineTo(7,-14); ctx.stroke();
+    } else if(t.key==='ballista'){
+      ctx.fillStyle='#4a3220'; rr(-16,-2,32,16,4); ctx.fill(); ol();
+      ctx.save(); ctx.rotate(t.ang);
+      ctx.fillStyle='#6b4a2f'; rr(-14,-16,30,8,3); ctx.fill(); ol(2);       // ложе
+      ctx.strokeStyle='#8f9aa5'; ctx.lineWidth=3;                           // плечи лука
+      ctx.beginPath(); ctx.moveTo(2,-24); ctx.quadraticCurveTo(12,-12,2,0); ctx.stroke();
+      ctx.strokeStyle=OUT; ctx.lineWidth=1.2; ctx.stroke();
+      ctx.strokeStyle='#e8dcc0'; ctx.lineWidth=1.6;
+      ctx.beginPath(); ctx.moveTo(2,-24); ctx.lineTo(t.fireAnim>0?6:-6,-12); ctx.lineTo(2,0); ctx.stroke();
+      ctx.fillStyle='#cfd8de'; rr(-10,-13.5,22,3,1.5); ctx.fill(); ol(1.4);
+      ctx.restore();
+      if(l>1){ ctx.fillStyle='#e7b74e'; rr(-16,-4,32,3,1.5); ctx.fill(); }
+    } else if(t.key==='rune'){
+      ctx.fillStyle='#46566b';
+      ctx.beginPath(); ctx.moveTo(-14,14); ctx.lineTo(-10,-16); ctx.lineTo(0,-26-l*3); ctx.lineTo(10,-16); ctx.lineTo(14,14); ctx.closePath(); ctx.fill(); ol();
+      ctx.fillStyle='rgba(255,255,255,.18)';
+      ctx.beginPath(); ctx.moveTo(-14,14); ctx.lineTo(-10,-16); ctx.lineTo(0,-26-l*3); ctx.lineTo(-3,14); ctx.closePath(); ctx.fill();
+      const q=0.5+0.5*Math.sin(game.time*2.4 + t.c);
+      ctx.strokeStyle='rgba(127,166,224,'+(0.5+q*0.5)+')'; ctx.lineWidth=2.6;
+      ctx.beginPath(); ctx.moveTo(0,-16); ctx.lineTo(0,2); ctx.moveTo(0,-10); ctx.lineTo(7,-16);
+      ctx.moveTo(0,-4); ctx.lineTo(-7,-10); ctx.stroke();
+      const ready=clamp(1-t.cd/t.st.cd,0,1);
+      ctx.strokeStyle='rgba(127,166,224,.85)'; ctx.lineWidth=3;
+      ctx.beginPath(); ctx.arc(0,0,21,-Math.PI/2,-Math.PI/2+ready*6.283); ctx.stroke();
+    }
+    drawRank(t.lvl); drawReload(t);
+    ctx.restore();
+    if(t.key==='flame' && t.beamTarget) drawFlameCone(t);
+  }
+}
+
+/* Спрайты башен статичны (восемь направлений в паке — восемь РАЗНЫХ построек,
+   их нельзя крутить). Поэтому подвижную часть — лук, копьё, рычаг — рисуем сверху
+   и наводим точно на цель, с отдачей в момент выстрела. */
+function glyphRestart(x,y){
+  ctx.strokeStyle='#e9f0f4'; ctx.lineWidth=3; ctx.lineCap='round';
+  ctx.beginPath(); ctx.arc(x,y,8.5,0.6,5.4); ctx.stroke();
+  ctx.fillStyle='#e9f0f4';
+  ctx.beginPath(); ctx.moveTo(x+9,y-11); ctx.lineTo(x+11,y-2); ctx.lineTo(x+2,y-5); ctx.closePath(); ctx.fill();
+}
+function glyphPause(x,y,paused){
+  ctx.fillStyle='#e9f0f4';
+  if(paused){ ctx.beginPath(); ctx.moveTo(x-6,y-9); ctx.lineTo(x+9,y); ctx.lineTo(x-6,y+9); ctx.closePath(); ctx.fill(); }
+  else { rr(x-7,y-9,5,18,2); ctx.fill(); rr(x+2,y-9,5,18,2); ctx.fill(); }
+}
+function glyphSound(x,y,on){
+  ctx.fillStyle='#e9f0f4';
+  ctx.beginPath(); ctx.moveTo(x-8,y-4); ctx.lineTo(x-3,y-4); ctx.lineTo(x+2,y-10);
+  ctx.lineTo(x+2,y+10); ctx.lineTo(x-3,y+4); ctx.lineTo(x-8,y+4); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle='#e9f0f4'; ctx.lineWidth=2.2; ctx.lineCap='round';
+  if(on){ ctx.beginPath(); ctx.arc(x+3,y,7,-0.9,0.9); ctx.stroke();
+          ctx.beginPath(); ctx.arc(x+3,y,11,-0.8,0.8); ctx.stroke(); }
+  else { ctx.beginPath(); ctx.moveTo(x+6,y-6); ctx.lineTo(x+13,y+6);
+         ctx.moveTo(x+13,y-6); ctx.lineTo(x+6,y+6); ctx.stroke(); }
+}
+function glyphHome(x,y){
+  ctx.fillStyle='#e9f0f4';
+  ctx.beginPath(); ctx.moveTo(x,y-10); ctx.lineTo(x+10,y-1); ctx.lineTo(x+7,y-1);
+  ctx.lineTo(x+7,y+9); ctx.lineTo(x-7,y+9); ctx.lineTo(x-7,y-1); ctx.lineTo(x-10,y-1); ctx.closePath(); ctx.fill();
+}
+function drawAxes(x,y){                       // скрещённые топоры — жизни деревни
+  ctx.save(); ctx.translate(x,y);
+  for(const d of [-1,1]){
+    ctx.save(); ctx.rotate(d*0.62);
+    ctx.strokeStyle=OUT; ctx.lineWidth=5.5; ctx.lineCap='round';
+    ctx.beginPath(); ctx.moveTo(0,10); ctx.lineTo(0,-8); ctx.stroke();
+    ctx.strokeStyle='#8a5f38'; ctx.lineWidth=3;
+    ctx.beginPath(); ctx.moveTo(0,10); ctx.lineTo(0,-8); ctx.stroke();
+    ctx.fillStyle='#cfd8de';
+    ctx.beginPath(); ctx.moveTo(0,-11); ctx.quadraticCurveTo(d*9,-8,d*7,-1);
+    ctx.quadraticCurveTo(d*4,-4,0,-4); ctx.closePath(); ctx.fill(); ol(1.6);
+    ctx.restore();
+  }
+  ctx.restore();
+}
+function drawCoin(x,y){
+  ctx.fillStyle='#b78d28'; ctx.beginPath(); ctx.arc(x,y+1,10,0,7); ctx.fill();
+  ctx.fillStyle='#e7b74e'; ctx.beginPath(); ctx.arc(x,y,10,0,7); ctx.fill(); ol(1.8);
+  ctx.strokeStyle='#8c6a18'; ctx.lineWidth=2;                     // руна на монете
+  ctx.beginPath(); ctx.moveTo(x,y-5); ctx.lineTo(x,y+5); ctx.moveTo(x,y-2); ctx.lineTo(x+4,y-5);
+  ctx.moveTo(x,y+2); ctx.lineTo(x-4,y-1); ctx.stroke();
+}
+function drawBuilding(t){                     // леса и полоса готовности
+  const k=1-t.bt/t.btMax;
+  ctx.strokeStyle='#6b4a2f'; ctx.lineWidth=3; ctx.lineCap='round';
+  ctx.beginPath();
+  ctx.moveTo(-16,16); ctx.lineTo(-11,-18); ctx.moveTo(16,16); ctx.lineTo(11,-18);
+  ctx.moveTo(-14,0); ctx.lineTo(14,0); ctx.moveTo(-15,10); ctx.lineTo(15,10); ctx.stroke();
+  ctx.strokeStyle='rgba(12,22,29,.85)'; ctx.lineWidth=6;
+  ctx.beginPath(); ctx.arc(0,-2,20,-Math.PI/2,-Math.PI/2+6.283); ctx.stroke();
+  ctx.strokeStyle='#e7b74e'; ctx.lineWidth=4;
+  ctx.beginPath(); ctx.arc(0,-2,20,-Math.PI/2,-Math.PI/2+6.283*k); ctx.stroke();
+  txt(Math.ceil(t.bt)+'s',0,-2,12,'#e9f0f4','center',true);
+}
+function drawReload(t){                      // видимая перезарядка у долгих башен
+  const s=t.st;
+  if(t.bt>0 || t.dis>0 || !s.cd || s.cd<1.3) return;
+  const k=clamp(1-t.cd/s.cd,0,1);
+  const w=30;
+  ctx.fillStyle='rgba(10,20,27,.8)'; rr(-w/2,28,w,5,2.5); ctx.fill();
+  ctx.fillStyle = k>=1 ? '#7fd18a' : (t.key==='rune' ? '#7fa6e0' : '#e7b74e');
+  rr(-w/2+1,29,(w-2)*k,3,1.5); ctx.fill();
+  if(k>=1 && Math.sin(game.time*6)>0.2){
+    ctx.strokeStyle='rgba(127,209,138,.8)'; ctx.lineWidth=1.4; rr(-w/2,28,w,5,2.5); ctx.stroke();
+  }
+}
+function drawRank(lvl){                       // знак уровня башни
+  const n=lvl+1, w=9+n*9;
+  ctx.fillStyle='rgba(12,22,29,.82)'; rr(-w/2,15,w,11,5); ctx.fill();
+  ctx.strokeStyle='rgba(231,183,78,.5)'; ctx.lineWidth=1; rr(-w/2,15,w,11,5); ctx.stroke();
+  ctx.strokeStyle='#e7b74e'; ctx.lineWidth=2; ctx.lineCap='round'; ctx.lineJoin='round';
+  for(let i=0;i<n;i++){
+    const cx=-w/2+7+i*9;
+    ctx.beginPath(); ctx.moveTo(cx-3,23); ctx.lineTo(cx,17.5); ctx.lineTo(cx+3,23); ctx.stroke();
+  }
+}
+function drawTurret(t){
+  if(t.hasAzimuth) return;            // спрайт уже развёрнут к цели
+  if(t.key!=='archer' && t.key!=='ballista' && t.key!=='catapult') return;
+  const rec = t.fireAnim>0 ? 4 : 0;
+  ctx.save();
+  ctx.translate(t.x - Math.cos(t.ang)*rec, t.y - 26 - Math.sin(t.ang)*rec*0.5);
+  ctx.rotate(t.ang);
+  ctx.lineCap='round'; ctx.lineJoin='round';
+  if(t.key==='archer'){
+    ctx.strokeStyle=OUT; ctx.lineWidth=5.5;
+    ctx.beginPath(); ctx.arc(4,0,11,-1.15,1.15); ctx.stroke();
+    ctx.strokeStyle='#6b4a2f'; ctx.lineWidth=3.4;
+    ctx.beginPath(); ctx.arc(4,0,11,-1.15,1.15); ctx.stroke();
+    ctx.strokeStyle='#e8dcc0'; ctx.lineWidth=1.4;
+    ctx.beginPath(); ctx.moveTo(8.5,-10); ctx.lineTo(t.fireAnim>0?2:-4,0); ctx.lineTo(8.5,10); ctx.stroke();
+    if(t.fireAnim<=0){ ctx.strokeStyle=OUT; ctx.lineWidth=4;
+      ctx.beginPath(); ctx.moveTo(-5,0); ctx.lineTo(13,0); ctx.stroke();
+      ctx.strokeStyle='#f6ecd2'; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.moveTo(-5,0); ctx.lineTo(13,0); ctx.stroke(); }
+  } else if(t.key==='ballista'){
+    ctx.strokeStyle=OUT; ctx.lineWidth=7;
+    ctx.beginPath(); ctx.moveTo(-12,0); ctx.lineTo(10,0); ctx.stroke();
+    ctx.strokeStyle='#7d6749'; ctx.lineWidth=4.5;
+    ctx.beginPath(); ctx.moveTo(-12,0); ctx.lineTo(10,0); ctx.stroke();
+    ctx.strokeStyle='#9aa7b4'; ctx.lineWidth=3.2;
+    ctx.beginPath(); ctx.moveTo(6,-13); ctx.quadraticCurveTo(15,0,6,13); ctx.stroke();
+    if(t.fireAnim<=0){ ctx.fillStyle='#cfd8de'; ctx.beginPath();
+      ctx.moveTo(20,0); ctx.lineTo(11,-3.5); ctx.lineTo(11,3.5); ctx.closePath(); ctx.fill(); ol(1.4); }
+  } else {
+    const k = t.fireAnim>0 ? -1.15 : -0.3;
+    ctx.strokeStyle=OUT; ctx.lineWidth=8;
+    ctx.beginPath(); ctx.moveTo(-9,2); ctx.lineTo(17*Math.cos(k), 2+17*Math.sin(k)); ctx.stroke();
+    ctx.strokeStyle='#8a5f38'; ctx.lineWidth=5;
+    ctx.beginPath(); ctx.moveTo(-9,2); ctx.lineTo(17*Math.cos(k), 2+17*Math.sin(k)); ctx.stroke();
+    if(t.fireAnim<=0){ ctx.fillStyle='#8f9aa5';
+      ctx.beginPath(); ctx.arc(17*Math.cos(k), 2+17*Math.sin(k), 5.5, 0, 7); ctx.fill(); ol(1.8); }
+  }
+  ctx.restore();
+}
+function drawFlameCone(t){
+  const sd=t.st;
+  ctx.save(); ctx.translate(t.x,t.y-8); ctx.rotate(t.ang);
+  const grd=ctx.createLinearGradient(0,0,sd.range,0);
+  grd.addColorStop(0,'rgba(247,221,134,.6)'); grd.addColorStop(.5,'rgba(232,145,58,.35)'); grd.addColorStop(1,'rgba(196,68,31,0)');
+  ctx.fillStyle=grd; ctx.beginPath(); ctx.moveTo(0,0); ctx.arc(0,0,sd.range,-0.5,0.5); ctx.closePath(); ctx.fill(); ctx.restore();
+}
+function hpBar(x,y,w,frac){
+  const h=4;
+  ctx.fillStyle='rgba(10,18,24,.72)'; rr(x-w/2-1,y-1,w+2,h+2,3); ctx.fill();
+  ctx.fillStyle = frac>.5?'#79c97f' : frac>.25?'#e7b74e' : '#d6584f';
+  rr(x-w/2,y,Math.max(2,w*frac),h,2); ctx.fill();
+}
+function drawCorpses(){
+  for(const c of game.corpses){
+    const H=c.r*(c.boss?2.8:3.15);
+    if(c.frames){
+      const fr=Math.min(5, Math.floor(c.t/0.11));        // раскадровка падения
+      const fade=c.t>2.0 ? clamp(1-(c.t-2.0)/0.8,0,1) : 1;
+      ctx.save(); ctx.globalAlpha=fade;
+      ctx.translate(c.x, c.y + (c.fly? 24*Math.min(1,c.t*2.4) : 0));
+      if(c.face<0) ctx.scale(-1,1);
+      spriteScaled(c.base+'_death_'+fr, 0, c.r*0.95, c.base+'_move_e', H);
+      ctx.restore();
+      continue;
+    }
+    const k=clamp(c.t/1.1,0,1);
+    ctx.save();
+    ctx.globalAlpha=(1-k)*(k<0.62?1:(1-(k-0.62)/0.38));
+    ctx.translate(c.x, c.y + (c.fly? 26*Math.min(1,k*2.2) : 0) + Math.min(1,k*3)*H*0.12);
+    if(c.face<0) ctx.scale(-1,1);
+    ctx.rotate(c.dir*Math.min(1,k*2.6)*1.25);
+    if(ART.has(c.base+'_move') || ART.has(c.base+'_move_e'))
+      sprite(ART.has(c.base+'_move_e')? c.base+'_move_e' : c.base+'_move', 0, c.r*0.95, H);
+    ctx.restore();
+  }
+}
+function drawEnemies(){
+  drawCorpses();
+  const list=game.enemies.slice().sort((p,q)=>p.y-q.y);   // ближние перекрывают дальних
+  for(const e of list){
+    const fly = e.flying ? 15+Math.sin(e.anim*5)*3 : 0;
+    const x=e.x, y=e.y-fly;
+    const base=esprite(e);
+    const [dk,mir]=moveDir(e.dir);
+    let spr=base+'_move_'+dk, flip=mir;
+    if(!ART.has(spr)){ spr=base+'_move'; flip=(e.face<0); }   // запасной вариант со старым паком
+    if(ART.has(spr)){
+      const H = e.r*(e.d.boss?2.8:3.15);   // рост фигуры на экране
+      const step=Math.sin(e.phase);
+      shadow(e.x, e.y+e.r*0.72, H*0.26, H*0.1);
+      ctx.save();
+      ctx.translate(x, y - Math.abs(step)*1.8 + 1.2);   // подъём на шаге
+      if(flip) ctx.scale(-1,1);                          // западные ракурсы — зеркало восточных
+      ctx.rotate(Math.sin(e.phase*0.5)*0.028);           // мягкое покачивание корпуса
+      if(e.stunT>0) ctx.translate(Math.sin(game.time*40)*1.5,0);
+      if(e.charge>0 && Math.random()<0.35) particle(e.x-Math.cos(e.dir)*10, e.y+e.r*0.6, '#b99a6b');
+      if(e.tp>0) ctx.globalAlpha=0.55+0.45*Math.sin(game.time*30);
+      if(e.hit>0){ try{ ctx.filter='brightness(1.9) saturate(.6)'; }catch(err){} }
+      if(e.slowT>0){ ctx.shadowColor='#79cbe8'; ctx.shadowBlur=14; }
+      else if(e.burnT>0){ ctx.shadowColor='#e0733a'; ctx.shadowBlur=16; }
+      sprite(spr, 0, e.r*0.95, H);
+      ctx.restore();
+      if(e.stunT>0){
+        ctx.strokeStyle='#f7dd86'; ctx.lineWidth=2;
+        for(let i=0;i<3;i++){ const ang=game.time*6+i*2.1;
+          ctx.beginPath(); ctx.arc(x+Math.cos(ang)*(e.r+7), y-e.r*1.5+Math.sin(ang)*3, 2.2, 0, 7); ctx.stroke(); }
+      }
+      const frac=clamp(e.hp/e.maxHp,0,1);
+      if(frac<1 && !e.d.boss) hpBar(x, y-H+e.r*0.95-9, Math.max(22,H*0.62), frac);
+      continue;
+    }
+    // ---- запасной векторный вариант ----
+    shadow(e.x,e.y+e.r*0.75,e.r*0.9,e.r*0.36);
+    ctx.save();
+    const bob=e.stunT>0?0:Math.sin(e.anim*8)*1.6;
+    ctx.translate(x,y+bob);
+    if(e.tp>0){ ctx.globalAlpha=0.55+0.45*Math.sin(game.time*30); }
+    let col=e.hit>0 ? '#ffffff' : e.d.col;
+    if(e.slowT>0){ ctx.shadowColor='#79cbe8'; ctx.shadowBlur=12; }
+    if(e.burnT>0){ ctx.shadowColor='#e0733a'; ctx.shadowBlur=14; }
+    if(e.type==='raven'){
+      const w=Math.sin(e.anim*11)*7;
+      ctx.fillStyle=col;
+      ctx.beginPath(); ctx.moveTo(-e.r-3,-2+w); ctx.quadraticCurveTo(0,-12,e.r+3,-2+w);
+      ctx.quadraticCurveTo(0,7,-e.r-3,-2+w); ctx.closePath(); ctx.fill(); ol(2);
+      ctx.beginPath(); ctx.ellipse(0,0,e.r*0.55,e.r*0.46,0,0,7); ctx.fill(); ol(2);
+    } else {
+      ctx.fillStyle=col; ctx.beginPath(); ctx.ellipse(0,0,e.r*0.86,e.r,0,0,7); ctx.fill(); ol(2.4);
+      ctx.fillStyle='rgba(255,255,255,.16)'; ctx.beginPath(); ctx.ellipse(-e.r*0.3,-e.r*0.2,e.r*0.32,e.r*0.5,0,0,7); ctx.fill();
+      ctx.fillStyle='#7c838c'; ctx.beginPath(); ctx.ellipse(0,-e.r*0.52,e.r*0.66,e.r*0.44,0,0,7); ctx.fill(); ol(2);
+      if(e.armor>=4){ ctx.fillStyle='#9aa7b4'; ctx.beginPath(); ctx.ellipse(e.r*0.62,2,e.r*0.44,e.r*0.76,0,0,7); ctx.fill(); ol(2); }
+      if(e.d.heal){ ctx.strokeStyle='rgba(111,224,168,'+(0.45+0.4*Math.sin(e.anim*4))+')'; ctx.lineWidth=2.4;
+        ctx.beginPath(); ctx.arc(0,0,e.r+8,0,7); ctx.stroke(); }
+      if(e.d.boss){ ctx.fillStyle='#e7b74e'; rr(-e.r*0.75,-e.r*1.62,e.r*1.5,5,2); ctx.fill(); ol(1.6); }
+    }
+    ctx.restore();
+    const frac=clamp(e.hp/e.maxHp,0,1);
+    if(frac<1 && !e.d.boss) hpBar(x, y-e.r-12, e.r*1.9, frac);
+  }
+}
+function drawShots(){
+  for(const s of game.shots){
+    if(s.kind==='rock'){
+      shadow(s.x, s.y+18, 7, 3);
+      if(!spriteC('proj_boulder',s.x,s.y,20)){
+        ctx.fillStyle='#8f9aa5'; ctx.beginPath(); ctx.arc(s.x,s.y,7,0,7); ctx.fill(); ol(2);
+        ctx.fillStyle='rgba(255,255,255,.28)'; ctx.beginPath(); ctx.arc(s.x-2.5,s.y-2.5,3,0,7); ctx.fill();
+      }
+      continue;
+    }
+    ctx.save(); ctx.translate(s.x,s.y); ctx.rotate(s.ang);
+    if(s.kind==='spear'){
+      ctx.fillStyle='rgba(230,240,250,.28)';                    // след
+      ctx.beginPath(); ctx.moveTo(-34,-2.5); ctx.lineTo(-6,-1.5); ctx.lineTo(-6,1.5); ctx.lineTo(-34,2.5); ctx.closePath(); ctx.fill();
+      if(!spriteC('proj_spear',0,0,46)){
+        ctx.strokeStyle=OUT; ctx.lineWidth=6.5;
+        ctx.beginPath(); ctx.moveTo(-18,0); ctx.lineTo(14,0); ctx.stroke();
+        ctx.strokeStyle='#8a5f38'; ctx.lineWidth=4;
+        ctx.beginPath(); ctx.moveTo(-18,0); ctx.lineTo(14,0); ctx.stroke();
+        ctx.fillStyle='#cfd8de'; ctx.beginPath(); ctx.moveTo(23,0); ctx.lineTo(12,-5.5); ctx.lineTo(12,5.5); ctx.closePath(); ctx.fill(); ol(1.6);
+      }
+      ctx.restore(); continue;
+    }
+    if(s.kind==='arrow'){
+      ctx.strokeStyle='rgba(255,240,200,.35)'; ctx.lineWidth=5;        // след
+      ctx.beginPath(); ctx.moveTo(-22,0); ctx.lineTo(-8,0); ctx.stroke();
+      ctx.strokeStyle=OUT; ctx.lineWidth=5.5;
+      ctx.beginPath(); ctx.moveTo(-11,0); ctx.lineTo(9,0); ctx.stroke();
+      ctx.strokeStyle='#f6ecd2'; ctx.lineWidth=3;
+      ctx.beginPath(); ctx.moveTo(-11,0); ctx.lineTo(9,0); ctx.stroke();
+      ctx.fillStyle='#dfe7ee'; ctx.beginPath(); ctx.moveTo(13,0); ctx.lineTo(5,-4.5); ctx.lineTo(5,4.5); ctx.closePath(); ctx.fill(); ol(1.6);
+      ctx.strokeStyle='#c8b48a'; ctx.lineWidth=2;                      // оперение
+      ctx.beginPath(); ctx.moveTo(-11,0); ctx.lineTo(-15,-3.5); ctx.moveTo(-11,0); ctx.lineTo(-15,3.5); ctx.stroke();
+    } else {
+      ctx.fillStyle='rgba(159,224,245,.4)'; ctx.beginPath(); ctx.ellipse(-10,0,10,4,0,0,7); ctx.fill();
+      ctx.fillStyle='#bdeeff'; ctx.beginPath(); ctx.moveTo(10,0); ctx.lineTo(-6,-6); ctx.lineTo(-6,6); ctx.closePath(); ctx.fill(); ol(2);
+    }
+    ctx.restore();
+  }
+}
+function drawFx(){
+  for(const f of game.fx){
+    const k=f.life/f.max;
+    if(f.kind==='bolt'){
+      ctx.save(); ctx.strokeStyle='rgba(200,170,255,'+k+')'; ctx.lineWidth=3.5; ctx.shadowColor='#b58ce0'; ctx.shadowBlur=14;
+      ctx.beginPath();
+      for(let i=0;i<f.pts.length-1;i++){ const a=f.pts[i], b=f.pts[i+1];
+        ctx.moveTo(a.x,a.y);
+        ctx.lineTo((a.x+b.x)/2+(Math.random()-.5)*14,(a.y+b.y)/2+(Math.random()-.5)*14); ctx.lineTo(b.x,b.y); }
+      ctx.stroke(); ctx.restore();
+    } else if(f.kind==='boom' && ART.has('fx_explosion_0')){
+      spriteC('fx_explosion_'+clamp(Math.floor((1-k)*8),0,7), f.x, f.y, f.r*2.6);
+    } else if(f.kind==='tp'){
+      ctx.save();
+      ctx.strokeStyle='rgba(159,196,255,'+k+')'; ctx.lineWidth=2.5;
+      ctx.beginPath(); ctx.ellipse(f.x0,f.y0,f.r*1.5*k,f.r*0.6*k,0,0,7); ctx.stroke();      // откуда исчез
+      ctx.beginPath(); ctx.ellipse(f.x1,f.y1,f.r*1.6*(1-k),f.r*0.65*(1-k),0,0,7); ctx.stroke(); // куда прибыл
+      ctx.setLineDash([6,7]); ctx.globalAlpha=k*0.8;
+      ctx.beginPath(); ctx.moveTo(f.x0,f.y0-f.r); ctx.lineTo(f.x1,f.y1-f.r); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.globalAlpha=k; ctx.fillStyle='rgba(159,196,255,.35)';
+      ctx.beginPath(); ctx.ellipse(f.x1,f.y1-f.r*0.8,f.r*0.9,f.r*1.5,0,0,7); ctx.fill();
+      ctx.restore();
+    } else if(f.kind==='ring' && ART.has('fx_rune_ring_0')){
+      spriteC('fx_rune_ring_'+clamp(Math.floor((1-k)*8),0,7), f.x, f.y, f.r*2.2);
+    } else if(f.kind==='boom'){
+      ctx.strokeStyle='rgba(240,190,120,'+k+')'; ctx.lineWidth=3.5;
+      ctx.beginPath(); ctx.arc(f.x,f.y,f.r*(1.15-k*0.5),0,7); ctx.stroke();
+      ctx.fillStyle='rgba(240,190,120,'+k*0.18+')'; ctx.beginPath(); ctx.arc(f.x,f.y,f.r*(1.1-k*0.5),0,7); ctx.fill();
+    } else if(f.kind==='beam'){
+      ctx.save(); ctx.translate(f.x,f.y); ctx.rotate(f.ang);
+      ctx.fillStyle='rgba(230,240,250,'+k*0.8+')'; ctx.fillRect(0,-2.5,f.len,5);
+      ctx.fillStyle='rgba(255,255,255,'+k+')'; ctx.fillRect(0,-1,f.len,2); ctx.restore();
+    } else if(f.kind==='ring'){
+      ctx.strokeStyle='rgba(127,166,224,'+k+')'; ctx.lineWidth=4;
+      ctx.beginPath(); ctx.arc(f.x,f.y,f.r*(1.15-k),0,7); ctx.stroke();
+      ctx.fillStyle='rgba(127,166,224,'+k*0.12+')'; ctx.beginPath(); ctx.arc(f.x,f.y,f.r*(1.15-k),0,7); ctx.fill();
+    }
+  }
+  for(const p of game.parts){ ctx.globalAlpha=clamp(p.life/p.max,0,1); ctx.fillStyle=p.col;
+    ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,7); ctx.fill(); ctx.globalAlpha=1; }
+  for(const t of game.texts){ ctx.globalAlpha=clamp(t.life/t.max,0,1);
+    ctx.lineWidth=3; ctx.strokeStyle=OUT; ctx.font='bold 15px '+F; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.strokeText(t.txt,t.x,t.y); txt(t.txt,t.x,t.y,15,t.col,'center',true); ctx.globalAlpha=1; }
+}
+
+function towerUnlocked(k){ return game.sandbox || mastRank(k)>=1; }
+/* Панель действий прямо над выбранной башней — чтобы не тянуться в нижний угол. */
+function drawTowerPopup(t){
+  const bw=104, bh=34, gap=6, tot=bw*2+gap;
+  let x=clamp(t.x-tot/2, 8, W-tot-8);
+  let y=t.y-64;
+  if(y<BY+6) y=t.y+26;                       // не влезает сверху — показываем снизу
+  ctx.fillStyle='rgba(10,20,27,.88)'; rr(x-7,y-7,tot+14,bh+14,9); ctx.fill();
+  ctx.strokeStyle='#3d5f72'; ctx.lineWidth=1.5; rr(x-7,y-7,tot+14,bh+14,9); ctx.stroke();
+  if(t.lvl>=2)        btn('up',x,y,bw,bh,'Max level',{fs:13,on:false});
+  else if(!t.canUp()) btn('up',x,y,bw,bh,'Workshop rank '+['I','II','III'][t.lvl+1],{fs:12,c1:'#4a5566',c2:'#333e4c',on:false});
+  else                btn('up',x,y,bw,bh,'Upgrade '+t.upCost(),{fs:13,c1:'#f0c766',c2:'#cf9a2f',tc:'#241708',on:game.gold>=t.upCost()});
+  btn('sell',x+bw+gap,y,bw,bh,(t.cancelable()? (t.upPaid?'Cancel upgrade +':'Cancel +') : 'Sell +')+t.sellValue(),{fs:13,c1:'#6a4750',c2:'#4a2f36'});
+}
+function drawHud(){
+  const g=game; uiBtns=[];
+  ctx.fillStyle='#0e1c25'; ctx.fillRect(0,0,W,BY);
+  ctx.fillStyle='#2b4353'; ctx.fillRect(0,BY-2,W,2);
+  txt(g.L.n,16,26,19,'#e9f0f4','left',true);
+  txt('Wave '+Math.min(g.wave+1,g.waves.length)+' / '+g.waves.length,16,44,13,'#8ea6b5');
+  drawAxes(268,27);
+  txt(g.lives,286,27,20,'#e9f0f4','left',true);
+  drawCoin(360,27);
+  txt(Math.floor(g.gold),378,27,20,'#e9f0f4','left',true);
+  const boss=game.enemies.find(e=>e.d.boss && !e.dead);
+  if(boss){
+    const bw=300, bx=W/2-bw/2+30, by=BY+10;
+    ctx.fillStyle='rgba(10,18,24,.82)'; rr(bx-4,by-4,bw+8,18,7); ctx.fill();
+    ctx.strokeStyle='#5d4a2a'; ctx.lineWidth=1.5; rr(bx-4,by-4,bw+8,18,7); ctx.stroke();
+    ctx.fillStyle='#b5423c'; rr(bx,by,bw*clamp(boss.hp/boss.maxHp,0,1),10,4); ctx.fill();
+    txt(boss.d.name, bx+bw/2, by+24, 12.5, '#e7b74e', 'center', true);
+  }
+  btn('restart',W-296,8,58,40,'',{c1:g.askRestart?'#8a4a44':'#3a5766',c2:g.askRestart?'#5d2f2b':'#24404e'});
+  glyphRestart(W-296+29,28);
+  if(g.askRestart) txt('again?',W-296+29,54,11,'#e59a95','center',true);
+  btn('pause',W-232,8,58,40,'',{});
+  glyphPause(W-232+29,28,g.paused);
+  btn('speed',W-168,8,58,40,g.speed===1?'1x':'2x',{fs:17,c1:g.speed===2?'#4a7a52':'#3a5766',c2:g.speed===2?'#2f5a37':'#24404e'});
+  btn('sound',W-104,8,44,40,'',{});
+  glyphSound(W-104+22,28,save.sound);
+  btn('exit', W-52,8,44,40,'',{});
+  glyphHome(W-52+22,28);
+
+  ctx.fillStyle='#0e1c25'; ctx.fillRect(0,PY,W,H-PY);
+  ctx.fillStyle='#2b4353'; ctx.fillRect(0,PY,W,2);
+  TKEYS.forEach((k,i)=>{
+    const t=TOWERS[k], x=6+i*88, y=PY+8, w=84, h=88, cost=towerCost(k);
+    const lock=!towerUnlocked(k), afford=g.gold>=cost, selq=g.sel===k;
+    ctx.fillStyle='#162833'; rr(x,y,w,h,7); ctx.fill();
+    if(selq){ ctx.fillStyle='rgba(231,183,78,.16)'; rr(x,y,w,h,7); ctx.fill(); }
+    ctx.strokeStyle=selq?'#e7b74e':'#2f4a5a'; ctx.lineWidth=2; rr(x,y,w,h,7); ctx.stroke();
+    ctx.save(); ctx.globalAlpha=lock?0.3:(afford?1:0.45);
+    drawTowerIcon(k,x+w/2,y+32);
+    txt(t.short,x+w/2,y+56,11.5,'#cfe0ea','center',true);
+    txt((TOWERS[k].build||3)+'s',x+w/2,y+68,10.5,'#7d94a3','center');
+    ctx.restore();
+    if(lock){
+      ctx.fillStyle='#8ea6b5'; rr(x+w/2-9,y+68,18,13,3); ctx.fill();
+      ctx.strokeStyle='#8ea6b5'; ctx.lineWidth=2.4; ctx.beginPath(); ctx.arc(x+w/2,y+68,5,Math.PI,0); ctx.stroke();
+      txt('Workshop',x+w/2,y+90,10.5,'#8ea6b5','center');
+    } else {
+      ctx.save(); ctx.translate(x+w/2-18,y+75); ctx.scale(.62,.62); drawCoin(0,0); ctx.restore();
+      txt(cost,x+w/2+4,y+76,13,afford?'#e9f0f4':'#d6584f','center',true);
+    }
+    uiBtns.push({id:'t_'+k,x,y,w,h,on:true});
+  });
+
+  const px=630, pw=W-px-8;
+  ctx.fillStyle='#162833'; rr(px,PY+8,pw,88,7); ctx.fill();
+  ctx.strokeStyle='#2f4a5a'; ctx.lineWidth=2; rr(px,PY+8,pw,88,7); ctx.stroke();
+  if(g.selTower){
+    const t=g.selTower, s2=t.st;
+    txt(t.def.name+'  lv.'+(t.lvl+1),px+12,PY+30,15,'#e9f0f4','left',true);
+    txt(s2.ab||'',px+12,PY+52,12,'#8ea6b5');
+    txt('range '+s2.range+(s2.dps?('  ·  '+Math.round(s2.dps*t.dmgMul)+' dps'):(s2.dmg?('  ·  '+Math.round(s2.dmg*t.dmgMul)+' dmg'):'')),
+        px+12,PY+72,12,'#6f8a9a');
+  } else if(g.sandbox){
+    txt('Sandbox: spawn enemies',px+12,PY+20,13,'#cfe0ea','left',true);
+    const list=['raider','scout','shield','raven','shaman','berserk','jarl','draugr','fenrir'];
+    list.forEach((t,i)=>{
+      const bx=px+10+(i%5)*62, by=PY+28+Math.floor(i/5)*28;
+      btn('sp_'+t,bx,by,58,24,ENEMIES[t].name.split(' ')[0].slice(0,7),{fs:11,c1:'#44606f',c2:'#2c4451'});
+    });
+    btn('sp_clear',px+10+3*62,PY+84,120,22,'Clear field',{fs:11,c1:'#6a4750',c2:'#4a2f36'});
+  } else {
+    if(g.waveState==='idle'){
+      txt('Next wave in '+Math.ceil(g.waveTimer)+'s',px+12,PY+26,14,'#cfe0ea','left',true);
+      btn('early',px+12,PY+40,pw-24,24,'Call wave early · +'+Math.round(Math.ceil(g.waveTimer)*(2+g.wave*0.35)*goldMul())+' gold',{c1:'#4a7a52',c2:'#2f5a37',fs:13});
+    } else {
+      const left=g.spawnQ.length+g.enemies.length;
+      txt('In battle. Enemies left: '+left,px+12,PY+26,14,'#cfe0ea','left',true);
+      ctx.fillStyle='#23394a'; rr(px+12,PY+42,pw-24,8,4); ctx.fill();
+      const wv=g.waves[Math.min(g.wave,g.waves.length-1)];
+      const tot=wv.groups.reduce((a,b)=>a+b.count,0)||1;
+      ctx.fillStyle='#e7b74e'; rr(px+12,PY+42,(pw-24)*clamp(1-left/tot,0,1),8,4); ctx.fill();
+    }
+    btn('adgold',px+12,PY+68,pw-24,26,g.adGold?'Watch ad for +50 gold':'Ad already used',
+        {c1:'#5fbf72',c2:'#2f8a48',tc:'#062211',fs:13,on:g.adGold});
+  }
+  if(g.paused){
+    ctx.fillStyle='rgba(8,16,22,.55)'; ctx.fillRect(0,BY,W,PY-BY);
+    txt('Paused',W/2,BY+(PY-BY)/2,44,'#e9f0f4','center',true);
+  }
+  if(g.hints.length){
+    const h=g.hints[0], bw=250;
+    const words=h.text.split(' '); const lines=[]; let cur='';
+    ctx.font='12.5px '+F;
+    for(const w2 of words){ const t2=cur?cur+' '+w2:w2;
+      const mt=ctx.measureText(t2), mw=(mt&&mt.width)||t2.length*6.2;
+      if(mw>bw-24){ lines.push(cur); cur=w2; } else cur=t2; }
+    if(cur) lines.push(cur);
+    const bh=20+lines.length*16, y0=BY+12, fade=clamp(h.t,0,1)*clamp((7.5-h.t)*3,0,1);
+    ctx.save(); ctx.globalAlpha=fade;
+    ctx.fillStyle='rgba(10,20,27,.88)'; rr(10,y0,bw,bh,9); ctx.fill();
+    ctx.strokeStyle='#e7b74e'; ctx.lineWidth=1.5; rr(10,y0,bw,bh,9); ctx.stroke();
+    ctx.fillStyle='#e7b74e'; rr(10,y0,4,bh,2); ctx.fill();
+    lines.forEach((ln,i)=> txt(ln,24,y0+18+i*16,12.5,'#dbe8f0'));
+    ctx.restore();
+  }
+  if(g.selTower) drawTowerPopup(g.selTower);
+  if(g.sel && !g.selTower){
+    const tip = towerUnlocked(g.sel) ? TOWERS[g.sel].tip : 'Locked. Buy rank I for this weapon in the Workshop.';
+    ctx.fillStyle='rgba(14,28,37,.92)'; rr(6,PY-40,540,32,6); ctx.fill();
+    ctx.strokeStyle='#2f4a5a'; ctx.lineWidth=1.5; rr(6,PY-40,540,32,6); ctx.stroke();
+    txt(tip,18,PY-24,13,'#cfe0ea');
+  }
+}
+function drawTowerIcon(k,x,y){
+  if(spriteW('icon_tower_'+k+'_1',x,y+20,42)) return;
+  ctx.save(); ctx.translate(x,y); ctx.scale(.55,.55);
+  if(k==='archer'){ ctx.fillStyle='#6b4a2f'; rr(-12,-10,24,22,3); ctx.fill(); ol(2.6);
+    ctx.fillStyle='#b5411f'; ctx.beginPath(); ctx.moveTo(-16,-10); ctx.lineTo(0,-26); ctx.lineTo(16,-10); ctx.closePath(); ctx.fill(); ol(2.6); }
+  if(k==='catapult'){ ctx.fillStyle='#4a3220'; rr(-16,2,32,12,3); ctx.fill(); ol(2.6);
+    ctx.strokeStyle='#8a5f38'; ctx.lineWidth=7; ctx.beginPath(); ctx.moveTo(-8,4); ctx.lineTo(10,-14); ctx.stroke();
+    ctx.fillStyle='#8f9aa5'; ctx.beginPath(); ctx.arc(11,-16,7,0,7); ctx.fill(); ol(2.6); }
+  if(k==='frost'){ ctx.fillStyle='#5d6b7a'; ctx.beginPath(); ctx.moveTo(-11,14); ctx.lineTo(-7,-18); ctx.lineTo(7,-18); ctx.lineTo(11,14); ctx.closePath(); ctx.fill(); ol(2.6);
+    ctx.strokeStyle='#79cbe8'; ctx.lineWidth=3.4; ctx.beginPath(); ctx.moveTo(-5,-10); ctx.lineTo(5,0); ctx.moveTo(5,-10); ctx.lineTo(-5,0); ctx.stroke(); }
+  if(k==='flame'){ ctx.fillStyle='#6b6169'; rr(-13,2,26,12,3); ctx.fill(); ol(2.6);
+    ctx.fillStyle='#c4441f'; ctx.beginPath(); ctx.moveTo(-9,2); ctx.quadraticCurveTo(0,-26,9,2); ctx.closePath(); ctx.fill(); ol(2.4);
+    ctx.fillStyle='#f7dd86'; ctx.beginPath(); ctx.moveTo(-4,2); ctx.quadraticCurveTo(0,-14,4,2); ctx.closePath(); ctx.fill(); }
+  if(k==='totem'){ ctx.fillStyle='#6b5570'; rr(-11,-20,22,34,4); ctx.fill(); ol(2.6);
+    ctx.fillStyle='#e9f0f4'; ctx.beginPath(); ctx.arc(-4,-12,3,0,7); ctx.arc(4,-12,3,0,7); ctx.fill();
+    ctx.strokeStyle='#b58ce0'; ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(-7,-2); ctx.lineTo(0,3); ctx.lineTo(-4,7); ctx.lineTo(7,0); ctx.stroke(); }
+  if(k==='ballista'){ ctx.fillStyle='#4a3220'; rr(-14,6,28,10,3); ctx.fill(); ol(2.4);
+    ctx.save(); ctx.rotate(-0.5);
+    ctx.fillStyle='#6b4a2f'; rr(-14,-6,28,7,3); ctx.fill(); ol(2.4);
+    ctx.strokeStyle='#8f9aa5'; ctx.lineWidth=3.4; ctx.beginPath(); ctx.moveTo(6,-16); ctx.quadraticCurveTo(16,-3,6,10); ctx.stroke();
+    ctx.fillStyle='#cfd8de'; rr(-10,-4.5,24,4,2); ctx.fill(); ol(1.8); ctx.restore(); }
+  if(k==='rune'){ ctx.fillStyle='#46566b'; ctx.beginPath(); ctx.moveTo(-12,14); ctx.lineTo(-9,-12); ctx.lineTo(0,-24); ctx.lineTo(9,-12); ctx.lineTo(12,14); ctx.closePath(); ctx.fill(); ol(2.6);
+    ctx.strokeStyle='#7fa6e0'; ctx.lineWidth=3.2; ctx.beginPath(); ctx.moveTo(0,-14); ctx.lineTo(0,6); ctx.moveTo(0,-8); ctx.lineTo(8,-15); ctx.moveTo(0,0); ctx.lineTo(-8,-7); ctx.stroke(); }
+  ctx.restore();
+}
+
+/* ---------- 9. ВВОД ----------------------------------------------------- */
+let scale=1, offX=0, offY=0;
+function fit(){
+  const w=window.innerWidth, h=window.innerHeight;
+  scale=Math.min(w/W, h/H);
+  const st=document.getElementById('stage');
+  st.style.transform='scale('+scale+')';
+}
+window.addEventListener('resize',fit); window.addEventListener('orientationchange',()=>setTimeout(fit,200));
+
+function toGame(ev){
+  const r=cv.getBoundingClientRect();
+  const cx=(ev.touches? ev.touches[0].clientX : ev.clientX);
+  const cy=(ev.touches? ev.touches[0].clientY : ev.clientY);
+  return { x:(cx-r.left)/scale, y:(cy-r.top)/scale };
+}
+function hitBtn(p){ for(let i=uiBtns.length-1;i>=0;i--){ const b=uiBtns[i];
+  if(p.x>=b.x&&p.x<=b.x+b.w&&p.y>=b.y&&p.y<=b.y+b.h) return b; } return null; }
+
+cv.addEventListener('pointerdown',e=>{ e.preventDefault(); if(!game) return;
+  if(save.sound){ audio(); if(actx && actx.state==='suspended') actx.resume(); startWind(); }
+  const p=toGame(e); const b=hitBtn(p);
+  if(b){ if(b.on) onButton(b.id); else SFX.no(); return; }
+  if(p.y<BY || p.y>=PY) return;
+  const c=Math.floor(p.x/TS), r=Math.floor((p.y-BY)/TS);
+  const t=game.towers.find(t=>t.c===c&&t.r===r);
+  if(t){ game.selTower=t; game.sel=null; return; }
+  game.selTower=null;
+  if(game.sel){
+    if(!towerUnlocked(game.sel)){ SFX.no(); return; }
+    const cost=towerCost(game.sel);
+    if(!buildable(c,r)){ SFX.no(); return; }
+    if(game.gold<cost){ SFX.no(); floatText(tx(c),ty(r),'not enough gold','#d6584f'); return; }
+    const nt=new Tower(game.sel,c,r); nt.spent=cost;
+    game.towers.push(nt); game.gold-=cost; SFX.build(); hint('building');
+    for(let i=0;i<6;i++) particle(tx(c),ty(r),'#caa84f');
+  }
+});
+cv.addEventListener('pointermove',e=>{ if(!game) return; const p=toGame(e);
+  if(p.y>=BY&&p.y<PY){ game.hoverC=Math.floor(p.x/TS); game.hoverR=Math.floor((p.y-BY)/TS); }
+  else { game.hoverC=-1; }
+});
+cv.addEventListener('pointerleave',()=>{ if(game) game.hoverC=-1; });
+cv.addEventListener('contextmenu',e=>e.preventDefault());
+window.addEventListener('keydown',e=>{
+  if(!game||!game.running) return;
+  if(e.code==='Space'){ e.preventDefault(); onButton('pause'); }
+  if(e.code==='Escape'){ game.sel=null; game.selTower=null; }
+  const n=parseInt(e.key,10); if(n>=1&&n<=TKEYS.length) game.sel=TKEYS[n-1], game.selTower=null;
+});
+
+async function onButton(id){
+  const g=game;
+  if(id==='restart'){
+    if(g.askRestart){ startLevel(g.idx, g.sandbox); return; }
+    g.askRestart=true; g.paused=true;
+    setTimeout(()=>{ if(game){ game.askRestart=false; game.paused=false; } },2500);
+    return;
+  }
+  if(id==='pause'){ g.paused=!g.paused; return; }
+  if(id==='speed'){ g.speed = g.speed===1?2:1; return; }
+  if(id==='sound'){ save.sound=!save.sound; persist(); if(save.sound) startWind(); else stopWind(); return; }
+  if(id==='exit'){ stopWind(); game=null; screen('scLevels'); renderLevels(); return; }
+  if(id==='early'){ startWave(true); return; }
+  if(id==='up'){ const t=g.selTower, c=t.upCost();
+    if(g.gold>=c && t.canUp()){ g.gold-=c; t.spent+=c; t.lvl++; SFX.build();
+      t.btMax=(TOWERS[t.key].build||3)*0.6; t.bt=t.btMax; t.upPaid=c;
+      for(let i=0;i<8;i++) particle(t.x,t.y,'#e7b74e'); } return; }
+  if(id==='sell'){
+    const t=g.selTower; g.gold+=t.sellValue();
+    if(t.cancelable() && t.upPaid){                 // откатываем только улучшение, башня остаётся
+      t.spent-=t.upPaid; t.upPaid=0; t.lvl--; t.bt=0; SFX.sell(); return;
+    }
+    game.towers=game.towers.filter(x=>x!==t); g.selTower=null; SFX.sell(); return; }
+  if(id==='adgold'){
+    if(!g.adGold) return;
+    g.paused=true;
+    const ok=await Ads.rewarded('gold-50-ingame','Ad for 50 gold');
+    g.paused=false;
+    if(ok){ g.adGold=false; g.gold+=50; floatText(480,BY+40,'+50 gold','#e7b74e'); }
+    return;
+  }
+  if(id.startsWith('sp_')){
+    const t=id.slice(3);
+    if(t==='clear'){ g.enemies.length=0; return; }
+    g.enemies.push(new Enemy(t,0,1.6,1)); return;
+  }
+  if(id.startsWith('t_')){ const k=id.slice(2);
+    if(!towerUnlocked(k)){ SFX.no(); g.sel=k; g.selTower=null;
+      floatText(480,BY+40,TOWERS[k].name+' — buy rank I in the Workshop','#8ea6b5'); return; }
+    g.sel = g.sel===k? null : k; g.selTower=null; return; }
+}
+
+/* ---------- 10. ЭКРАНЫ -------------------------------------------------- */
+const $=s=>document.querySelector(s);
+function screen(id){
+  if(id && id!=='scResult') game=null;     // ни один уровень не работает за открытым меню
+  document.querySelectorAll('.screen').forEach(s=>{ if(s.id!=='adOv') s.classList.remove('on'); });
+  if(id) $('#'+id).classList.add('on');
+  document.querySelectorAll('#silv1,#silv2,#silv3,.silvv').forEach(el=>{ el.textContent=P().silver; });
+}
+document.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>screen(b.dataset.go));
+$('#bPlay').onclick=()=>{ renderLevels(); screen('scLevels'); };
+$('#bPerks').onclick=()=>{ renderPerks(); screen('scPerks'); };
+$('#bHelp').onclick=()=>screen('scHelp');
+$('#bSandbox').onclick=()=>startLevel(5,true);   // карта «Чёрный лес», все башни, бесконечное золото
+
+function unlocked(i){ return i===0 || (P().stars[i-1]||0)>0; }
+function renderDiff(){
+  const row=$('#diffRow'); row.innerHTML='';
+  DIFFS.forEach((d,i)=>{
+    const cleared = Object.keys(save.prof[1].stars||{}).length;
+    const lock = (i===2 && cleared<5);
+    const b=document.createElement('button');
+    b.className='btn'+(i===(save.diff||0)?'':' sec'); b.style.minWidth='150px';
+    b.textContent = lock ? (d.n+' · '+cleared+'/5') : d.n;
+    b.disabled = lock;
+    b.title = lock ? 'Clear 5 fjords on Viking to unlock' : '';
+    b.onclick=()=>{ save.diff=i; persist(); renderLevels(); };
+    row.appendChild(b);
+  });
+  const cl=Object.keys(save.prof[1].stars||{}).length;
+  $('#diffHint').textContent = DIFFS[save.diff||0].d +
+    (cl<5 ? '  ·  Berserker unlocks after 5 fjords cleared on Viking ('+cl+'/5).' : '');
+}
+function renderLevels(){
+  renderDiff();
+  for(let i=0;i<LEVELS.length;i++) if(i===0 || P().stars[i-1]) { preloadLevelBg(i); break; }
+  const ll=$('#livesLine');
+  if(ll) ll.textContent='Profile: '+DIFFS[save.diff||0].n+'  ·  silver '+P().silver+
+    '  ·  village lives '+Math.min(P().lives,livesMax())+' / '+livesMax()+
+    '. Every difficulty keeps its own silver, workshop and progress.';
+  document.querySelectorAll('.silvv,#silv1').forEach(el=>el.textContent=P().silver);
+  const grid=$('#lvGrid'); grid.innerHTML='';
+  LEVELS.forEach((L,i)=>{
+    const st=P().stars[i]||0, lock=!unlocked(i);
+    const d=document.createElement('div');
+    d.className='lv'+(lock?' lock':'');
+    d.innerHTML='<b>'+(i+1)+'</b><span>'+L.n+'</span><div class="st">'+(lock?'locked':'★★★'.slice(0,st)+'☆☆☆'.slice(0,3-st))+'</div>';
+    if(!lock) d.onclick=()=>openPrep(i);
+    grid.appendChild(d);
+  });
+}
+function buyBtn(label, cost, max, maxLabel, onBuy){
+  const b=document.createElement('button');
+  const poor = !max && P().silver<cost;
+  b.className='btn'+(max||poor?' sec':''); b.style.fontSize='13.5px'; b.style.minHeight='46px';
+  b.textContent = max ? maxLabel : (poor ? ('Need '+cost+' silver') : (label+' · '+cost));
+  b.disabled = max || poor;
+  b.onclick=()=>{ if(!max && P().silver>=cost){ P().silver-=cost; onBuy(); persist(); renderPerks(); SFX.up(); } else SFX.no(); };
+  return b;
+}
+const RANK_TXT=['Rank I — lets you build it','Rank II — upgrade to level II','Rank III — upgrade to level III'];
+function renderMastery(){
+  const grid=$('#mastGrid'); grid.innerHTML='';
+  TKEYS.forEach(k=>{
+    const t=TOWERS[k], r=mastRank(k), max=r>=3, cost=max?0:MAST_COST(k)[r];
+    const el=document.createElement('div'); el.className='perk';
+    el.innerHTML='<div class="top"><img src="assets/icons/'+k+'.png" alt=""><h3 style="font-size:15px">'+t.name+'</h3></div>'+
+      '<p style="min-height:0;font-size:12px">'+(max? 'Fully trained' : RANK_TXT[r])+'</p>'+
+      '<div class="pips">'+[0,1,2].map(i=>'<div class="pip'+(i<r?' on':'')+'"></div>').join('')+'</div>';
+    el.appendChild(buyBtn(['Unlock','Rank II','Rank III'][r]||'Train', cost, max, 'Rank III', ()=>{ P().mast[k]=r+1; }));
+    grid.appendChild(el);
+  });
+}
+function renderLives(){
+  const el=$('#livesCard'); if(!el) return;
+  const cur=Math.min(P().lives,livesMax()), max=livesMax(), full=cur>=max;
+  const cost=Math.round(60*(1+0.3*(save.diff||0)));
+  el.innerHTML='<div class="top">'+ICON('icon_lives')+'<h3>Reinforcements</h3></div>'+
+    '<p>Village lives carry from fjord to fjord and are never restored by themselves — not even after a defeat. '+
+    'A win gives 5 back. Now: <b>'+cur+' / '+max+'</b>.</p>';
+  const b=document.createElement('button');
+  const poor=P().silver<cost;
+  b.className='btn'+(full||poor?' sec':''); b.style.minHeight='46px'; b.style.fontSize='14px';
+  b.textContent = full ? 'Gates are full' : (poor ? 'Need '+cost+' silver' : '+5 lives · '+cost);
+  b.disabled = full || poor;
+  b.onclick=()=>{ if(P().silver>=cost && !full){ P().silver-=cost; P().lives=Math.min(max,cur+5); persist(); renderPerks(); SFX.up(); } };
+  el.appendChild(b);
+}
+function renderReset(){
+  const box=$('#resetBox'); if(!box) return;
+  const d=DIFFS[save.diff||0];
+  box.innerHTML='<div class="danger"><div class="top">'+ICON('icon_reset')+'<div class="dtext"><b>Raze the '+d.n+' profile</b>'+
+    '<span>Silver, workshop ranks, stars and lives for this difficulty are wiped and the gates go back to 20. '+
+    'The other two difficulties are untouched.</span></div></div></div>';
+  const b=document.createElement('button');
+  b.className='btn danger-btn'; b.textContent='Start this difficulty over';
+  b.onclick=()=>{
+    if(b.dataset.armed){ save.prof[save.diff||0]=newProfile(); persist(); renderPerks(); renderLevels(); SFX.sell(); b.dataset.armed=''; b.textContent='Start this difficulty over'; }
+    else { b.dataset.armed='1'; b.textContent='Tap again to confirm'; setTimeout(()=>{ if(b.dataset.armed){ b.dataset.armed=''; b.textContent='Start this difficulty over'; } },4000); }
+  };
+  box.querySelector('.danger').appendChild(b);
+}
+function renderPerks(){
+  renderMastery(); renderLives(); renderReset();
+  document.querySelectorAll('.silvv,#silv1').forEach(el=>el.textContent=P().silver);
+}
+// --- подготовка к бою: расходники на один раунд ---
+let prepLevel=0;
+function openPrep(idx){
+  stopWind(); game=null;
+  prepLevel=idx; preloadLevelBg(idx); loadout={gold:0,life:0,dmg:0,cost:0};
+  renderPrep(); screen('scPrep');
+}
+function renderPrep(){
+  const L=LEVELS[prepLevel];
+  $('#prepTitle').textContent=(prepLevel+1)+'. '+L.n;
+  $('#prepLine').textContent='Village lives: '+Math.min(P().lives,livesMax())+' / '+livesMax()+
+    '. Supplies below last for this fjord only and burn up when it ends.'+(P().stars[prepLevel]?' Endless raid: waves never stop, lives are not spent, silver by waves held.':'');
+  const grid=$('#prepGrid'); grid.innerHTML='';
+  PERKS.forEach(p=>{
+    const n=loadout[p.k]||0, next=perkPrice(p.k,n), can=(n<PERK_MAX) && (P().silver>=loadoutCost(loadout)+next);
+    const el=document.createElement('div'); el.className='perk';
+    el.innerHTML='<div class="top">'+(PERK_ICON[p.k]||'')+'<h3>'+p.name+'</h3></div>'+
+      '<p>'+p.desc+' Each one: <b>'+p.fmt(p.val)+'</b>.</p>'+
+      '<div class="cnt"><span class="num">×'+n+'</span><span class="pr">'+(n<PERK_MAX?('next '+next+' silver'):'max')+'</span></div>';
+    const row=document.createElement('div'); row.style.display='flex'; row.style.gap='8px';
+    const minus=document.createElement('button');
+    minus.className='btn sec'; minus.style.minWidth='0'; minus.style.flex='1'; minus.style.minHeight='44px'; minus.textContent='−';
+    minus.disabled=n<=0;
+    minus.onclick=()=>{ loadout[p.k]=Math.max(0,n-1); renderPrep(); };
+    const plus=document.createElement('button');
+    plus.className='btn'; plus.style.minWidth='0'; plus.style.flex='2'; plus.style.minHeight='44px'; plus.textContent='+';
+    plus.disabled=!can;
+    plus.onclick=()=>{ loadout[p.k]=n+1; renderPrep(); SFX.build(); };
+    row.appendChild(minus); row.appendChild(plus); el.appendChild(row);
+    grid.appendChild(el);
+  });
+  const cleared=!!P().stars[prepLevel];
+  const eb=$('#bEndless');
+  eb.style.display = cleared? 'inline-flex':'none';
+  eb.onclick=()=>marchOut(true);
+  const total=loadoutCost(loadout);
+  $('#prepCost').textContent = total? ('Supplies cost '+total+' silver of your '+P().silver+'.')
+                                    : ('You can march out with nothing — you keep all '+P().silver+' silver.');
+  document.querySelectorAll('.silvv').forEach(el=>el.textContent=P().silver);
+}
+function marchOut(endless){
+  const total=loadoutCost(loadout);
+  if(total>P().silver){ SFX.no(); return; }
+  P().silver-=total; persist();
+  startLevel(prepLevel, false, endless);
+}
+$('#bStart').onclick=()=>marchOut(false);
+function showEndless(){
+  const g=game, w=g.wave;
+  const silver=Math.round(w*6*DIFFS[save.diff||0].silver);
+  P().silver+=silver; persist();
+  $('#resTitle').textContent='Raid over';
+  $('#resStars').innerHTML='';
+  $('#resText').textContent='You held '+w+' waves on '+g.L.n+'. Silver earned: '+silver+
+    '. Endless raids never touch your village lives.';
+  const box=$('#resBtns'); box.innerHTML='';
+  const mk=(label,cls,fn)=>{ const b=document.createElement('button'); b.className='btn '+cls; b.textContent=label; b.onclick=fn; box.appendChild(b); return b; };
+  mk('Raid again','',()=>startLevel(g.idx,false,true));
+  mk('Back to map','sec',()=>{ game=null; renderLevels(); screen('scLevels'); });
+  screen('scResult');
+}
+let levelsDone=0;
+function showResult(win){
+  const g=game, i=g.idx;
+  const stars = win ? (g.lives>=g.maxLives*0.9?3 : g.lives>=g.maxLives*0.5?2 : 1) : 0;
+  $('#resTitle').textContent = win ? 'Fjord Held' : 'The Gates Have Fallen';
+  $('#resStars').innerHTML = win ? '★★★'.slice(0,stars)+'<span style="color:#2c4452">'+'☆☆☆'.slice(0,3-stars)+'</span>' : '';
+  let silver=0;
+  if(g.endless){ showEndless(); return; }
+  const melt = win ? Math.floor(g.gold/10) : 0;         // непотраченное золото переплавляем в серебро
+  if(!g.sandbox && !g.endless){
+    // победа: остаток плюс 5. поражение: запас откатывается к тому, с чем игрок входил в фьорд
+    P().lives = win ? Math.min(livesMax(), g.lives+5) : g.livesIn;
+    persist();
+  }
+  if(win){
+    const firstClear = !(P().stars[i]);
+    silver = Math.round((30 + (i+1)*14 + g.lives*2) * DIFFS[save.diff||0].silver * (firstClear?2.1:0.2)) + melt;
+    if(stars>(P().stars[i]||0)) P().stars[i]=stars;
+    P().silver+=silver; persist();
+    $('#resText').textContent='Level complete. Silver earned: '+silver+
+      (melt? ' (including '+melt+' melted from leftover gold)':'')+
+      '. Village lives: '+P().lives+' of '+livesMax()+' — they carry over to the next fjord.';
+  } else {
+    $('#resText').textContent='The raiders broke through on wave '+(g.wave+1)+' of '+g.waves.length+
+      '. The village keeps the '+g.livesIn+' lives it had before the battle, but the fjord paid no silver. ';
+  }
+  const box=$('#resBtns'); box.innerHTML='';
+  const mk=(label,cls,fn)=>{ const b=document.createElement('button'); b.className='btn '+cls; b.textContent=label; b.onclick=fn; box.appendChild(b); return b; };
+
+  if(win){
+    mk('Double silver (ad)','ad', async e=>{
+      const btnEl=e.target; btnEl.disabled=true;
+      const ok=await Ads.rewarded('double-silver','Ad for double silver');
+      if(ok){ P().silver+=silver; persist(); screen('scResult'); $('#resText').textContent='Silver doubled: +'+(silver*2)+'.'; }
+      btnEl.remove();
+    });
+    if(i+1<LEVELS.length) mk('Next fjord','', async ()=>{
+      levelsDone++;
+      if(levelsDone%2===0) await Ads.interstitial();   // межуровневая реклама
+      openPrep(i+1);
+    });
+    mk('Back to map','sec',()=>{ game=null; renderLevels(); screen('scLevels'); });
+  } else {
+    if(g.adRevive) mk('+3 lives (ad)','ad', async e=>{
+      e.target.disabled=true;
+      const ok=await Ads.rewarded('revive-3-lives','Ad for +3 lives');
+      if(ok){
+        g.adRevive=false; g.lives=3; persist(); g.over=null; g.running=true;
+        g.enemies.length=0; g.shots.length=0; g.spawnQ.length=0;
+        g.waveState='idle'; g.waveTimer=8; g.gold+=120;
+        screen(null);
+      } else e.target.disabled=false;
+    });
+    mk('Retry','',()=>openPrep(i));
+    mk('Back to map','sec',()=>{ game=null; renderLevels(); screen('scLevels'); });
+  }
+  screen('scResult');
+}
+
+/* ---------- ЦИКЛ -------------------------------------------------------- */
+let last=performance.now();
+function loop(now){
+  let dt=(now-last)/1000; last=now;
+  dt=Math.min(dt,0.05);
+  if(game && game.running && !game.paused){
+    const steps=game.speed;
+    for(let i=0;i<steps;i++) update(dt);
+  }
+  if(game) draw(); else ctx.clearRect(0,0,W,H);
+  requestAnimationFrame(loop);
+}
+
+(async function boot(){
+  await loadSave();
+  fit(); screen('scMenu'); renderLevels();
+  requestAnimationFrame(loop);
+  // Playables: сообщаем платформе, что кадр отрисован и игра готова принимать ввод
+  if(window.ytgame && ytgame.game){
+    try{
+      requestAnimationFrame(()=>{ try{ ytgame.game.firstFrameReady(); }catch(e){} });
+      ytgame.game.gameReady();
+      if(ytgame.system && ytgame.system.getLanguage) console.log('YT language:', ytgame.system.getLanguage());
+    }catch(e){}
+  }
+})();
+</script>
+</body>
+</html>

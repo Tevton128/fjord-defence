@@ -125,7 +125,7 @@
       <button class="btn sec" id="bHelp">How to play</button>
     </div>
     <div class="bar"><div class="silver"><img src="assets/icons/icon_silver.png" alt=""><b id="silv1">0</b></div></div>
-    <div class="build">build 16.09 · 15</div>
+    <div class="build">build 16.09 · 20</div>
   </div>
 
   <!-- ВЫБОР УРОВНЯ -->
@@ -367,7 +367,8 @@ const SFX={
   lose(){ [330,262,196,147].forEach((f,i)=>tone(f,f*0.97,0.45,'sawtooth',0.06,i*0.16)); }
 };
 /* ---------- 3. ДАННЫЕ --------------------------------------------------- */
-const W=960,H=640,TS=48,COLS=20,ROWS=10,BY=56,PY=536;   // поле: y 56..536, панель 536..640
+const W=960,TS=48,COLS=20,ROWS=10,BY=56,PY=536;
+let H=640, TOUCH=false;   // на сенсорном экране панель управления выше, кнопки крупнее   // поле: y 56..536, панель 536..640
 const F="'Trebuchet MS','Segoe UI',system-ui,sans-serif";
 
 const TOWERS = {
@@ -1395,12 +1396,27 @@ function drawRange(){
     ctx.fillStyle='rgba(231,183,78,.10)'; ctx.fill();
     ctx.strokeStyle='rgba(231,183,78,.6)'; ctx.setLineDash([7,6]); ctx.lineWidth=2; ctx.stroke(); ctx.restore();
   }
+  if(g.sel && !g.selTower && towerUnlocked(g.sel)){
+    const cost=towerCost(g.sel);
+    for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++){           // подсвечиваем всё, куда можно ставить
+      if(!buildable(c,r)) continue;
+      const x=c*TS, y=BY+r*TS;
+      ctx.fillStyle = g.gold>=cost ? 'rgba(120,220,140,.13)' : 'rgba(150,170,190,.10)';
+      rr(x+3,y+3,TS-6,TS-6,5); ctx.fill();
+      ctx.strokeStyle = g.gold>=cost ? 'rgba(140,230,160,.35)' : 'rgba(150,170,190,.22)';
+      ctx.lineWidth=1.5; rr(x+3,y+3,TS-6,TS-6,5); ctx.stroke();
+    }
+  }
   if(g.sel && g.hoverC>=0 && !g.selTower){
     const ok=buildable(g.hoverC,g.hoverR) && g.gold>=towerCost(g.sel);
     ctx.fillStyle=ok?'rgba(110,220,130,.28)':'rgba(220,90,90,.3)';
     ctx.fillRect(g.hoverC*TS+3,BY+g.hoverR*TS+3,TS-6,TS-6);
-    ctx.strokeStyle=ok?'rgba(150,240,170,.9)':'rgba(240,120,120,.9)'; ctx.lineWidth=2;
-    ctx.strokeRect(g.hoverC*TS+3,BY+g.hoverR*TS+3,TS-6,TS-6);
+    ctx.strokeStyle=ok?'rgba(150,240,170,.95)':'rgba(240,120,120,.95)'; ctx.lineWidth=3;
+    rr(g.hoverC*TS+3,BY+g.hoverR*TS+3,TS-6,TS-6,5); ctx.stroke();
+    if(ok && TOUCH){                                          // на телефоне подсказываем второй тап
+      ctx.fillStyle='rgba(10,20,27,.85)'; rr(g.hoverC*TS-14,BY+g.hoverR*TS-26,76,20,6); ctx.fill();
+      txt('tap again',g.hoverC*TS+24,BY+g.hoverR*TS-16,12,'#cfe0ea','center',true);
+    }
   }
 }
 
@@ -1549,6 +1565,18 @@ function drawAxes(x,y){                       // скрещённые топор
   }
   ctx.restore();
 }
+function drawLock(x,y,sc){                      // маленький аккуратный замок
+  ctx.save(); ctx.translate(x,y); ctx.scale(sc||1,sc||1);
+  ctx.strokeStyle='#c9d8e2'; ctx.lineWidth=3; ctx.lineCap='round';
+  ctx.beginPath(); ctx.arc(0,-6,5.5,Math.PI,0); ctx.stroke();      // дужка
+  ctx.strokeStyle=OUT; ctx.lineWidth=1.2; ctx.stroke();
+  ctx.fillStyle='#e7b74e'; rr(-8,-6,16,13,3.5); ctx.fill();        // корпус
+  ctx.strokeStyle=OUT; ctx.lineWidth=1.6; rr(-8,-6,16,13,3.5); ctx.stroke();
+  ctx.fillStyle='rgba(255,255,255,.35)'; rr(-6.5,-4.5,5,10,2); ctx.fill();
+  ctx.fillStyle='#8c6a18'; ctx.beginPath(); ctx.arc(0,0,1.9,0,7); ctx.fill();
+  ctx.fillRect(-0.9,0,1.8,4);                                      // скважина
+  ctx.restore();
+}
 function drawCoin(x,y){
   ctx.fillStyle='#b78d28'; ctx.beginPath(); ctx.arc(x,y+1,10,0,7); ctx.fill();
   ctx.fillStyle='#e7b74e'; ctx.beginPath(); ctx.arc(x,y,10,0,7); ctx.fill(); ol(1.8);
@@ -1572,6 +1600,22 @@ function drawReload(t){                      // видимая перезаря�
   const s=t.st;
   if(t.bt>0 || t.dis>0 || !s.cd || s.cd<1.3) return;
   const k=clamp(1-t.cd/s.cd,0,1);
+  if(t.key==='rune'){                        // у руны это ключевая механика, показываем крупно
+    ctx.lineCap='round';
+    ctx.strokeStyle='rgba(10,20,27,.8)'; ctx.lineWidth=5;
+    ctx.beginPath(); ctx.arc(0,-4,23,0,6.283); ctx.stroke();
+    ctx.strokeStyle = k>=1 ? '#8ef0c0' : '#7fa6e0'; ctx.lineWidth=4;
+    ctx.beginPath(); ctx.arc(0,-4,23,-Math.PI/2,-Math.PI/2+6.283*k); ctx.stroke();
+    if(k>=1){
+      const pu=0.5+0.5*Math.sin(game.time*5);
+      ctx.strokeStyle='rgba(142,240,192,'+(0.25+pu*0.5)+')'; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.arc(0,-4,27+pu*3,0,6.283); ctx.stroke();
+      txt('READY',0,-4,10,'#8ef0c0','center',true);
+    } else {
+      txt(Math.ceil(t.cd)+'s',0,-4,12,'#cfe0ea','center',true);
+    }
+    return;
+  }
   const w=30;
   ctx.fillStyle='rgba(10,20,27,.8)'; rr(-w/2,28,w,5,2.5); ctx.fill();
   ctx.fillStyle = k>=1 ? '#7fd18a' : (t.key==='rune' ? '#7fa6e0' : '#e7b74e');
@@ -1861,63 +1905,75 @@ function drawHud(){
 
   ctx.fillStyle='#0e1c25'; ctx.fillRect(0,PY,W,H-PY);
   ctx.fillStyle='#2b4353'; ctx.fillRect(0,PY,W,2);
+  const cols=TOUCH?4:7, cw=TOUCH?132:84, ch=TOUCH?92:88, gap=TOUCH?8:4;
   TKEYS.forEach((k,i)=>{
-    const t=TOWERS[k], x=6+i*88, y=PY+8, w=84, h=88, cost=towerCost(k);
+    const t=TOWERS[k];
+    const x=6+(i%cols)*(cw+gap), y=PY+8+Math.floor(i/cols)*(ch+8), w=cw, h=ch, cost=towerCost(k);
     const lock=!towerUnlocked(k), afford=g.gold>=cost, selq=g.sel===k;
     ctx.fillStyle='#162833'; rr(x,y,w,h,7); ctx.fill();
     if(selq){ ctx.fillStyle='rgba(231,183,78,.16)'; rr(x,y,w,h,7); ctx.fill(); }
-    ctx.strokeStyle=selq?'#e7b74e':'#2f4a5a'; ctx.lineWidth=2; rr(x,y,w,h,7); ctx.stroke();
+    ctx.strokeStyle=selq?'#e7b74e':'#2f4a5a'; ctx.lineWidth=selq?3:2; rr(x,y,w,h,7); ctx.stroke();
     ctx.save(); ctx.globalAlpha=lock?0.3:(afford?1:0.45);
-    drawTowerIcon(k,x+w/2,y+32);
-    txt(t.short,x+w/2,y+56,11.5,'#cfe0ea','center',true);
-    txt((TOWERS[k].build||3)+'s',x+w/2,y+68,10.5,'#7d94a3','center');
+    drawTowerIcon(k,x+w/2,y+(TOUCH?36:32));
+    txt(t.short,x+w/2,y+(TOUCH?68:56),TOUCH?13:11.5,'#cfe0ea','center',true);
     ctx.restore();
     if(lock){
-      ctx.fillStyle='#8ea6b5'; rr(x+w/2-9,y+68,18,13,3); ctx.fill();
-      ctx.strokeStyle='#8ea6b5'; ctx.lineWidth=2.4; ctx.beginPath(); ctx.arc(x+w/2,y+68,5,Math.PI,0); ctx.stroke();
-      txt('Workshop',x+w/2,y+90,10.5,'#8ea6b5','center');
+      ctx.fillStyle='rgba(10,20,27,.55)'; rr(x+2,y+2,w-4,h-4,6); ctx.fill();
+      drawLock(x+w/2, y+h-34, TOUCH?1.15:1);
+      txt('Workshop',x+w/2,y+h-11,TOUCH?12:10.5,'#9db4c4','center',true);
     } else {
-      ctx.save(); ctx.translate(x+w/2-18,y+75); ctx.scale(.62,.62); drawCoin(0,0); ctx.restore();
-      txt(cost,x+w/2+4,y+76,13,afford?'#e9f0f4':'#d6584f','center',true);
+      ctx.save(); ctx.translate(x+w/2-20,y+h-16); ctx.scale(TOUCH?.72:.62,TOUCH?.72:.62); drawCoin(0,0); ctx.restore();
+      txt(cost,x+w/2+6,y+h-15,TOUCH?15:13,afford?'#e9f0f4':'#d6584f','center',true);
+      txt((TOWERS[k].build||3)+'s',x+w-12,y+12,TOUCH?12:10.5,'#7d94a3','right');
     }
     uiBtns.push({id:'t_'+k,x,y,w,h,on:true});
   });
 
-  const px=630, pw=W-px-8;
-  ctx.fillStyle='#162833'; rr(px,PY+8,pw,88,7); ctx.fill();
-  ctx.strokeStyle='#2f4a5a'; ctx.lineWidth=2; rr(px,PY+8,pw,88,7); ctx.stroke();
+  const px = TOUCH ? 6+cols*(cw+gap) : 630, pw = W-px-8;
+  const ph = TOUCH ? (ch*2+8) : 88;
+  ctx.fillStyle='#162833'; rr(px,PY+8,pw,ph,7); ctx.fill();
+  ctx.strokeStyle='#2f4a5a'; ctx.lineWidth=2; rr(px,PY+8,pw,ph,7); ctx.stroke();
+  const bH = TOUCH?56:30, adH = TOUCH?46:26;
   if(g.selTower){
     const t=g.selTower, s2=t.st;
-    txt(t.def.name+'  lv.'+(t.lvl+1),px+12,PY+30,15,'#e9f0f4','left',true);
-    txt(s2.ab||'',px+12,PY+52,12,'#8ea6b5');
+    txt(t.def.name+'  lv.'+(t.lvl+1),px+12,PY+30,TOUCH?17:15,'#e9f0f4','left',true);
+    txt(s2.ab||'',px+12,PY+52,TOUCH?13:12,'#8ea6b5');
     txt('range '+s2.range+(s2.dps?('  ·  '+Math.round(s2.dps*t.dmgMul)+' dps'):(s2.dmg?('  ·  '+Math.round(s2.dmg*t.dmgMul)+' dmg'):'')),
-        px+12,PY+72,12,'#6f8a9a');
+        px+12,PY+72,TOUCH?13:12,'#6f8a9a');
   } else if(g.sandbox){
     txt('Sandbox: spawn enemies',px+12,PY+20,13,'#cfe0ea','left',true);
     const list=['raider','scout','shield','raven','shaman','berserk','jarl','draugr','fenrir'];
+    const bw2=TOUCH?(pw-24)/5:58, bh2=TOUCH?34:26;
     list.forEach((t,i)=>{
-      const bx=px+10+(i%5)*62, by=PY+28+Math.floor(i/5)*30;
-      btn('sp_'+t,bx,by,58,26,ENEMIES[t].name.split(' ')[0].slice(0,7),{fs:11,c1:'#44606f',c2:'#2c4451'});
+      btn('sp_'+t, px+12+(i%5)*(bw2+2), PY+28+Math.floor(i/5)*(bh2+4), bw2, bh2,
+          ENEMIES[t].name.split(' ')[0].slice(0,7),{fs:TOUCH?12:11,c1:'#44606f',c2:'#2c4451'});
     });
-    btn('sp_clear',px+10+4*62,PY+58,58,26,'Clear',{fs:11,c1:'#6a4750',c2:'#4a2f36'});
+    btn('sp_clear', px+12+4*(bw2+2), PY+28+(bh2+4), bw2, bh2, 'Clear',{fs:TOUCH?12:11,c1:'#6a4750',c2:'#4a2f36'});
   } else {
     if(g.waveState==='idle'){
-      txt('Next wave in '+Math.ceil(g.waveTimer)+'s',px+12,PY+26,14,'#cfe0ea','left',true);
-      btn('early',px+12,PY+40,pw-24,24,'Call wave early · +'+Math.round(Math.ceil(g.waveTimer)*(2+g.wave*0.35)*goldMul())+' gold',{c1:'#4a7a52',c2:'#2f5a37',fs:13});
+      txt('Next wave in '+Math.ceil(g.waveTimer)+'s',px+12,PY+(TOUCH?22:20),TOUCH?15:12.5,'#cfe0ea','left',true);
+      btn('early',px+12,PY+(TOUCH?32:26),pw-24,bH,'Call wave early  +'+Math.round(Math.ceil(g.waveTimer)*(2+g.wave*0.35)*goldMul())+' gold',
+          {c1:'#4a7a52',c2:'#2f5a37',fs:TOUCH?17:15});
     } else {
       const left=g.spawnQ.length+g.enemies.length;
-      txt('In battle. Enemies left: '+left,px+12,PY+26,14,'#cfe0ea','left',true);
-      ctx.fillStyle='#23394a'; rr(px+12,PY+42,pw-24,8,4); ctx.fill();
+      txt('In battle. Enemies left: '+left,px+12,PY+(TOUCH?26:22),TOUCH?16:13,'#cfe0ea','left',true);
+      ctx.fillStyle='#23394a'; rr(px+12,PY+(TOUCH?44:36),pw-24,TOUCH?14:9,5); ctx.fill();
       const wv=g.waves[Math.min(g.wave,g.waves.length-1)];
       const tot=wv.groups.reduce((a,b)=>a+b.count,0)||1;
-      ctx.fillStyle='#e7b74e'; rr(px+12,PY+42,(pw-24)*clamp(1-left/tot,0,1),8,4); ctx.fill();
+      ctx.fillStyle='#e7b74e'; rr(px+12,PY+(TOUCH?44:36),(pw-24)*clamp(1-left/tot,0,1),TOUCH?14:9,5); ctx.fill();
     }
-    btn('adgold',px+12,PY+68,pw-24,26,g.adGold?'Watch ad for +50 gold':'Ad already used',
-        {c1:'#5fbf72',c2:'#2f8a48',tc:'#062211',fs:13,on:g.adGold});
+    btn('adgold',px+12,PY+ph-adH-2,pw-24,adH,g.adGold?'Watch ad  +50 gold':'Ad already used',
+        {c1:'#5fbf72',c2:'#2f8a48',tc:'#062211',fs:TOUCH?16:15,on:g.adGold});
   }
   if(g.paused){
     ctx.fillStyle='rgba(8,16,22,.55)'; ctx.fillRect(0,BY,W,PY-BY);
     txt('Paused',W/2,BY+(PY-BY)/2,44,'#e9f0f4','center',true);
+  }
+  if(g.sel && !g.selTower){
+    const tip = towerUnlocked(g.sel) ? TOWERS[g.sel].tip : 'Locked. Buy rank I for this weapon in the Workshop.';
+    ctx.fillStyle='rgba(14,28,37,.92)'; rr(6,PY-40,560,32,6); ctx.fill();
+    ctx.strokeStyle='#2f4a5a'; ctx.lineWidth=1.5; rr(6,PY-40,560,32,6); ctx.stroke();
+    txt(tip,18,PY-24,13,'#cfe0ea');
   }
   if(g.hints.length){
     const h=g.hints[0], bw=250;
@@ -1973,6 +2029,13 @@ function drawTowerIcon(k,x,y){
 /* Вписываем поле в экран вручную. На вертикальном телефоне поворачиваем всю сцену
    на 90°, чтобы игра занимала весь экран, а не узкую полоску посередине. */
 let VIEW={s:1, rot:0, vw:960, vh:640};
+function setLayout(touch){
+  TOUCH=!!touch; H = TOUCH ? 728 : 640;
+  const cv2=document.getElementById('cv'), st=document.getElementById('stage');
+  if(cv2){ cv2.height=H; cv2.style.height=H+'px'; }
+  if(st) st.style.height=H+'px';
+  fit();
+}
 function fit(){
   const vv = window.visualViewport;
   const vw = Math.round(vv? vv.width : window.innerWidth);
@@ -1997,10 +2060,16 @@ function toGame(ev){
   if(VIEW.rot===90){ const t=dx; dx=dy; dy=-t; }   // обратный поворот сцены
   return { x: dx/VIEW.s + W/2, y: dy/VIEW.s + H/2 };
 }
-function hitBtn(p){ for(let i=uiBtns.length-1;i>=0;i--){ const b=uiBtns[i];
-  if(p.x>=b.x&&p.x<=b.x+b.w&&p.y>=b.y&&p.y<=b.y+b.h) return b; } return null; }
+function hitBtn(p){
+  const s=TOUCH?10:0;                 // палец толще курсора
+  for(let i=uiBtns.length-1;i>=0;i--){ const b=uiBtns[i];
+    if(p.x>=b.x-s&&p.x<=b.x+b.w+s&&p.y>=b.y-s&&p.y<=b.y+b.h+s) return b; }
+  return null;
+}
 
 cv.addEventListener('pointerdown',e=>{ e.preventDefault(); if(!game) return;
+  if(e.pointerType==='touch' && !TOUCH){ setLayout(true); }
+  if(e.pointerType==='touch') game.touch=true;
   if(save.sound){ audio(); if(actx && actx.state==='suspended') actx.resume(); startWind(); }
   const p=toGame(e); const b=hitBtn(p);
   if(b){ if(b.on) onButton(b.id); else SFX.no(); return; }
@@ -2013,6 +2082,9 @@ cv.addEventListener('pointerdown',e=>{ e.preventDefault(); if(!game) return;
     if(!towerUnlocked(game.sel)){ SFX.no(); return; }
     const cost=towerCost(game.sel);
     if(!buildable(c,r)){ SFX.no(); return; }
+    if(TOUCH && (game.hoverC!==c || game.hoverR!==r)){      // первый тап — показать радиус и клетку
+      game.hoverC=c; game.hoverR=r; return;
+    }
     if(game.gold<cost){ SFX.no(); floatText(tx(c),ty(r),'not enough gold','#d6584f'); return; }
     const nt=new Tower(game.sel,c,r); nt.spent=cost;
     game.towers.push(nt); game.gold-=cost; SFX.build(); hint('building');
@@ -2071,7 +2143,7 @@ async function onButton(id){
   if(id.startsWith('t_')){ const k=id.slice(2);
     if(!towerUnlocked(k)){ SFX.no(); g.sel=k; g.selTower=null;
       floatText(480,BY+40,TOWERS[k].name+' — buy rank I in the Workshop','#8ea6b5'); return; }
-    g.sel = g.sel===k? null : k; g.selTower=null; return; }
+    g.sel = g.sel===k? null : k; g.selTower=null; if(TOUCH){ g.hoverC=-1; g.hoverR=-1; } return; }
 }
 
 /* ---------- 10. ЭКРАНЫ -------------------------------------------------- */
@@ -2314,7 +2386,8 @@ function loop(now){
 
 (async function boot(){
   await loadSave();
-  fit(); screen('scMenu'); renderLevels();
+  setLayout((navigator.maxTouchPoints||0)>0 || 'ontouchstart' in window);
+  screen('scMenu'); renderLevels();
   requestAnimationFrame(loop);
   // Playables: сообщаем платформе, что кадр отрисован и игра готова принимать ввод
   if(window.ytgame && ytgame.game){

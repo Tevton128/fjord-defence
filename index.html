@@ -125,7 +125,7 @@
       <button class="btn sec" id="bHelp">How to play</button>
     </div>
     <div class="bar"><div class="silver"><img src="assets/icons/icon_silver.png" alt=""><b id="silv1">0</b></div></div>
-    <div class="build">build 16.09 · 21</div>
+    <div class="build">build 16.09 · 22</div>
   </div>
 
   <!-- ВЫБОР УРОВНЯ -->
@@ -399,8 +399,8 @@ const TOWERS = {
     L:[ {cost:130, range:88,  dps:26, burn:8,  melt:2, max:2, ab:'Burns up to 2 enemies at once, armour -2.'},
         {cost:155, range:96,  dps:46, burn:14, melt:4, max:3, ab:'Burns up to 3 at once, armour -4.'},
         {cost:325, range:108, dps:74, burn:24, melt:8, max:4, ab:'Burns up to 4 at once, armour -8, longer flame.'} ] },
-  rune:{ build:5, name:'Rune of Return', short:'Return', air:true, unlock:6, color:'#7fa6e0',
-    tip:'Does not kill, it throws enemies back down the path. Strong against crowds.',
+  rune:{ build:5, name:'Rune of Return', short:'Return', air:true, unlock:6, color:'#7fa6e0', limit:3, gap:4,
+    tip:'Throws enemies back down the path instead of killing them. Up to 3 per fjord, 4 tiles apart.',
     L:[ {cost:180, range:112, cd:5.0, push:80,  dmg:12, maxT:4, ab:'Throws up to 4 enemies back 80 steps.'},
         {cost:210, range:126, cd:4.4, push:130, dmg:24, maxT:6, ab:'Throws up to 6 enemies back 130.'},
         {cost:415, range:142, cd:3.8, push:190, dmg:40, freeze:.7, maxT:8,
@@ -907,6 +907,7 @@ const HINTS={
   berserk:'Berserkers charge: every few seconds they burst forward at double speed.',
   boss:'A boss is coming. It carries heavy armour — lightning and the ballista ignore armour.',
   disabled:'That tower was sabotaged and is dark for a moment. It cannot fire.',
+  rune:'The rune of return is capped: three per fjord, and two runes cannot stand within four tiles of each other. Red cells are blocked by that rule.',
   building:'Towers take a few seconds to raise — a catapult needs five. Build before a wave lands, not while it runs.',
   freeze:'Fire melts frost and frost puts out fire. Do not stack a frost rune next to a fire altar.'
 };
@@ -969,6 +970,23 @@ function startLevel(idx, sandbox, endless){
   screen(null);
 }
 function towerCost(key){ return Math.round(TOWERS[key].L[0].cost*(1-perkVal('cost')/100)); }
+/* Руна возврата слишком сильна, если её ставить пачкой: ограничиваем и число на уровень,
+   и минимальное расстояние между рунами. Правило общее, просто пока задано только руне. */
+function placeBlock(key,c,r){
+  const d=TOWERS[key];
+  if(d.limit){
+    const n=game.towers.filter(t=>t.key===key).length;
+    if(n>=d.limit) return 'limit '+d.limit+' per fjord';
+  }
+  if(d.gap){
+    for(const t of game.towers){
+      if(t.key!==key) continue;
+      if(Math.hypot(t.c-c, t.r-r) < d.gap) return 'keep '+d.gap+' tiles apart';
+    }
+  }
+  return null;
+}
+function canPlace(key,c,r){ return buildable(c,r) && !placeBlock(key,c,r); }
 function buildable(c,r){
   if(c<0||r<0||c>=COLS||r>=ROWS) return false;
   if(game.blocked.has(c+','+r)) return false;
@@ -1401,6 +1419,11 @@ function drawRange(){
     for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++){           // подсвечиваем всё, куда можно ставить
       if(!buildable(c,r)) continue;
       const x=c*TS, y=BY+r*TS;
+      if(placeBlock(g.sel,c,r)){                              // занято правилом расстановки
+        ctx.fillStyle='rgba(200,110,110,.10)'; rr(x+3,y+3,TS-6,TS-6,5); ctx.fill();
+        ctx.strokeStyle='rgba(220,130,130,.28)'; ctx.lineWidth=1.5; rr(x+3,y+3,TS-6,TS-6,5); ctx.stroke();
+        continue;
+      }
       ctx.fillStyle = g.gold>=cost ? 'rgba(120,220,140,.13)' : 'rgba(150,170,190,.10)';
       rr(x+3,y+3,TS-6,TS-6,5); ctx.fill();
       ctx.strokeStyle = g.gold>=cost ? 'rgba(140,230,160,.35)' : 'rgba(150,170,190,.22)';
@@ -1408,7 +1431,7 @@ function drawRange(){
     }
   }
   if(g.sel && g.hoverC>=0 && !g.selTower){
-    const ok=buildable(g.hoverC,g.hoverR) && g.gold>=towerCost(g.sel);
+    const ok=canPlace(g.sel,g.hoverC,g.hoverR) && g.gold>=towerCost(g.sel);
     ctx.fillStyle=ok?'rgba(110,220,130,.28)':'rgba(220,90,90,.3)';
     ctx.fillRect(g.hoverC*TS+3,BY+g.hoverR*TS+3,TS-6,TS-6);
     ctx.strokeStyle=ok?'rgba(150,240,170,.95)':'rgba(240,120,120,.95)'; ctx.lineWidth=3;
@@ -1448,8 +1471,15 @@ function drawTowers(){
     if(sprite(tn,0,fit[2],fit[0]+t.lvl*3,TS*fit[1])){
       ctx.globalAlpha=1;
       if(t.bt>0) drawBuilding(t);
-      for(let i=0;i<=t.lvl;i++){ ctx.fillStyle='#e7b74e'; ctx.beginPath(); ctx.arc(-8+i*8,19,3,0,7); ctx.fill(); ol(1.4); }
+      else { drawRank(t.lvl); drawReload(t); }
+      if(t.dis>0){                                   // саботаж шамана
+        ctx.fillStyle='rgba(20,30,40,.55)'; ctx.beginPath(); ctx.ellipse(0,-14,20,26,0,0,7); ctx.fill();
+        ctx.strokeStyle='#8ef0c0'; ctx.lineWidth=2;
+        for(let i=0;i<3;i++){ const a=game.time*7+i*2.1;
+          ctx.beginPath(); ctx.arc(Math.cos(a)*16,-30+Math.sin(a)*5,2.4,0,7); ctx.stroke(); }
+      }
       ctx.restore();
+      if(t.bt<=0) drawTurret(t);
       if(t.key==='flame' && t.beamTarget) drawFlameCone(t);
         continue;
     }
@@ -1934,6 +1964,10 @@ function drawHud(){
       ctx.save(); ctx.translate(x+w/2-20,y+h-16); ctx.scale(TOUCH?.72:.62,TOUCH?.72:.62); drawCoin(0,0); ctx.restore();
       txt(cost,x+w/2+6,y+h-15,TOUCH?15:13,afford?'#e9f0f4':'#d6584f','center',true);
       txt((TOWERS[k].build||3)+'s',x+w-12,y+12,TOUCH?12:10.5,'#7d94a3','right');
+      if(t.limit){
+        const n=g.towers.filter(q=>q.key===k).length;
+        txt(n+'/'+t.limit,x+12,y+12,TOUCH?12:10.5, n>=t.limit?'#d6584f':'#7d94a3','left',true);
+      }
     }
     uiBtns.push({id:'t_'+k,x,y,w,h,on:true});
   });
@@ -2091,12 +2125,15 @@ cv.addEventListener('pointerdown',e=>{ e.preventDefault(); if(!game) return;
     if(!towerUnlocked(game.sel)){ SFX.no(); return; }
     const cost=towerCost(game.sel);
     if(!buildable(c,r)){ SFX.no(); return; }
+    const block=placeBlock(game.sel,c,r);
+    if(block){ SFX.no(); floatText(tx(c),ty(r)-10,block,'#e0a0a0'); return; }
     if(TOUCH && (game.hoverC!==c || game.hoverR!==r)){      // первый тап — показать радиус и клетку
       game.hoverC=c; game.hoverR=r; return;
     }
     if(game.gold<cost){ SFX.no(); floatText(tx(c),ty(r),'not enough gold','#d6584f'); return; }
     const nt=new Tower(game.sel,c,r); nt.spent=cost;
     game.towers.push(nt); game.gold-=cost; SFX.build(); hint('building');
+    if(game.sel==='rune') hint('rune');
     for(let i=0;i<6;i++) particle(tx(c),ty(r),'#caa84f');
   }
 });

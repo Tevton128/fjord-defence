@@ -125,7 +125,7 @@
       <button class="btn sec" id="bHelp">How to play</button>
     </div>
     <div class="bar"><div class="silver"><img src="assets/icons/icon_silver.png" alt=""><b id="silv1">0</b></div></div>
-    <div class="build">build 16.09 · 20</div>
+    <div class="build">build 16.09 · 21</div>
   </div>
 
   <!-- ВЫБОР УРОВНЯ -->
@@ -1413,9 +1413,18 @@ function drawRange(){
     ctx.fillRect(g.hoverC*TS+3,BY+g.hoverR*TS+3,TS-6,TS-6);
     ctx.strokeStyle=ok?'rgba(150,240,170,.95)':'rgba(240,120,120,.95)'; ctx.lineWidth=3;
     rr(g.hoverC*TS+3,BY+g.hoverR*TS+3,TS-6,TS-6,5); ctx.stroke();
+    if(ok){
+      const fit=FIT[g.sel]||[52,1.05,18];                     // призрак того, что встанет на клетку
+      ctx.save(); ctx.globalAlpha=0.55;
+      ctx.translate(tx(g.hoverC), ty(g.hoverR));
+      sprite('tower_'+g.sel+'_1',0,fit[2],fit[0],TS*fit[1]);
+      ctx.restore();
+    }
     if(ok && TOUCH){                                          // на телефоне подсказываем второй тап
-      ctx.fillStyle='rgba(10,20,27,.85)'; rr(g.hoverC*TS-14,BY+g.hoverR*TS-26,76,20,6); ctx.fill();
-      txt('tap again',g.hoverC*TS+24,BY+g.hoverR*TS-16,12,'#cfe0ea','center',true);
+      const bx=clamp(tx(g.hoverC)-44,4,W-92), by=Math.max(BY+4, BY+g.hoverR*TS-28);
+      ctx.fillStyle='rgba(231,183,78,.92)'; rr(bx,by,88,24,7); ctx.fill();
+      ctx.strokeStyle=OUT; ctx.lineWidth=1.5; rr(bx,by,88,24,7); ctx.stroke();
+      txt('tap again',bx+44,by+12,13,'#241708','center',true);
     }
   }
 }
@@ -2091,11 +2100,11 @@ cv.addEventListener('pointerdown',e=>{ e.preventDefault(); if(!game) return;
     for(let i=0;i<6;i++) particle(tx(c),ty(r),'#caa84f');
   }
 });
-cv.addEventListener('pointermove',e=>{ if(!game) return; const p=toGame(e);
+cv.addEventListener('pointermove',e=>{ if(!game || e.pointerType==='touch') return; const p=toGame(e);
   if(p.y>=BY&&p.y<PY){ game.hoverC=Math.floor(p.x/TS); game.hoverR=Math.floor((p.y-BY)/TS); }
   else { game.hoverC=-1; }
 });
-cv.addEventListener('pointerleave',()=>{ if(game) game.hoverC=-1; });
+cv.addEventListener('pointerleave',e=>{ if(game && e.pointerType!=='touch' && !TOUCH) game.hoverC=-1; });
 cv.addEventListener('contextmenu',e=>e.preventDefault());
 window.addEventListener('keydown',e=>{
   if(!game||!game.running) return;

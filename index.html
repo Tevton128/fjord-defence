@@ -125,7 +125,7 @@
       <button class="btn sec" id="bHelp">How to play</button>
     </div>
     <div class="bar"><div class="silver"><img src="assets/icons/icon_silver.png" alt=""><b id="silv1">0</b></div></div>
-    <div class="build">build 16.09 · 22</div>
+    <div class="build">build 16.09 · 23</div>
   </div>
 
   <!-- ВЫБОР УРОВНЯ -->
@@ -217,6 +217,7 @@
 const memStore = {};
 const Store = {
   async get(k){
+    try{ if(window.bridge && bridge.storage){ const v=await bridge.storage.get(k); if(v!=null) return v; } }catch(e){}
     try{ if(window.ytgame && ytgame.game && ytgame.game.loadData){
       const s = await ytgame.game.loadData(); if(s) return JSON.parse(s)[k] ?? null; } }catch(e){}
     try{ if(window.storage){ const r = await window.storage.get(k,false); if(r) return r.value; } }catch(e){}
@@ -224,6 +225,7 @@ const Store = {
     return memStore[k] ?? null;
   },
   async set(k,v){
+    try{ if(window.bridge && bridge.storage){ await bridge.storage.set(k,v); return; } }catch(e){}
     try{ if(window.ytgame && ytgame.game && ytgame.game.saveData){
       await ytgame.game.saveData(JSON.stringify({[k]:v})); return; } }catch(e){}
     try{ if(window.storage){ await window.storage.set(k,v,false); return; } }catch(e){}
@@ -244,6 +246,39 @@ async function loadSave(){
 let saveTimer=null;
 function persist(){ clearTimeout(saveTimer); saveTimer=setTimeout(()=>Store.set('fjord_save_v2',JSON.stringify(save)),250); }
 
+/* Платформа (YouTube или Bridge) может в любой момент потребовать паузу и отключение звука.
+   Это обязательное требование сертификации: игра обязана слушаться мгновенно. */
+let platformPaused=false, platformMuted=false;
+function platformPause(v){
+  platformPaused=!!v;
+  if(game) game.paused = platformPaused ? true : game.paused;
+  if(platformPaused) stopWind();
+  else if(save.sound && !platformMuted && game) startWind();
+}
+function platformMute(v){
+  platformMuted=!!v;
+  if(platformMuted) stopWind();
+  else if(save.sound && game) startWind();
+  if(master && actx){ try{ master.gain.value = platformMuted?0:0.9; }catch(e){} }
+}
+function bindPlatformEvents(){
+  document.addEventListener('visibilitychange',()=>platformPause(document.hidden));
+  window.addEventListener('blur',()=>platformPause(true));
+  window.addEventListener('focus',()=>platformPause(false));
+  try{
+    if(window.ytgame && ytgame.system){
+      if(ytgame.system.onPause) ytgame.system.onPause(()=>platformPause(true));
+      if(ytgame.system.onResume) ytgame.system.onResume(()=>platformPause(false));
+      if(ytgame.system.onAudioEnabledChange) ytgame.system.onAudioEnabledChange(on=>platformMute(!on));
+      if(typeof ytgame.system.isAudioEnabled==='function') platformMute(!ytgame.system.isAudioEnabled());
+    }
+  }catch(e){}
+  try{
+    if(window.bridge && bridge.game && bridge.game.on){
+      bridge.game.on('visibility_state_changed', st=>platformPause(st==='hidden'));
+    }
+  }catch(e){}
+}
 /* ---------- 1. РЕКЛАМА --------------------------------------------------
    Один слой над всеми показами. Сейчас — демо-ролик 5 секунд.
    Чтобы включить настоящую монетизацию YouTube Playables, раскомментируй
@@ -251,9 +286,18 @@ function persist(){ clearTimeout(saveTimer); saveTimer=setTimeout(()=>Store.set(
    в head — только в сборке для Playables). Сторонние сети (AdMob и т.п.)
    на Playables запрещены. */
 const Ads = {
-  available(){ return !!(window.ytgame && ytgame.ads); },
+  bridgeReady(){ try{ return !!(window.bridge && bridge.advertisement); }catch(e){ return false; } },
+  available(){ return this.bridgeReady() || !!(window.ytgame && ytgame.ads); },
 
   async interstitial(){                             // между уровнями
+    if(this.bridgeReady()){
+      try{
+        if(bridge.advertisement.isInterstitialSupported===false) return false;
+        if(game) game.paused=true;
+        await bridge.advertisement.showInterstitial();
+      }catch(e){} finally{ if(game) game.paused=false; }
+      return true;
+    }
     if(this.available()){
       try{ if(game) game.paused=true; await ytgame.ads.requestInterstitialAd(); }
       catch(e){}
@@ -264,6 +308,13 @@ const Ads = {
   },
 
   async rewarded(id, title){                        // за награду
+    if(this.bridgeReady()){
+      try{
+        if(bridge.advertisement.isRewardedSupported===false) return false;
+        const r=await bridge.advertisement.showRewarded();
+        return r!==false;
+      }catch(e){ return false; }
+    }
     if(this.available()){
       try{ await ytgame.ads.requestRewardedAd(id); return true; }
       catch(e){ return false; }
@@ -310,7 +361,7 @@ function env(node, vol, dur, delay){
   return t;
 }
 function tone(freq,freq2,dur,type,vol,delay){
-  if(!save.sound||!audio()) return;
+  if(!save.sound||platformMuted||!audio()) return;
   const o=actx.createOscillator(); o.type=type||'sine';
   const t=env(o,vol||0.08,dur,delay);
   o.frequency.setValueAtTime(freq,t);
@@ -318,7 +369,7 @@ function tone(freq,freq2,dur,type,vol,delay){
   o.start(t); o.stop(t+dur+0.02);
 }
 function noise(dur,f0,f1,q,vol,type,delay){
-  if(!save.sound||!audio()) return;
+  if(!save.sound||platformMuted||!audio()) return;
   const src=actx.createBufferSource(); src.buffer=noiseBuf(Math.max(dur,0.05));
   const bp=actx.createBiquadFilter(); bp.type=type||'bandpass'; bp.Q.value=q||1;
   const t=actx.currentTime+(delay||0);
@@ -328,7 +379,7 @@ function noise(dur,f0,f1,q,vol,type,delay){
   src.start(t); src.stop(t+dur+0.02);
 }
 function startWind(){                      // тихий ветер фьорда под боем
-  if(!save.sound||!audio()||windNode) return;
+  if(!save.sound||platformMuted||platformPaused||!audio()||windNode) return;
   const src=actx.createBufferSource(); src.buffer=noiseBuf(4); src.loop=true;
   const lp=actx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=380; lp.Q.value=0.6;
   const g=actx.createGain(); g.gain.value=0.035;
@@ -2422,7 +2473,7 @@ let last=performance.now();
 function loop(now){
   let dt=(now-last)/1000; last=now;
   dt=Math.min(dt,0.05);
-  if(game && game.running && !game.paused){
+  if(game && game.running && !game.paused && !platformPaused){
     const steps=game.speed;
     for(let i=0;i<steps;i++) update(dt);
   }
@@ -2435,6 +2486,9 @@ function loop(now){
   setLayout((navigator.maxTouchPoints||0)>0 || 'ontouchstart' in window);
   screen('scMenu'); renderLevels();
   requestAnimationFrame(loop);
+  try{ if(window.bridge && bridge.initialize) await bridge.initialize(); }catch(e){}
+  bindPlatformEvents();
+  try{ if(window.bridge && bridge.platform && bridge.platform.sendMessage) bridge.platform.sendMessage('game_ready'); }catch(e){}
   // Playables: сообщаем платформе, что кадр отрисован и игра готова принимать ввод
   if(window.ytgame && ytgame.game){
     try{

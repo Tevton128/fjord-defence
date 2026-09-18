@@ -26,7 +26,7 @@
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   html,body{margin:0;height:100%;overflow:hidden;background:#0a141b;font-family:var(--f);color:var(--snow)}
-  #wrap{position:fixed;inset:0;overflow:hidden;
+  #wrap{position:fixed;inset:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px);overflow:hidden;
         background:radial-gradient(120% 90% at 50% 0%,#1b3446 0%,#0a141b 70%)}
   #stage{position:absolute;left:0;top:0;width:960px;height:640px;transform-origin:center center;overflow:hidden;
          border-radius:10px;box-shadow:0 24px 70px rgba(0,0,0,.6)}
@@ -107,6 +107,18 @@
 
   .back .btn{min-width:0;min-height:44px;padding:10px 20px;font-size:15px;margin:0}
 
+
+  body.portrait .screen{padding:24px 18px;overflow-y:auto;border-radius:0}
+  body.portrait .screen.scroll{padding:20px 18px 28px}
+  body.portrait .screen .btn{min-height:60px;font-size:20px;max-width:100%}
+  body.portrait .screen p.sub{font-size:18px}
+  body.portrait .levels{grid-template-columns:repeat(3,1fr)}
+  body.portrait .lv{height:100px}
+  body.portrait .lv span{font-size:12px}
+  body.portrait .perks{grid-template-columns:1fr}
+  body.portrait .hdr{top:-20px}
+  body.portrait .back,body.portrait .bar{top:0}
+  body.portrait ul.help{font-size:18px}
 </style>
 </head>
 <body>
@@ -978,6 +990,7 @@ const clamp=(v,a,b)=>v<a?a:v>b?b:v;
 
 /* ---------- 7. ЛОГИКА УРОВНЯ -------------------------------------------- */
 function startLevel(idx, sandbox, endless){
+  BV.zoom=1; BV.panX=0; BV.panY=0; updateBoardView();
   screen(null);                       // закрываем меню сразу, что бы дальше ни случилось
   const L=LEVELS[idx];
   game={
@@ -1137,6 +1150,7 @@ function btn(id,x,y,w,h,label,opt){
 function draw(){
   const g=game;
   ctx.clearRect(0,0,CW,H);
+  if(PORTRAIT){ const bg=ctx.createLinearGradient(0,PORT_BOARD_Y,0,PORT_BOARD_Y+PORT_BOARD_H); bg.addColorStop(0,'#142d39'); bg.addColorStop(.5,'#0b1b23'); bg.addColorStop(1,'#142d39'); ctx.fillStyle=bg; ctx.fillRect(0,PORT_BOARD_Y,CW,PORT_BOARD_H); }
   ctx.save();
   if(g&&g.shake>0){ const s=g.shake*7; ctx.translate((Math.random()-.5)*s,(Math.random()-.5)*s); }
   if(!g){ ctx.restore(); return; }
@@ -2000,8 +2014,59 @@ function drawTopBar(g){
   glyphRestart(bx+bw/2,by+bh/2);
   if(g.askRestart) txt('again?',bx+bw/2,by+bh+10,11,'#e59a95','center',true);
 }
+
+/* Portrait: overview above, stable thumb controls below. No controls cover the map. */
+function drawPortraitHud(g){
+  const dock=PORT_BOARD_Y+PORT_BOARD_H;
+  ctx.fillStyle='#0e1c25'; ctx.fillRect(0,0,CW,PORT_BOARD_Y); ctx.fillRect(0,dock,CW,H-dock);
+  txt(g.L.n,14,23,19,'#e9f0f4','left',true);
+  txt('Wave '+Math.min(g.wave+1,g.waves.length)+' / '+g.waves.length,14,49,16,'#9fb3c0');
+  drawAxes(210,25); txt(g.lives,230,25,20,'#e9f0f4','left',true);
+  drawCoin(316,25); txt(Math.floor(g.gold),336,25,20,'#e7b74e','left',true);
+  ['exit','sound','restart','pause'].forEach((id,i)=>{
+    const x=14+i*68; btn(id,x,61,60,46,'',{});
+    if(id==='exit') glyphHome(x+30,84);
+    if(id==='sound') glyphSound(x+27,84,save.sound);
+    if(id==='restart') glyphRestart(x+30,84);
+    if(id==='pause') glyphPause(x+30,84,g.paused);
+  });
+  txt(g.askRestart?'Tap restart again':Math.round(BV.zoom*100)+'%',CW-14,84,16,g.askRestart?'#e59a95':'#9fb3c0','right');
+  if(g.paused){ ctx.fillStyle='rgba(8,16,22,.55)'; ctx.fillRect(0,PORT_BOARD_Y,CW,PORT_BOARD_H); txt('Paused',CW/2,PORT_BOARD_Y+PORT_BOARD_H/2,34,'#fff','center',true); }
+  const boss=g.enemies.find(e=>e.d.boss&&!e.dead);
+  let status=g.selTower?g.selTower.def.name+' · level '+(g.selTower.lvl+1):g.sel?(towerUnlocked(g.sel)?'Tap a cell, then tap again to build':'Locked · unlock in the Forge'):'Pinch to zoom · drag the map';
+  if(boss&&!g.sel&&!g.selTower) status=boss.d.name+' · '+Math.ceil(boss.hp)+' HP';
+  txt(status,14,dock+19,16,'#cfe0ea');
+  if(g.selTower){
+    const t=g.selTower;
+    btn('up',12,dock+36,224,58,t.lvl>=2?'Max level':'Upgrade '+t.upCost(),{fs:18,on:t.lvl<2&&t.canUp()&&g.gold>=t.upCost()});
+    btn('sell',244,dock+36,224,58,(t.cancelable()?'Cancel +':'Sell +')+t.sellValue(),{fs:18,c1:'#6a4750',c2:'#4a2f36'});
+  }else{
+    btn('zout',12,dock+36,60,58,'−',{fs:26});
+    btn('fit',80,dock+36,184,58,'Full map',{fs:18});
+    btn('zin',272,dock+36,60,58,'+',{fs:26});
+    btn('cancel',340,dock+36,128,58,'Deselect',{fs:16,on:!!g.sel});
+  }
+  TKEYS.forEach((k,i)=>{
+    const x=12+(i%4)*116,y=dock+104+Math.floor(i/4)*90,w=108,h=82;
+    const lock=!towerUnlocked(k),cost=towerCost(k),selected=g.sel===k;
+    ctx.fillStyle=selected?'#394438':'#162833'; rr(x,y,w,h,8); ctx.fill();
+    ctx.strokeStyle=selected?'#e7b74e':'#365365'; ctx.lineWidth=selected?3:1.5; ctx.stroke();
+    ctx.save(); ctx.globalAlpha=lock?.35:(g.gold>=cost?1:.5); if(!sprite('icon_tower_'+k+'_1',x+w/2,y+46,40,68)){ ctx.translate(x+w/2,y+24); ctx.scale(.55,.55); drawTowerIcon(k,0,0); } ctx.restore();
+    txt(TOWERS[k].short,x+w/2,y+56,15,'#dce9ef','center',true);
+    txt(lock?'Locked':cost+' gold',x+w/2,y+73,14,lock?'#8ea6b5':g.gold>=cost?'#e7b74e':'#e58d80','center');
+    uiBtns.push({id:'t_'+k,x,y,w,h,on:true});
+  });
+  if(g.sandbox){ btn('sp_raider',360,dock+194,108,82,'Raider +',{fs:16}); }
+  else{ txt('NEXT WAVE',414,dock+218,12,'#8ea6b5','center'); txt(g.waveState==='idle'?Math.ceil(g.waveTimer)+'s':g.enemies.length+g.spawnQ.length+' left',414,dock+247,20,'#e7b74e','center',true); }
+  const y=dock+286;
+  btn('early',12,y,184,60,g.waveState==='idle'?'Wave +'+Math.round(Math.ceil(g.waveTimer)*(2+g.wave*0.35)*goldMul())+' gold':'Wave in progress',{fs:17,c1:'#4a7a52',c2:'#2f5a37',on:g.waveState==='idle'&&!g.sandbox});
+  btn('speed',204,y,76,60,g.speed+'x',{fs:22});
+  btn('adgold',288,y,180,60,g.adGold?'Ad · +50 gold':'Ad used',{fs:18,c1:'#5fbf72',c2:'#2f8a48',tc:'#062211',on:g.adGold});
+}
+
 function drawHud(){
   const g=game; uiBtns=[];
+  if(PORTRAIT){ drawPortraitHud(g); return; }
   drawTopBar(g);
 
   const boss=g.enemies.find(e=>e.d.boss && !e.dead);
@@ -2176,59 +2241,64 @@ function drawTowerIcon(k,x,y){
 }
 
 /* ---------- 9. ВВОД ----------------------------------------------------- */
-/* Вписываем поле в экран вручную. На вертикальном телефоне поворачиваем всю сцену
-   на 90°, чтобы игра занимала весь экран, а не узкую полоску посередине. */
+/* Адаптивный холст: отдельная вертикальная панель и независимая камера поля. */
 let VIEW={s:1, rot:0, vw:960, vh:640};
 function setLayout(touch, portrait){
   TOUCH=!!touch;
-  PORTRAIT = !!portrait && TOUCH;
+  PORTRAIT = !!portrait;
+  document.body.classList.toggle("portrait",PORTRAIT);
   if(PORTRAIT){
-    CW=720;
-    const vw=window.innerWidth||390, vh=window.innerHeight||844;
-    BV.zoom = 1.5;                                     // компромисс: клетка крупная, карта видна на две трети
-    PORT_BOARD_H = Math.round(ROWS*TS*(CW/W)*BV.zoom);  // ровно под приближённое поле
-    const want = Math.round(CW*vh/vw);                  // сколько влезет по пропорциям экрана
-    PORT_CARD_H = clamp(Math.round((want - PORT_BOARD_Y - PORT_BOARD_H - 34 - 24)/2), 112, 176);
-    H = PORT_BOARD_Y + PORT_BOARD_H + 34 + 2*(PORT_CARD_H+8) + 16;
+    CW=480;
+    const vv=window.visualViewport;
+    const bounds=document.getElementById("wrap").getBoundingClientRect();
+    const vw=Math.min(bounds.width,vv?vv.width:window.innerWidth), vh=Math.min(bounds.height,vv?vv.height:window.innerHeight);
+    H=Math.max(640,Math.round(CW*vh/vw));
+    PORT_BOARD_H=H-PORT_BOARD_Y-360;
+    PORT_CARD_H=88;
   }
   else { CW=960; H = TOUCH ? 728 : 640; }
   const cv2=document.getElementById('cv'), st=document.getElementById('stage');
   if(cv2){ cv2.width=CW; cv2.height=H; cv2.style.width=CW+'px'; cv2.style.height=H+'px'; }
   if(st){ st.style.width=CW+'px'; st.style.height=H+'px'; }
+  if(typeof fingers!=="undefined"){ fingers.clear(); drag=null; pinch=null; gestureUsed=false; }
   updateBoardView();
   fit();
 }
 function updateBoardView(){
   if(PORTRAIT){
-    BV.s = (CW/W) * BV.zoom;                     // по умолчанию поле ровно по ширине экрана
+    BV.s = Math.min(CW/W, PORT_BOARD_H/(ROWS*TS)) * BV.zoom;                     // по умолчанию поле ровно по ширине экрана
     const bw=W*BV.s, bh=ROWS*TS*BV.s;
     const areaH = PORT_BOARD_H;
     BV.x = (bw<=CW) ? (CW-bw)/2 : clamp(BV.panX, CW-bw, 0);
     BV.y = PORT_BOARD_Y + ((bh<=areaH) ? (areaH-bh)/2 : clamp(BV.panY, areaH-bh, 0));
+    BV.panX=BV.x; BV.panY=BV.y-PORT_BOARD_Y;
   } else {
     BV.s=1; BV.x=0; BV.y=BY; BV.zoom=1; BV.panX=0; BV.panY=0;
   }
 }
-const PORT_BOARD_Y=96;
+const PORT_BOARD_Y=112;
 let PORT_BOARD_H=500, PORT_CARD_H=112;   // считаются под пропорции конкретного экрана
 function fit(){
   const vv = window.visualViewport;
-  const vw = Math.round(vv? vv.width : window.innerWidth);
-  const vh = Math.round(vv? vv.height : window.innerHeight);
+  const bounds=document.getElementById("wrap").getBoundingClientRect();
+  const vw = Math.round(Math.min(bounds.width,vv? vv.width : window.innerWidth));
+  const vh = Math.round(Math.min(bounds.height,vv? vv.height : window.innerHeight));
   const s = Math.min(vw/CW, vh/H);
   VIEW={s, rot:0, vw, vh};
   const st=document.getElementById('stage');
   st.style.transformOrigin='0 0';
   st.style.transform='translate('+(vw/2)+'px,'+(vh/2)+'px) scale('+s+') translate('+(-CW/2)+'px,'+(-H/2)+'px)';
 }
-window.addEventListener('resize',fit);
-window.addEventListener('orientationchange',()=>setTimeout(fit,250));
-if(window.visualViewport){ visualViewport.addEventListener('resize',fit); }
+function resizeLayout(){ setLayout(TOUCH,window.innerHeight>window.innerWidth*1.04); }
+window.addEventListener('resize',resizeLayout);
+window.addEventListener('orientationchange',()=>setTimeout(resizeLayout,250));
+if(window.visualViewport){ visualViewport.addEventListener('resize',resizeLayout); }
 
 function toGame(ev){            // координаты холста
   const cx=(ev.touches? ev.touches[0].clientX : ev.clientX);
   const cy=(ev.touches? ev.touches[0].clientY : ev.clientY);
-  return { x: (cx-VIEW.vw/2)/VIEW.s + CW/2, y: (cy-VIEW.vh/2)/VIEW.s + H/2 };
+  const bounds=cv.getBoundingClientRect();
+  return {x:(cx-bounds.left)*CW/bounds.width,y:(cy-bounds.top)*H/bounds.height};
 }
 function toBoard(p){           // координаты поля с учётом масштаба и сдвига
   return { x:(p.x-BV.x)/BV.s, y:(p.y-BV.y)/BV.s + BY };
@@ -2238,7 +2308,7 @@ function onBoard(p){
   return p.y>=PORT_BOARD_Y && p.y<PORT_BOARD_Y+PORT_BOARD_H;
 }
 function hitBtn(p){
-  const s=TOUCH?10:0;                 // палец толще курсора
+  const s=PORTRAIT?0:(TOUCH?4:0);                 // палец толще курсора
   for(let i=uiBtns.length-1;i>=0;i--){ const b=uiBtns[i];
     if(p.x>=b.x-s&&p.x<=b.x+b.w+s&&p.y>=b.y-s&&p.y<=b.y+b.h+s) return b; }
   return null;
@@ -2256,7 +2326,7 @@ function handleTap(p){
   const c=Math.floor(bp.x/TS), r=Math.floor((bp.y-BY)/TS);
   if(c<0||r<0||c>=COLS||r>=ROWS) return;
   const t=g.towers.find(t=>t.c===c&&t.r===r);
-  if(t){ g.selTower=t; g.sel=null; return; }
+  if(t){ g.selTower=t; g.sel=null; haptic(12); return; }
   g.selTower=null;
   if(g.sel){
     if(!towerUnlocked(g.sel)){ SFX.no(); return; }
@@ -2267,40 +2337,81 @@ function handleTap(p){
     if(TOUCH && (g.hoverC!==c || g.hoverR!==r)){ g.hoverC=c; g.hoverR=r; return; }
     if(g.gold<cost){ SFX.no(); floatText(tx(c),ty(r),'not enough gold','#d6584f'); return; }
     const nt=new Tower(g.sel,c,r); nt.spent=cost;
-    g.towers.push(nt); g.gold-=cost; SFX.build(); hint('building');
+    g.towers.push(nt); g.gold-=cost; SFX.build(); haptic([20,30,30]); hint('building');
     if(g.sel==='rune') hint('rune');
     for(let i=0;i<6;i++) particle(tx(c),ty(r),'#caa84f');
   }
 }
+const fingers=new Map();
+let pinch=null, gestureUsed=false;
+function haptic(pattern){ try{ if(navigator.vibrate) navigator.vibrate(pattern); }catch(e){} }
+function zoomAt(z,p){
+  const bp=toBoard(p); BV.zoom=clamp(z,1,3); updateBoardView();
+  BV.panX=p.x-bp.x*BV.s;
+  BV.panY=p.y-PORT_BOARD_Y-(bp.y-BY)*BV.s;
+  updateBoardView();
+  if(game) game.hoverC=-1;
+}
+function beginPinch(){
+  const [a,b]=[...fingers.values()];
+  pinch={distance:Math.max(1,Math.hypot(b.x-a.x,b.y-a.y)),zoom:BV.zoom,
+    anchor:toBoard({x:(a.x+b.x)/2,y:(a.y+b.y)/2})};
+  gestureUsed=true; drag=null;
+  if(game) game.hoverC=-1;
+}
 cv.addEventListener('pointerdown',e=>{
-  e.preventDefault(); if(!game) return;
-  if(e.pointerType==='touch' && !TOUCH) setLayout(true, window.innerHeight > window.innerWidth*1.04);
+  e.preventDefault(); if(!game || !game.running) return;
   if(save.sound){ audio(); if(actx && actx.state==='suspended') actx.resume(); startWind(); }
   const p=toGame(e);
-  if(e.pointerType==='touch'){ game.touch=true; drag={p, moved:false, panX:BV.panX, panY:BV.panY}; return; }
+  if(e.pointerType==='touch'){
+    game.touch=true; cv.setPointerCapture(e.pointerId);
+    if(!fingers.size) gestureUsed=false;
+    fingers.set(e.pointerId,p);
+    if(fingers.size===2 && PORTRAIT && [...fingers.values()].every(onBoard)){ beginPinch(); return; }
+    if(fingers.size>1){ gestureUsed=true; drag=null; return; }
+    drag={p,moved:false,panX:BV.panX,panY:BV.panY,board:onBoard(p)&&!hitBtn(p)};
+    return;
+  }
   handleTap(p);
 });
 cv.addEventListener('pointermove',e=>{
   if(!game) return;
+  const p=toGame(e);
   if(e.pointerType!=='touch'){
-    const p=toGame(e);
     if(onBoard(p)){ const bp=toBoard(p); game.hoverC=Math.floor(bp.x/TS); game.hoverR=Math.floor((bp.y-BY)/TS); }
     else game.hoverC=-1;
     return;
   }
-  if(!drag) return;
-  const p=toGame(e), dx=p.x-drag.p.x, dy=p.y-drag.p.y;
-  if(Math.abs(dx)>12 || Math.abs(dy)>12) drag.moved=true;
-  if(drag.moved && PORTRAIT && onBoard(drag.p)){
-    BV.panX=drag.panX+dx; BV.panY=drag.panY+dy; updateBoardView();
+  if(!fingers.has(e.pointerId)) return;
+  fingers.set(e.pointerId,p);
+  if(pinch && fingers.size>=2){
+    const [a,b]=[...fingers.values()];
+    BV.zoom=clamp(pinch.zoom*Math.hypot(b.x-a.x,b.y-a.y)/pinch.distance,1,3);
+    updateBoardView();
+    BV.panX=(a.x+b.x)/2-pinch.anchor.x*BV.s;
+    BV.panY=(a.y+b.y)/2-PORT_BOARD_Y-(pinch.anchor.y-BY)*BV.s;
+    updateBoardView(); return;
+  }
+  if(!drag || gestureUsed) return;
+  const dx=p.x-drag.p.x,dy=p.y-drag.p.y;
+  if(Math.hypot(dx,dy)*VIEW.s>8) drag.moved=true;
+  if(drag.moved && PORTRAIT && drag.board){
+    BV.panX=drag.panX+dx; BV.panY=drag.panY+dy; updateBoardView(); game.hoverC=-1;
   }
 });
-cv.addEventListener('pointerup',e=>{
-  if(!game || e.pointerType!=='touch') return;
-  const d=drag; drag=null;
-  if(d && !d.moved) handleTap(toGame(e));
-});
-cv.addEventListener('pointercancel',()=>{ drag=null; });
+function endPointer(e,cancelled){
+  if(!fingers.has(e.pointerId)) return;
+  const d=drag; fingers.delete(e.pointerId);
+  if(cancelled) gestureUsed=true;
+  if(!fingers.size){
+    if(!gestureUsed && d && !d.moved && game) handleTap(toGame(e));
+    drag=null; pinch=null; gestureUsed=false;
+  } else { gestureUsed=true; pinch=null; drag=null; }
+}
+cv.addEventListener('pointerup',e=>endPointer(e,false));
+cv.addEventListener('pointercancel',e=>endPointer(e,true));
+cv.addEventListener('lostpointercapture',e=>endPointer(e,true));
+window.addEventListener('blur',()=>{ fingers.clear(); drag=null; pinch=null; gestureUsed=false; });
 cv.addEventListener('pointerleave',e=>{ if(game && e.pointerType!=='touch' && !TOUCH) game.hoverC=-1; });
 cv.addEventListener('contextmenu',e=>e.preventDefault());
 window.addEventListener('keydown',e=>{
@@ -2318,8 +2429,9 @@ async function onButton(id){
     setTimeout(()=>{ if(game){ game.askRestart=false; game.paused=false; } },2500);
     return;
   }
-  if(id==='zin'){ BV.zoom=Math.min(2.6,BV.zoom*1.25); updateBoardView(); return; }
-  if(id==='zout'){ BV.zoom=Math.max(0.9,BV.zoom/1.25); if(BV.zoom<=1){ BV.panX=0; BV.panY=0; } updateBoardView(); return; }
+  if(id==='fit'){ BV.zoom=1; BV.panX=0; BV.panY=0; updateBoardView(); return; }
+  if(id==='zin' || id==='zout'){ zoomAt(BV.zoom*(id==='zin'?1.25:0.8),{x:CW/2,y:PORT_BOARD_Y+PORT_BOARD_H/2}); return; }
+  if(id==='cancel'){ g.sel=null; g.selTower=null; g.hoverC=-1; return; }
   if(id==='pause'){ g.paused=!g.paused; return; }
   if(id==='speed'){ g.speed = g.speed===1?2:1; return; }
   if(id==='sound'){ save.sound=!save.sound; persist(); if(save.sound) startWind(); else stopWind(); return; }
@@ -2351,7 +2463,7 @@ async function onButton(id){
   if(id.startsWith('t_')){ const k=id.slice(2);
     if(!towerUnlocked(k)){ SFX.no(); g.sel=k; g.selTower=null;
       floatText(480,BY+40,TOWERS[k].name+' — buy rank I in the Workshop','#8ea6b5'); return; }
-    g.sel = g.sel===k? null : k; g.selTower=null; if(TOUCH){ g.hoverC=-1; g.hoverR=-1; } return; }
+    g.sel = g.sel===k? null : k; if(g.sel) haptic(12); g.selTower=null; if(TOUCH){ g.hoverC=-1; g.hoverR=-1; } return; }
 }
 
 /* ---------- 10. ЭКРАНЫ -------------------------------------------------- */

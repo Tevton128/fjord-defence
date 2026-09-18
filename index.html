@@ -125,7 +125,7 @@
       <button class="btn sec" id="bHelp">How to play</button>
     </div>
     <div class="bar"><div class="silver"><img src="assets/icons/icon_silver.png" alt=""><b id="silv1">0</b></div></div>
-    <div class="build">build 16.09 · 24</div>
+    <div class="build">build 16.09 · 26</div>
   </div>
 
   <!-- ВЫБОР УРОВНЯ -->
@@ -422,7 +422,8 @@ const W=960,TS=48,COLS=20,ROWS=10,BY=56,PY=536;
 let H=640, TOUCH=false, PORTRAIT=false;
 let CW=960;                       // логическая ширина холста (в портрете уже)
 /* Вид поля в портрете: поле масштабируется под ширину экрана, его можно приближать и двигать. */
-const BV={x:0, y:BY, s:1, zoom:1, panX:0, panY:0};   // поле: y 56..536, панель 536..640
+const BV={x:0, y:BY, s:1, zoom:1, panX:0, panY:0};
+   // поле: y 56..536, панель 536..640
 const F="'Trebuchet MS','Segoe UI',system-ui,sans-serif";
 
 const TOWERS = {
@@ -2020,8 +2021,8 @@ function drawHud(){
   const PANY = PORTRAIT ? (PORT_BOARD_Y+PORT_BOARD_H+34) : PY;
   ctx.fillStyle='#0e1c25'; ctx.fillRect(0,PANY,CW,H-PANY);
   ctx.fillStyle='#2b4353'; ctx.fillRect(0,PANY,CW,2);
-  const cols=PORTRAIT?4:(TOUCH?4:7), cw=PORTRAIT?170:(TOUCH?132:84),
-        ch=PORTRAIT?134:(TOUCH?92:88), gap=PORTRAIT?6:(TOUCH?8:4);
+  const cols=PORTRAIT?4:(TOUCH?4:7), cw=PORTRAIT?118:(TOUCH?132:84),
+        ch=PORTRAIT?PORT_CARD_H:(TOUCH?92:88), gap=PORTRAIT?6:(TOUCH?8:4);
   const BIG = PORTRAIT||TOUCH;
   TKEYS.forEach((k,i)=>{
     const t=TOWERS[k];
@@ -2031,34 +2032,34 @@ function drawHud(){
     if(selq){ ctx.fillStyle='rgba(231,183,78,.16)'; rr(x,y,w,h,7); ctx.fill(); }
     ctx.strokeStyle=selq?'#e7b74e':'#2f4a5a'; ctx.lineWidth=selq?3:2; rr(x,y,w,h,7); ctx.stroke();
     ctx.save(); ctx.globalAlpha=lock?0.3:(afford?1:0.45);
-    ctx.save(); ctx.translate(x+w/2,y+(PORTRAIT?52:(TOUCH?36:32))); if(PORTRAIT) ctx.scale(1.45,1.45);
+    ctx.save(); ctx.translate(x+w/2,y+(PORTRAIT?Math.round(ch*0.37):(TOUCH?36:32))); if(PORTRAIT) ctx.scale(ch/97,ch/97);
     drawTowerIcon(k,0,0); ctx.restore();
-    txt(t.short,x+w/2,y+(PORTRAIT?92:(TOUCH?68:56)),PORTRAIT?16:(TOUCH?13:11.5),'#cfe0ea','center',true);
+    txt(t.short,x+w/2,y+(PORTRAIT?Math.round(ch*0.66):(TOUCH?68:56)),PORTRAIT?13:(TOUCH?13:11.5),'#cfe0ea','center',true);
     ctx.restore();
     if(lock){
       ctx.fillStyle='rgba(10,20,27,.55)'; rr(x+2,y+2,w-4,h-4,6); ctx.fill();
-      drawLock(x+w/2, y+h-40, PORTRAIT?1.5:(TOUCH?1.15:1));
+      drawLock(x+w/2, y+h-36, PORTRAIT?1.2:(TOUCH?1.15:1));
       txt('Workshop',x+w/2,y+h-12,PORTRAIT?14:(TOUCH?12:10.5),'#9db4c4','center',true);
     } else {
-      ctx.save(); ctx.translate(x+w/2-24,y+h-20); const cs=PORTRAIT?.95:(TOUCH?.72:.62); ctx.scale(cs,cs); drawCoin(0,0); ctx.restore();
-      txt(cost,x+w/2+8,y+h-19,PORTRAIT?18:(TOUCH?15:13),afford?'#e9f0f4':'#d6584f','center',true);
-      txt((TOWERS[k].build||3)+'s',x+w-12,y+14,PORTRAIT?14:(TOUCH?12:10.5),'#7d94a3','right');
+      ctx.save(); ctx.translate(x+w/2-20,y+h-18); const cs=PORTRAIT?.78:(TOUCH?.72:.62); ctx.scale(cs,cs); drawCoin(0,0); ctx.restore();
+      txt(cost,x+w/2+6,y+h-17,PORTRAIT?15:(TOUCH?15:13),afford?'#e9f0f4':'#d6584f','center',true);
+      txt((TOWERS[k].build||3)+'s',x+w-10,y+13,PORTRAIT?12:(TOUCH?12:10.5),'#7d94a3','right');
       if(t.limit){
         const n=g.towers.filter(q=>q.key===k).length;
-        txt(n+'/'+t.limit,x+12,y+14,PORTRAIT?14:(TOUCH?12:10.5), n>=t.limit?'#d6584f':'#7d94a3','left',true);
+        txt(n+'/'+t.limit,x+10,y+13,PORTRAIT?12:(TOUCH?12:10.5), n>=t.limit?'#d6584f':'#7d94a3','left',true);
       }
     }
     uiBtns.push({id:'t_'+k,x,y,w,h,on:true});
   });
 
   const rows=Math.ceil(TKEYS.length/cols);
-  const px = PORTRAIT ? 6 : (TOUCH ? 6+cols*(cw+gap) : 630);
-  const pw = PORTRAIT ? CW-12 : W-px-8;
-  const pyy = PORTRAIT ? (PANY+8+rows*(ch+8)) : (PANY+8);
-  const ph = PORTRAIT ? (H-pyy-8) : (TOUCH ? (ch*2+8) : 88);
+  const px = PORTRAIT ? (6+cols*(cw+gap)) : (TOUCH ? 6+cols*(cw+gap) : 630);
+  const pw = PORTRAIT ? (CW-6-px) : (W-px-8);
+  const pyy = PANY+8;
+  const ph = PORTRAIT ? (rows*(ch+8)-8) : (TOUCH ? (ch*2+8) : 88);
   ctx.fillStyle='#162833'; rr(px,pyy,pw,ph,7); ctx.fill();
   ctx.strokeStyle='#2f4a5a'; ctx.lineWidth=2; rr(px,pyy,pw,ph,7); ctx.stroke();
-  const bH = PORTRAIT?62:(TOUCH?56:30), adH = PORTRAIT?52:(TOUCH?46:26);
+  const bH = PORTRAIT?(ch):(TOUCH?56:30), adH = PORTRAIT?(ch):(TOUCH?46:26);
   if(g.selTower){
     const t=g.selTower, s2=t.st;
     txt(t.def.name+'  lv.'+(t.lvl+1),px+12,pyy+24,BIG?17:15,'#e9f0f4','left',true);
@@ -2075,7 +2076,29 @@ function drawHud(){
     });
     btn('sp_clear', px+12+4*(bw2+2), pyy+26+(bh2+4), bw2, bh2, 'Clear',{fs:BIG?12:11,c1:'#6a4750',c2:'#4a2f36'});
   } else {
-    if(g.waveState==='idle'){
+    if(PORTRAIT){                                  // две квадратные кнопки вровень с карточками
+      const bx=px+6, bw3=pw-12;
+      if(g.waveState==='idle'){
+        btn('early',bx,pyy,bw3,ch,'',{c1:'#4a7a52',c2:'#2f5a37'});
+        txt('Call wave',bx+bw3/2,pyy+ch*0.26,16,'#e9f0f4','center',true);
+        txt('early',bx+bw3/2,pyy+ch*0.44,16,'#e9f0f4','center',true);
+        txt('+'+Math.round(Math.ceil(g.waveTimer)*(2+g.wave*0.35)*goldMul())+' gold',bx+bw3/2,pyy+ch*0.68,16,'#cfe9d2','center',true);
+        txt(Math.ceil(g.waveTimer)+'s',bx+bw3/2,pyy+ch*0.85,13,'#9ec7aa','center');
+      } else {
+        const left=g.spawnQ.length+g.enemies.length;
+        ctx.fillStyle='#16303c'; rr(bx,pyy,bw3,ch,7); ctx.fill();
+        ctx.strokeStyle='#2f4a5a'; ctx.lineWidth=2; rr(bx,pyy,bw3,ch,7); ctx.stroke();
+        txt('In battle',bx+bw3/2,pyy+ch*0.25,16,'#cfe0ea','center',true);
+        txt(left+' left',bx+bw3/2,pyy+ch*0.47,21,'#e7b74e','center',true);
+        const wv=g.waves[Math.min(g.wave,g.waves.length-1)];
+        const tot=wv.groups.reduce((a,b)=>a+b.count,0)||1;
+        ctx.fillStyle='#23394a'; rr(bx+14,pyy+ch*0.66,bw3-28,12,6); ctx.fill();
+        ctx.fillStyle='#e7b74e'; rr(bx+14,pyy+ch*0.66,(bw3-28)*clamp(1-left/tot,0,1),12,6); ctx.fill();
+      }
+      btn('adgold',bx,pyy+ch+8,bw3,ch,'',{c1:'#5fbf72',c2:'#2f8a48',on:g.adGold});
+      txt(g.adGold?'Watch ad':'Ad used',bx+bw3/2,pyy+ch+8+ch*0.38,17,'#062211','center',true);
+      if(g.adGold) txt('+50 gold',bx+bw3/2,pyy+ch+8+ch*0.62,17,'#062211','center',true);
+    } else if(g.waveState==='idle'){
       txt('Next wave in '+Math.ceil(g.waveTimer)+'s',px+12,pyy+(BIG?20:12),BIG?15:12.5,'#cfe0ea','left',true);
       btn('early',px+12,pyy+(BIG?30:18),pw-24,bH,'Call wave early  +'+Math.round(Math.ceil(g.waveTimer)*(2+g.wave*0.35)*goldMul())+' gold',
           {c1:'#4a7a52',c2:'#2f5a37',fs:BIG?17:15});
@@ -2087,7 +2110,7 @@ function drawHud(){
       ctx.fillStyle='#23394a'; rr(px+12,pyy+(BIG?42:28),pw-24,BIG?14:9,5); ctx.fill();
       ctx.fillStyle='#e7b74e'; rr(px+12,pyy+(BIG?42:28),(pw-24)*clamp(1-left/tot,0,1),BIG?14:9,5); ctx.fill();
     }
-    btn('adgold',px+12,pyy+ph-adH-8,pw-24,adH,g.adGold?'Watch ad  +50 gold':'Ad already used',
+    if(!PORTRAIT) btn('adgold',px+12,pyy+ph-adH-8,pw-24,adH,g.adGold?'Watch ad  +50 gold':'Ad already used',
         {c1:'#5fbf72',c2:'#2f8a48',tc:'#062211',fs:BIG?16:15,on:g.adGold});
   }
   if(g.paused){
@@ -2159,7 +2182,15 @@ let VIEW={s:1, rot:0, vw:960, vh:640};
 function setLayout(touch, portrait){
   TOUCH=!!touch;
   PORTRAIT = !!portrait && TOUCH;
-  if(PORTRAIT){ CW=720; H=1010; }
+  if(PORTRAIT){
+    CW=720;
+    const vw=window.innerWidth||390, vh=window.innerHeight||844;
+    BV.zoom = 1.5;                                     // компромисс: клетка крупная, карта видна на две трети
+    PORT_BOARD_H = Math.round(ROWS*TS*(CW/W)*BV.zoom);  // ровно под приближённое поле
+    const want = Math.round(CW*vh/vw);                  // сколько влезет по пропорциям экрана
+    PORT_CARD_H = clamp(Math.round((want - PORT_BOARD_Y - PORT_BOARD_H - 34 - 24)/2), 112, 176);
+    H = PORT_BOARD_Y + PORT_BOARD_H + 34 + 2*(PORT_CARD_H+8) + 16;
+  }
   else { CW=960; H = TOUCH ? 728 : 640; }
   const cv2=document.getElementById('cv'), st=document.getElementById('stage');
   if(cv2){ cv2.width=CW; cv2.height=H; cv2.style.width=CW+'px'; cv2.style.height=H+'px'; }
@@ -2178,7 +2209,8 @@ function updateBoardView(){
     BV.s=1; BV.x=0; BV.y=BY; BV.zoom=1; BV.panX=0; BV.panY=0;
   }
 }
-const PORT_BOARD_Y=96, PORT_BOARD_H=430;
+const PORT_BOARD_Y=96;
+let PORT_BOARD_H=500, PORT_CARD_H=112;   // считаются под пропорции конкретного экрана
 function fit(){
   const vv = window.visualViewport;
   const vw = Math.round(vv? vv.width : window.innerWidth);
@@ -2259,7 +2291,7 @@ cv.addEventListener('pointermove',e=>{
   if(!drag) return;
   const p=toGame(e), dx=p.x-drag.p.x, dy=p.y-drag.p.y;
   if(Math.abs(dx)>12 || Math.abs(dy)>12) drag.moved=true;
-  if(drag.moved && PORTRAIT && BV.zoom>1 && onBoard(drag.p)){
+  if(drag.moved && PORTRAIT && onBoard(drag.p)){
     BV.panX=drag.panX+dx; BV.panY=drag.panY+dy; updateBoardView();
   }
 });
@@ -2286,8 +2318,8 @@ async function onButton(id){
     setTimeout(()=>{ if(game){ game.askRestart=false; game.paused=false; } },2500);
     return;
   }
-  if(id==='zin'){ BV.zoom=Math.min(2.2,BV.zoom*1.35); updateBoardView(); return; }
-  if(id==='zout'){ BV.zoom=Math.max(1,BV.zoom/1.35); if(BV.zoom<=1){ BV.panX=0; BV.panY=0; } updateBoardView(); return; }
+  if(id==='zin'){ BV.zoom=Math.min(2.6,BV.zoom*1.25); updateBoardView(); return; }
+  if(id==='zout'){ BV.zoom=Math.max(0.9,BV.zoom/1.25); if(BV.zoom<=1){ BV.panX=0; BV.panY=0; } updateBoardView(); return; }
   if(id==='pause'){ g.paused=!g.paused; return; }
   if(id==='speed'){ g.speed = g.speed===1?2:1; return; }
   if(id==='sound'){ save.sound=!save.sound; persist(); if(save.sound) startWind(); else stopWind(); return; }

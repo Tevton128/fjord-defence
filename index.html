@@ -125,7 +125,7 @@
       <button class="btn sec" id="bHelp">How to play</button>
     </div>
     <div class="bar"><div class="silver"><img src="assets/icons/icon_silver.png" alt=""><b id="silv1">0</b></div></div>
-    <div class="build">build 28.09 · 1</div>
+    <div class="build">build 28.09 · 2</div>
   </div>
 
   <!-- ВЫБОР УРОВНЯ -->
@@ -419,7 +419,8 @@ const SFX={
 };
 /* ---------- 3. ДАННЫЕ --------------------------------------------------- */
 const W=960,TS=48,COLS=20,ROWS=10,BY=56,PY=536;
-let H=640, TOUCH=false, PORTRAIT=false;
+let H=640, TOUCH=false, PORTRAIT=false, STRIP=false;   // STRIP — панель сбоку (телефон лёжа)
+const STRIP_W=262;
 let CW=960;                       // логическая ширина холста (в портрете уже)
 /* Вид поля в портрете: поле масштабируется под ширину экрана, его можно приближать и двигать. */
 const BV={x:0, y:BY, s:1, zoom:1, panX:0, panY:0};
@@ -1981,8 +1982,9 @@ function b2c(x,y){             // из координат поля в коорд
 }
 function drawTopBar(g){
   const TB = PORTRAIT ? PORT_BOARD_Y : BY;
-  ctx.fillStyle='#0e1c25'; ctx.fillRect(0,0,CW,TB);
-  ctx.fillStyle='#2b4353'; ctx.fillRect(0,TB-2,CW,2);
+  const TW = STRIP ? W : CW;
+  ctx.fillStyle='#0e1c25'; ctx.fillRect(0,0,TW,TB);
+  ctx.fillStyle='#2b4353'; ctx.fillRect(0,TB-2,TW,2);
   txt(g.L.n,16,PORTRAIT?24:26,PORTRAIT?20:19,'#e9f0f4','left',true);
   txt('Wave '+Math.min(g.wave+1,g.waves.length)+' / '+g.waves.length,16,PORTRAIT?46:44,13,'#8ea6b5');
   const iy = PORTRAIT ? 74 : 27;
@@ -1990,8 +1992,8 @@ function drawTopBar(g){
   drawAxes(ix,iy); txt(g.lives,ix+18,iy,20,'#e9f0f4','left',true);
   const gx = PORTRAIT ? 150 : 360;
   drawCoin(gx,iy);  txt(Math.floor(g.gold),gx+18,iy,20,'#e9f0f4','left',true);
-  const bw=PORTRAIT?48:58, bh=PORTRAIT?40:40, by=PORTRAIT?50:8, gap=PORTRAIT?6:6;
-  let bx=CW-8-bw;
+  const bw=PORTRAIT?48:(STRIP?46:58), bh=PORTRAIT?40:(STRIP?40:40), by=PORTRAIT?50:8, gap=6;
+  let bx=(STRIP?W:CW)-8-bw;
   btn('exit',bx,by,bw,bh,'',{}); glyphHome(bx+bw/2,by+bh/2); bx-=bw+gap;
   btn('sound',bx,by,bw,bh,'',{}); glyphSound(bx+bw/2-3,by+bh/2,save.sound); bx-=bw+gap;
   btn('speed',bx,by,bw,bh,g.speed===1?'1x':'2x',{fs:17,c1:g.speed===2?'#4a7a52':'#3a5766',c2:g.speed===2?'#2f5a37':'#24404e'}); bx-=bw+gap;
@@ -2018,59 +2020,70 @@ function drawHud(){
   }
 
   const PANY = PORTRAIT ? (PORT_BOARD_Y+PORT_BOARD_H+30) : PY;
-  ctx.fillStyle='#0e1c25'; ctx.fillRect(0,PANY,CW,H-PANY);
-  ctx.fillStyle='#2b4353'; ctx.fillRect(0,PANY,CW,2);
-  const gap=PORTRAIT?6:(TOUCH?8:4);
-  const cols=PORTRAIT?4:(TOUCH?4:7),
-        cw=PORTRAIT?Math.floor((CW-12-3*gap)/4):(TOUCH?132:84),
-        ch=PORTRAIT?PORT_CARD_H:(TOUCH?92:88);
+  if(STRIP){                                        // панель сбоку: вертикальная полоса справа
+    ctx.fillStyle='#0e1c25'; ctx.fillRect(W,0,STRIP_W,H);
+    ctx.fillStyle='#2b4353'; ctx.fillRect(W,0,2,H);
+  } else {
+    ctx.fillStyle='#0e1c25'; ctx.fillRect(0,PANY,CW,H-PANY);
+    ctx.fillStyle='#2b4353'; ctx.fillRect(0,PANY,CW,2);
+  }
+  const gap=STRIP?6:(PORTRAIT?6:(TOUCH?8:4));
+  const cols=STRIP?2:(PORTRAIT?4:(TOUCH?4:7)),
+        cw=STRIP?Math.floor((STRIP_W-12-gap)/2):(PORTRAIT?Math.floor((CW-12-3*gap)/4):(TOUCH?132:84)),
+        ch=STRIP?96:(PORTRAIT?PORT_CARD_H:(TOUCH?92:88));
   const BIG = PORTRAIT||TOUCH;
+  const CARD_BIG = PORTRAIT||STRIP;
   TKEYS.forEach((k,i)=>{
     const t=TOWERS[k];
-    const x=6+(i%cols)*(cw+gap), y=PANY+8+Math.floor(i/cols)*(ch+8), w=cw, h=ch, cost=towerCost(k);
+    const x=(STRIP?W+6:6)+(i%cols)*(cw+gap),
+          y=(STRIP?6:PANY+8)+Math.floor(i/cols)*(ch+(STRIP?gap:8)), w=cw, h=ch, cost=towerCost(k);
     const lock=!towerUnlocked(k), afford=g.gold>=cost, selq=g.sel===k;
     ctx.fillStyle='#162833'; rr(x,y,w,h,7); ctx.fill();
     if(selq){ ctx.fillStyle='rgba(231,183,78,.16)'; rr(x,y,w,h,7); ctx.fill(); }
     ctx.strokeStyle=selq?'#e7b74e':'#2f4a5a'; ctx.lineWidth=selq?3:2; rr(x,y,w,h,7); ctx.stroke();
     ctx.save(); ctx.globalAlpha=lock?0.3:(afford?1:0.45);
-    ctx.save(); ctx.translate(x+w/2,y+(PORTRAIT?Math.round(ch*0.33):(TOUCH?36:32))); if(PORTRAIT){ const k=Math.min(1.05,ch/150); ctx.scale(k,k); }
+    ctx.save(); ctx.translate(x+w/2,y+(CARD_BIG?Math.round(ch*0.33):(TOUCH?36:32))); if(CARD_BIG){ const k=Math.min(1.05,ch/150); ctx.scale(k,k); }
     drawTowerIcon(k,0,0); ctx.restore();
-    txt(t.short,x+w/2,y+(PORTRAIT?Math.round(ch*0.66):(TOUCH?68:56)),PORTRAIT?13:(TOUCH?13:11.5),'#cfe0ea','center',true);
+    txt(t.short,x+w/2,y+(CARD_BIG?Math.round(ch*0.66):(TOUCH?68:56)),CARD_BIG?13:(TOUCH?13:11.5),'#cfe0ea','center',true);
     ctx.restore();
     if(lock){
       ctx.fillStyle='rgba(10,20,27,.55)'; rr(x+2,y+2,w-4,h-4,6); ctx.fill();
-      drawLock(x+w/2, y+h-36, PORTRAIT?1.2:(TOUCH?1.15:1));
-      txt('Workshop',x+w/2,y+h-12,PORTRAIT?14:(TOUCH?12:10.5),'#9db4c4','center',true);
+      drawLock(x+w/2, y+h-34, CARD_BIG?1.15:(TOUCH?1.15:1));
+      txt('Workshop',x+w/2,y+h-11,CARD_BIG?13:(TOUCH?12:10.5),'#9db4c4','center',true);
     } else {
-      ctx.save(); ctx.translate(x+w/2-20,y+h-18); const cs=PORTRAIT?.78:(TOUCH?.72:.62); ctx.scale(cs,cs); drawCoin(0,0); ctx.restore();
-      txt(cost,x+w/2+6,y+h-17,PORTRAIT?15:(TOUCH?15:13),afford?'#e9f0f4':'#d6584f','center',true);
-      txt((TOWERS[k].build||3)+'s',x+w-10,y+13,PORTRAIT?12:(TOUCH?12:10.5),'#7d94a3','right');
+      ctx.save(); ctx.translate(x+w/2-20,y+h-17); const cs=CARD_BIG?.75:(TOUCH?.72:.62); ctx.scale(cs,cs); drawCoin(0,0); ctx.restore();
+      txt(cost,x+w/2+6,y+h-16,CARD_BIG?15:(TOUCH?15:13),afford?'#e9f0f4':'#d6584f','center',true);
+      txt((TOWERS[k].build||3)+'s',x+w-9,y+12,CARD_BIG?12:(TOUCH?12:10.5),'#7d94a3','right');
       if(t.limit){
         const n=g.towers.filter(q=>q.key===k).length;
-        txt(n+'/'+t.limit,x+10,y+13,PORTRAIT?12:(TOUCH?12:10.5), n>=t.limit?'#d6584f':'#7d94a3','left',true);
+        txt(n+'/'+t.limit,x+9,y+12,CARD_BIG?12:(TOUCH?12:10.5), n>=t.limit?'#d6584f':'#7d94a3','left',true);
       }
     }
     uiBtns.push({id:'t_'+k,x,y,w,h,on:true});
   });
 
   const rows=Math.ceil(TKEYS.length/cols);
-  const px = PORTRAIT ? 6 : (TOUCH ? 6+cols*(cw+gap) : 630);
-  const pw = PORTRAIT ? (CW-12) : (W-px-8);
-  const pyy = PORTRAIT ? (PANY+8+rows*(ch+gap)) : (PANY+8);
-  const ph = PORTRAIT ? PORT_ACT_H : (TOUCH ? (ch*2+8) : 88);
-  if(!PORTRAIT){
+  const px = STRIP ? (W+6) : (PORTRAIT ? 6 : 630);
+  const pw = STRIP ? (STRIP_W-12) : (PORTRAIT ? (CW-12) : (W-px-8));
+  const pyy = STRIP ? (6+rows*(ch+gap)) : (PORTRAIT ? (PANY+8+rows*(ch+gap)) : (PANY+8));
+  const ph = STRIP ? (H-pyy-6) : (PORTRAIT ? PORT_ACT_H : 88);
+  if(!PORTRAIT && !STRIP){
     ctx.fillStyle='#162833'; rr(px,pyy,pw,ph,7); ctx.fill();
     ctx.strokeStyle='#2f4a5a'; ctx.lineWidth=2; rr(px,pyy,pw,ph,7); ctx.stroke();
   }
   const bH = TOUCH?56:30, adH = TOUCH?46:26;
   if(g.selTower){
     const t=g.selTower, s2=t.st;
-    ctx.fillStyle='#162833'; rr(px,pyy,pw,ph,8); ctx.fill();
-    ctx.strokeStyle='#2f4a5a'; ctx.lineWidth=2; rr(px,pyy,pw,ph,8); ctx.stroke();
-    txt(t.def.name+'  lv.'+(t.lvl+1),px+16,pyy+(PORTRAIT?30:24),PORTRAIT?19:(BIG?17:15),'#e9f0f4','left',true);
-    txt(s2.ab||'',px+16,pyy+(PORTRAIT?56:46),PORTRAIT?14:(BIG?13:12),'#8ea6b5');
+    if(PORTRAIT||STRIP){
+      ctx.fillStyle='#162833'; rr(px,pyy,pw,ph,8); ctx.fill();
+      ctx.strokeStyle='#2f4a5a'; ctx.lineWidth=2; rr(px,pyy,pw,ph,8); ctx.stroke();
+    }
+    const lh=STRIP?20:(PORTRAIT?24:20), fs2=STRIP?14:(PORTRAIT?19:(BIG?17:15));
+    txt(t.def.name,px+14,pyy+22,fs2,'#e9f0f4','left',true);
+    txt('level '+(t.lvl+1),px+14,pyy+22+lh,STRIP?12.5:(PORTRAIT?14:12),'#8ea6b5','left');
+    if(!STRIP) txt(s2.ab||'',px+14,pyy+22+lh*2,PORTRAIT?14:(BIG?13:12),'#8ea6b5');
     txt('range '+s2.range+(s2.dps?('  ·  '+Math.round(s2.dps*t.dmgMul)+' dps'):(s2.dmg?('  ·  '+Math.round(s2.dmg*t.dmgMul)+' dmg'):'')),
-        px+16,pyy+(PORTRAIT?80:66),PORTRAIT?14:(BIG?13:12),'#6f8a9a');
+        px+14,pyy+22+lh*(STRIP?2:3),STRIP?12.5:(PORTRAIT?14:12),'#6f8a9a');
   } else if(g.sandbox){
     txt('Sandbox: spawn enemies',px+12,pyy+18,13,'#cfe0ea','left',true);
     const list=['raider','scout','shield','raven','shaman','berserk','jarl','draugr','fenrir'];
@@ -2081,7 +2094,28 @@ function drawHud(){
     });
     btn('sp_clear', px+12+4*(bw2+2), pyy+26+(bh2+4), bw2, bh2, 'Clear',{fs:BIG?12:11,c1:'#6a4750',c2:'#4a2f36'});
   } else {
-    if(PORTRAIT){                                  // широкая строка: волна слева, реклама справа
+    if(STRIP){                                     // боковая панель: две кнопки одна под другой
+      const h3=Math.floor((ph-gap)/2);
+      if(g.waveState==='idle'){
+        btn('early',px,pyy,pw,h3,'',{c1:'#4a7a52',c2:'#2f5a37'});
+        txt('Call wave early',px+pw/2,pyy+h3*0.30,15,'#e9f0f4','center',true);
+        txt('+'+Math.round(Math.ceil(g.waveTimer)*(2+g.wave*0.35)*goldMul())+' gold',px+pw/2,pyy+h3*0.58,16,'#cfe9d2','center',true);
+        txt('next in '+Math.ceil(g.waveTimer)+'s',px+pw/2,pyy+h3*0.82,12.5,'#9ec7aa','center');
+      } else {
+        const left=g.spawnQ.length+g.enemies.length;
+        ctx.fillStyle='#16303c'; rr(px,pyy,pw,h3,8); ctx.fill();
+        ctx.strokeStyle='#2f4a5a'; ctx.lineWidth=2; rr(px,pyy,pw,h3,8); ctx.stroke();
+        txt('In battle',px+pw/2,pyy+h3*0.28,14,'#cfe0ea','center',true);
+        txt(left+' left',px+pw/2,pyy+h3*0.55,17,'#e7b74e','center',true);
+        const wv=g.waves[Math.min(g.wave,g.waves.length-1)];
+        const tot=wv.groups.reduce((a,b)=>a+b.count,0)||1;
+        ctx.fillStyle='#23394a'; rr(px+16,pyy+h3*0.74,pw-32,11,6); ctx.fill();
+        ctx.fillStyle='#e7b74e'; rr(px+16,pyy+h3*0.74,(pw-32)*clamp(1-left/tot,0,1),11,6); ctx.fill();
+      }
+      btn('adgold',px,pyy+h3+gap,pw,h3,'',{c1:'#5fbf72',c2:'#2f8a48',on:g.adGold});
+      txt(g.adGold?'Watch ad':'Ad used',px+pw/2,pyy+h3+gap+h3*(g.adGold?0.36:0.52),15,'#062211','center',true);
+      if(g.adGold) txt('+50 gold',px+pw/2,pyy+h3+gap+h3*0.64,16,'#062211','center',true);
+    } else if(PORTRAIT){                           // широкая строка: волна слева, реклама справа
       const bw3=Math.floor((pw-gap)/2), h3=ph;
       if(g.waveState==='idle'){
         btn('early',px,pyy,bw3,h3,'',{c1:'#4a7a52',c2:'#2f5a37'});
@@ -2115,7 +2149,7 @@ function drawHud(){
       ctx.fillStyle='#23394a'; rr(px+12,pyy+(BIG?42:28),pw-24,BIG?14:9,5); ctx.fill();
       ctx.fillStyle='#e7b74e'; rr(px+12,pyy+(BIG?42:28),(pw-24)*clamp(1-left/tot,0,1),BIG?14:9,5); ctx.fill();
     }
-    if(!PORTRAIT) btn('adgold',px+12,pyy+ph-adH-8,pw-24,adH,g.adGold?'Watch ad  +50 gold':'Ad already used',
+    if(!PORTRAIT && !STRIP) btn('adgold',px+12,pyy+ph-adH-8,pw-24,adH,g.adGold?'Watch ad  +50 gold':'Ad already used',
         {c1:'#5fbf72',c2:'#2f8a48',tc:'#062211',fs:BIG?16:15,on:g.adGold});
   }
   if(g.paused){
@@ -2123,12 +2157,23 @@ function drawHud(){
     ctx.fillStyle='rgba(8,16,22,.55)'; ctx.fillRect(0,by0,CW,bh0);
     txt('Paused',CW/2,by0+bh0/2,44,'#e9f0f4','center',true);
   }
-  if(g.sel && !g.selTower){
+  if(g.sel && !g.selTower && !STRIP){
     const tip = towerUnlocked(g.sel) ? TOWERS[g.sel].tip : 'Locked. Buy rank I for this weapon in the Workshop.';
     const ty0 = PANY-34;
     ctx.fillStyle='rgba(14,28,37,.92)'; rr(6,ty0,CW-12,30,6); ctx.fill();
     ctx.strokeStyle='#2f4a5a'; ctx.lineWidth=1.5; rr(6,ty0,CW-12,30,6); ctx.stroke();
     txt(tip,16,ty0+15,PORTRAIT?14:13,'#cfe0ea');
+  }
+  if(PORTRAIT){                                   // ненавязчивая подсказка: лёжа поле крупнее
+    const hy=H-40;
+    ctx.fillStyle='rgba(18,38,50,.85)'; rr(10,hy,CW-20,32,9); ctx.fill();
+    ctx.save(); ctx.translate(34,hy+16);
+    ctx.strokeStyle='#8ea6b5'; ctx.lineWidth=2; rr(-7,-10,14,20,3); ctx.stroke();
+    ctx.beginPath(); ctx.arc(0,0,13,-0.9,0.9); ctx.stroke();
+    ctx.fillStyle='#8ea6b5'; ctx.beginPath();
+    ctx.moveTo(13,9); ctx.lineTo(8,3); ctx.lineTo(15,2); ctx.closePath(); ctx.fill();
+    ctx.restore();
+    txt('Turn your phone sideways — the board gets 60% bigger',58,hy+17,13.5,'#9fb3c0');
   }
   if(g.hints.length){
     const h=g.hints[0], bw=PORTRAIT?CW-24:250;
@@ -2147,7 +2192,7 @@ function drawHud(){
     ctx.restore();
   }
   if(g.selTower) drawTowerPopup(g.selTower);
-  if(g.sel && !g.selTower){
+  if(g.sel && !g.selTower && !STRIP){
     const tip = towerUnlocked(g.sel) ? TOWERS[g.sel].tip : 'Locked. Buy rank I for this weapon in the Workshop.';
     ctx.fillStyle='rgba(14,28,37,.92)'; rr(6,PY-40,540,32,6); ctx.fill();
     ctx.strokeStyle='#2f4a5a'; ctx.lineWidth=1.5; rr(6,PY-40,540,32,6); ctx.stroke();
@@ -2187,18 +2232,22 @@ let VIEW={s:1, rot:0, vw:960, vh:640};
 function setLayout(touch, portrait){
   TOUCH=!!touch;
   PORTRAIT = !!portrait && TOUCH;
+  STRIP=false;
   if(PORTRAIT){
     CW=720;
     const vw=window.innerWidth||390, vh=window.innerHeight||844;
     BV.zoom = 1;                                        // вся карта видна сразу, приближать не нужно
     PORT_BOARD_H = Math.round(ROWS*TS*(CW/W)) + 16;      // ровно под поле целиком
     const want = Math.round(CW*vh/vw);                   // сколько влезает по пропорциям экрана
-    let rest = want - PORT_BOARD_Y - PORT_BOARD_H - 30 - 22;
-    PORT_CARD_H = clamp(Math.round((rest-150)/2), 132, 210);   // карточки почти квадратные
-    PORT_ACT_H  = clamp(rest - 2*(PORT_CARD_H+8) - 8, 104, 176);
-    H = PORT_BOARD_Y + PORT_BOARD_H + 30 + 2*(PORT_CARD_H+8) + 8 + PORT_ACT_H + 14;
+    let rest = want - PORT_BOARD_Y - PORT_BOARD_H - 30 - 66;
+    PORT_CARD_H = clamp(Math.round((rest-120)/2), 118, 152);   // компактные карточки
+    PORT_ACT_H  = clamp(rest - 2*(PORT_CARD_H+8) - 8, 92, 124);
+    H = PORT_BOARD_Y + PORT_BOARD_H + 30 + 2*(PORT_CARD_H+8) + 8 + PORT_ACT_H + 52;
   }
-  else { CW=960; H = TOUCH ? 752 : 640; }
+  else if(TOUCH){                                    // телефон лёжа: панель сбоку, поле во всю высоту
+    STRIP=true; CW=W+STRIP_W; H=BY+ROWS*TS;
+  }
+  else { CW=960; H=640; }
   const cv2=document.getElementById('cv'), st=document.getElementById('stage');
   if(cv2){ cv2.width=CW; cv2.height=H; cv2.style.width=CW+'px'; cv2.style.height=H+'px'; }
   if(st){ st.style.width=CW+'px'; st.style.height=H+'px'; }

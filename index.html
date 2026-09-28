@@ -100,6 +100,19 @@
   #adOv{background:rgba(4,9,13,.96);z-index:50}
   #adBox{width:420px;max-width:86%;border:2px solid #33505f;border-radius:10px;padding:26px;background:#0f1e28}
   #adTimer{font-size:46px;color:var(--rune);margin:10px 0}
+  #boot{position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;
+        background:linear-gradient(180deg,#0f2330,#0a141b);transition:opacity .45s}
+  #boot.gone{opacity:0;pointer-events:none}
+  .bootbox{text-align:center;padding:24px;max-width:90%}
+  .boottitle{font-size:clamp(34px,9vw,62px);margin:0;letter-spacing:.04em;line-height:.95;
+             color:var(--snow);text-shadow:0 5px 0 #0c1a24,0 0 34px rgba(231,183,78,.28)}
+  .boottitle small{display:block;font-size:clamp(16px,4.2vw,30px);letter-spacing:.34em;color:var(--rune);
+                   margin-top:10px;font-weight:bold;text-indent:.34em;text-shadow:0 3px 0 #0c1a24}
+  .bootbar{width:min(320px,70vw);height:10px;margin:28px auto 0;border-radius:6px;
+           background:#16303c;border:1px solid #2f4a5a;overflow:hidden}
+  .bootbar i{display:block;height:100%;width:0;border-radius:6px;
+             background:linear-gradient(90deg,#cf9a2f,#f0c766);transition:width .25s}
+  .boottip{color:#8ea6b5;font-size:14px;margin:14px 0 0;min-height:20px}
   .build{position:absolute;left:14px;bottom:10px;font-size:11px;color:#41596a;letter-spacing:.06em}
   .tiny{font-size:12px;color:#7d94a3;margin-top:14px;line-height:1.5}
   ul.help{text-align:left;max-width:560px;font-size:14.5px;line-height:1.65;color:#b9cbd6}
@@ -110,6 +123,13 @@
 </style>
 </head>
 <body>
+<div id="boot">
+  <div class="bootbox">
+    <h1 class="boottitle">FJORD<small>DEFENCE</small></h1>
+    <div class="bootbar"><i id="bootfill"></i></div>
+    <p class="boottip" id="boottip">Loading the fjord…</p>
+  </div>
+</div>
 <div id="wrap"><div id="stage">
   <canvas id="cv" width="960" height="640"></canvas>
 
@@ -125,7 +145,7 @@
       <button class="btn sec" id="bHelp">How to play</button>
     </div>
     <div class="bar"><div class="silver"><img src="assets/icons/icon_silver.png" alt=""><b id="silv1">0</b></div></div>
-    <div class="build">build 28.09 · 2</div>
+    <div class="build">build 28.09 · 3</div>
   </div>
 
   <!-- ВЫБОР УРОВНЯ -->
@@ -235,7 +255,7 @@ const Store = {
 };
 
 function newProfile(){ return { silver:0, lives:20, mast:{archer:1}, stars:{}, hints:{} }; }
-let save = { diff:0, sound:true, prof:{0:newProfile(),1:newProfile(),2:newProfile()} };
+let save = { diff:0, sound:true, vibe:true, portraitOk:false, prof:{0:newProfile(),1:newProfile(),2:newProfile()} };
 const P = () => save.prof[save.diff||0] || (save.prof[save.diff||0]=newProfile());
 async function loadSave(){
   const raw = await Store.get('fjord_save_v2');
@@ -1022,6 +1042,7 @@ function startLevel(idx, sandbox, endless){
   preloadLevelBg(Math.min(idx+1, LEVELS.length-1));
   if(sandbox){ game.gold=99999; game.lives=999; game.maxLives=999; game.waveState='sand'; }
   game.hints=[]; hint('build');
+  game.rotAsk = PORTRAIT && !save.portraitOk;   // просим повернуть, но играть не мешаем
   if(save.sound) startWind();
   screen(null);
 }
@@ -1157,10 +1178,13 @@ function draw(){
 const ATLAS_FILES=["tower_0", "tower_1", "enemy_0", "boss_0", "terrain_0", "fx_0", "ui_0", "v3_0", "v3_1"];
 // [атлас,x,y,w,h, bx,by,bw,bh, cx — опора; обломки вне основной фигуры отрезаны]
 const ATLAS_DATA={"icon_tower_archer_1":[0,2,2,128,128,17,3,69,122,34.8],"icon_tower_archer_2":[0,132,2,128,128,23,3,68,122,29.8],"icon_tower_archer_3":[0,262,2,128,128,14,3,99,122,48.8],"icon_tower_ballista_1":[0,392,2,128,128,14,3,99,121,52.1],"icon_tower_ballista_2":[0,522,2,128,128,5,3,113,122,48.4],"icon_tower_ballista_3":[0,652,2,128,128,11,8,114,111,60.9],"icon_tower_catapult_1":[0,782,2,128,128,3,8,111,112,50.2],"icon_tower_catapult_2":[0,912,2,128,128,4,3,102,122,42.8],"icon_tower_catapult_3":[0,1042,2,128,128,10,3,108,122,49.8],"icon_tower_flame_1":[0,1172,2,128,128,3,16,107,99,51.7],"icon_tower_flame_2":[0,1302,2,128,128,15,4,89,121,33.9],"icon_tower_flame_3":[0,1432,2,128,128,16,7,109,113,55.1],"icon_tower_frost_1":[0,1562,2,128,128,6,3,80,120,39.1],"icon_tower_frost_2":[0,1692,2,128,128,12,3,87,122,36.8],"icon_tower_frost_3":[0,1822,2,128,128,28,11,97,97,48.1],"icon_tower_rune_1":[0,2,132,128,128,6,3,114,122,54.6],"icon_tower_rune_2":[0,132,132,128,128,15,3,96,122,47.3],"icon_tower_rune_3":[0,262,132,128,128,7,3,113,122,56.3],"icon_tower_totem_1":[0,392,132,128,128,28,3,61,122,30.5],"icon_tower_totem_2":[0,522,132,128,128,31,3,51,122,23.8],"icon_tower_totem_3":[0,652,132,128,128,16,3,96,122,44.8],"tower_archer_1":[0,782,132,192,256,9,16,128,228,65.5],"tower_archer_2":[0,976,132,192,256,18,12,130,232,57.4],"tower_archer_3":[0,1170,132,192,256,24,12,144,232,67.2],"tower_ballista_1":[0,1364,132,192,256,9,33,174,210,91.3],"tower_ballista_2":[0,1558,132,192,256,9,63,168,181,72.2],"tower_ballista_3":[0,1752,132,192,256,9,31,174,213,89.5],"tower_catapult_1":[0,2,390,192,256,9,85,159,159,72.0],"tower_catapult_2":[1,778,2,192,256,9,67,148,177,62.3],"tower_catapult_3":[1,778,260,192,256,11,12,168,232,79.1],"tower_flame_1":[1,778,518,192,256,9,102,153,142,73.9],"tower_flame_2":[1,972,518,192,256,9,28,157,216,60.5],"tower_flame_3":[1,1166,518,192,256,9,16,174,228,87.6],"tower_frost_1":[1,1360,518,192,256,10,61,120,180,58.0],"tower_frost_2":[1,1554,518,192,256,9,39,147,205,62.4],"tower_frost_3":[1,1748,518,192,256,9,13,174,231,86.2],"tower_rune_1":[1,2,776,192,256,9,59,173,184,83.2],"tower_rune_2":[1,196,776,192,256,10,25,172,218,84.1],"tower_rune_3":[1,390,776,192,256,12,12,168,232,84.6],"tower_totem_1":[1,584,776,192,256,28,12,117,232,58.5],"tower_totem_2":[1,778,776,192,256,33,12,98,232,45.8],"tower_totem_3":[1,972,776,192,256,37,12,102,232,47.5],"tower_catapult_1_dir4":[1,2,2,192,192,57,6,77,180,38.3],"tower_catapult_1_dir5":[1,196,2,192,192,47,6,98,180,55.7],"tower_catapult_1_dir6":[1,390,2,192,192,55,6,94,180,48.7],"tower_catapult_1_dir7":[1,584,2,192,192,60,6,83,180,37.9],"tower_catapult_2_base":[1,972,2,192,128,15,6,138,116,58.8],"tower_catapult_2_dir0":[1,1166,2,192,192,40,6,111,180,55.0],"tower_catapult_2_dir1":[1,1360,2,192,192,35,6,121,180,60.8],"tower_catapult_2_dir2":[1,1554,2,192,192,34,6,124,180,62.0],"tower_catapult_2_dir3":[1,1748,2,192,192,31,6,129,180,67.3],"tower_catapult_2_dir4":[1,2,260,192,192,37,6,117,180,58.0],"tower_catapult_2_dir5":[1,196,260,192,192,32,6,127,180,60.0],"tower_catapult_2_dir6":[1,390,260,192,192,35,6,121,180,59.2],"tower_catapult_2_dir7":[1,584,260,192,192,36,6,119,180,60.4],"tower_catapult_3_base":[1,972,260,192,128,24,6,143,116,67.1],"tower_catapult_3_dir0":[1,1166,260,192,192,46,6,81,180,40.6],"tower_catapult_3_dir1":[1,1360,260,192,192,41,6,87,180,43.8],"tower_catapult_3_dir2":[1,1554,260,192,192,43,6,106,180,45.8],"tower_catapult_3_dir3":[1,1748,260,192,192,41,6,109,180,51.7],"tower_catapult_3_dir4":[1,2,518,192,192,47,6,86,180,42.7],"tower_catapult_3_dir5":[1,196,518,192,192,40,6,98,180,47.6],"tower_catapult_3_dir6":[1,390,518,192,192,41,6,109,180,49.8],"tower_catapult_3_dir7":[1,584,518,192,192,47,6,97,180,44.7],"enemy_berserk_move":[2,2,2,128,128,4,4,120,121,50.8],"enemy_jarl_move":[2,132,2,192,192,5,15,182,172,91.1],"enemy_raider_move":[2,326,2,128,128,13,4,101,121,54.3],"enemy_raven_move":[2,456,2,128,128,3,51,121,74,45.0],"enemy_scout_move":[2,586,2,128,128,11,4,105,121,58.0],"enemy_shaman_move":[2,716,2,128,128,3,16,121,109,55.0],"enemy_shield_move":[2,846,2,128,128,15,4,97,121,51.7],"boss_draugr_move":[3,2,2,192,192,6,25,181,162,100.5],"boss_fenrir_move":[3,196,2,192,192,5,64,182,123,99.0],"boss_jarl_move":[3,390,2,192,192,5,22,182,165,97.0],"deco_ash_bush_1":[4,2,2,192,256,30,62,145,187,91.4],"deco_ash_bush_2":[4,196,2,192,256,17,89,108,160,31.5],"deco_ash_rock_1":[4,390,2,192,256,69,116,101,133,65.9],"deco_ash_rock_2":[4,584,2,192,256,16,35,151,215,54.0],"deco_ash_rock_3":[4,778,2,192,256,16,86,160,164,93.8],"deco_ash_stump_1":[4,972,2,192,256,97,56,79,194,53.0],"deco_ash_stump_2":[4,1166,2,192,256,16,70,159,180,56.8],"deco_ash_tree_1":[4,1360,2,192,256,5,67,120,183,59.8],"deco_ash_tree_2":[4,1554,2,192,256,58,79,115,171,54.1],"deco_ash_tree_3":[4,1748,2,192,256,75,165,112,85,55.2],"deco_ash_tree_4":[4,2,260,192,256,5,142,80,108,36.1],"deco_gate":[4,196,260,192,256,17,6,157,245,74.1],"deco_grass_bush_1":[4,390,260,192,256,26,122,139,128,80.7],"deco_grass_bush_2":[4,584,260,192,256,27,114,137,135,66.1],"deco_grass_rock_1":[4,778,260,192,256,27,63,137,187,83.9],"deco_grass_rock_2":[4,972,260,192,256,27,86,138,164,84.8],"deco_grass_rock_3":[4,1166,260,192,256,27,62,137,188,83.6],"deco_grass_stump_1":[4,1360,260,192,256,27,74,137,176,79.4],"deco_grass_stump_2":[4,1554,260,192,256,27,98,137,152,72.5],"deco_grass_tree_1":[4,1748,260,192,256,12,7,168,243,114.9],"deco_grass_tree_2":[4,2,518,192,256,42,7,136,243,72.6],"deco_grass_tree_3":[4,196,518,192,256,16,7,160,243,85.0],"deco_grass_tree_4":[4,390,518,192,256,26,7,139,243,70.8],"deco_snow_bush_1":[4,584,518,192,256,31,135,113,115,50.1],"deco_snow_bush_2":[4,778,518,192,256,35,140,122,110,55.3],"deco_snow_rock_1":[4,972,518,192,256,34,87,123,163,70.5],"deco_snow_rock_2":[4,1166,518,192,256,88,84,72,166,42.5],"deco_snow_rock_3":[4,1360,518,192,256,32,67,90,183,35.4],"deco_snow_stump_1":[4,1554,518,192,256,31,90,102,160,43.6],"deco_snow_stump_2":[4,1748,518,192,256,32,134,113,116,46.3],"deco_snow_tree_1":[4,2,776,192,256,14,7,141,243,72.4],"deco_snow_tree_2":[4,196,776,192,256,7,7,113,243,35.9],"deco_snow_tree_3":[4,390,776,192,256,71,30,116,220,60.0],"deco_snow_tree_4":[4,584,776,192,256,5,128,182,122,90.5],"tile_ash_ground_a":[4,778,776,128,128,0,0,128,128,63.5],"tile_ash_ground_b":[4,908,776,128,128,0,0,128,128,63.5],"tile_ash_ground_c":[4,1038,776,128,128,0,0,128,128,63.5],"tile_ash_ground_d":[4,1168,776,128,128,0,0,128,128,63.5],"tile_ash_path":[4,1298,776,128,128,0,0,128,128,63.5],"tile_ash_path_alt":[4,1428,776,128,128,0,0,128,128,63.5],"tile_ash_path_corner":[4,1558,776,128,128,0,0,128,128,63.5],"tile_ash_path_in":[4,1688,776,128,128,0,0,128,128,63.5],"tile_ash_path_out":[4,1818,776,128,128,0,0,128,128,63.5],"tile_ash_path_t":[4,2,1034,128,128,0,0,128,128,63.5],"tile_grass_ground_a":[4,132,1034,128,128,0,0,128,128,63.5],"tile_grass_ground_b":[4,262,1034,128,128,0,0,128,128,63.5],"tile_grass_ground_c":[4,392,1034,128,128,0,0,128,128,63.5],"tile_grass_ground_d":[4,522,1034,128,128,0,0,128,128,63.5],"tile_grass_path":[4,652,1034,128,128,0,0,128,128,63.5],"tile_grass_path_alt":[4,782,1034,128,128,0,0,128,128,63.5],"tile_grass_path_corner":[4,912,1034,128,128,0,0,128,128,63.5],"tile_grass_path_in":[4,1042,1034,128,128,0,0,128,128,63.5],"tile_grass_path_out":[4,1172,1034,128,128,0,0,128,128,63.5],"tile_grass_path_t":[4,1302,1034,128,128,0,0,128,128,63.5],"tile_snow_ground_a":[4,1432,1034,128,128,0,0,128,128,63.5],"tile_snow_ground_b":[4,1562,1034,128,128,0,0,128,128,63.5],"tile_snow_ground_c":[4,1692,1034,128,128,0,0,128,128,63.5],"tile_snow_ground_d":[4,1822,1034,128,128,0,0,128,128,63.5],"tile_snow_path":[4,2,1164,128,128,0,0,128,128,63.5],"tile_snow_path_alt":[4,132,1164,128,128,0,0,128,128,63.5],"tile_snow_path_corner":[4,262,1164,128,128,0,0,128,128,63.5],"tile_snow_path_in":[4,392,1164,128,128,0,0,128,128,63.5],"tile_snow_path_out":[4,522,1164,128,128,0,0,128,128,63.5],"tile_snow_path_t":[4,652,1164,128,128,0,0,128,128,63.5],"fx_explosion_0":[5,2,2,256,256,5,59,245,137,123.7],"fx_explosion_1":[5,260,2,256,256,5,45,245,165,116.6],"fx_explosion_2":[5,518,2,256,256,5,34,245,187,128.2],"fx_explosion_3":[5,776,2,256,256,5,18,245,219,116.8],"fx_explosion_4":[5,1034,2,256,256,7,26,243,203,119.0],"fx_explosion_5":[5,1292,2,256,256,5,41,245,174,118.5],"fx_explosion_6":[5,1550,2,256,256,5,50,245,155,121.5],"fx_explosion_7":[5,2,260,256,256,5,66,244,125,125.6],"fx_flame_0":[5,260,260,256,256,7,40,243,176,119.9],"fx_flame_1":[5,518,260,256,256,5,52,245,151,107.5],"fx_flame_2":[5,776,260,256,256,5,42,245,171,117.1],"fx_flame_3":[5,1034,260,256,256,5,45,244,166,117.4],"fx_flame_4":[5,1292,260,256,256,5,49,244,159,118.8],"fx_flame_5":[5,1550,260,256,256,5,54,245,147,119.9],"fx_frost_ring_0":[5,2,518,256,256,5,66,244,123,125.8],"fx_frost_ring_1":[5,260,518,256,256,5,62,245,132,109.5],"fx_frost_ring_2":[5,518,518,256,256,5,52,244,151,115.9],"fx_frost_ring_3":[5,776,518,256,256,5,52,245,152,124.5],"fx_frost_ring_4":[5,1034,518,256,256,20,58,230,140,123.8],"fx_frost_ring_5":[5,1292,518,256,256,5,56,245,143,141.6],"fx_lightning_0":[5,1550,518,256,256,6,73,244,110,91.6],"fx_lightning_1":[5,2,776,256,256,5,74,245,108,119.0],"fx_lightning_2":[5,260,776,256,256,5,74,245,100,116.4],"fx_lightning_3":[5,518,776,256,256,5,73,244,109,139.1],"fx_rune_ring_0":[5,776,776,256,256,5,61,245,133,121.9],"fx_rune_ring_1":[5,1034,776,256,256,5,61,245,133,120.9],"fx_rune_ring_2":[5,1292,776,256,256,7,29,243,197,138.1],"fx_rune_ring_3":[5,1550,776,256,256,5,18,245,220,108.5],"fx_rune_ring_4":[5,2,1034,256,256,5,12,245,231,155.8],"fx_rune_ring_5":[5,260,1034,256,256,5,25,245,205,138.2],"fx_rune_ring_6":[5,518,1034,256,256,5,28,245,199,123.2],"fx_rune_ring_7":[5,776,1034,256,256,10,5,235,245,114.8],"fx_thaw_steam_0":[5,1034,1034,256,256,7,13,243,230,119.1],"fx_thaw_steam_1":[5,1292,1034,256,256,6,11,242,234,120.8],"fx_thaw_steam_2":[5,1550,1034,256,256,5,42,244,171,128.5],"fx_thaw_steam_3":[5,2,1292,256,256,7,29,243,198,106.8],"fx_thaw_steam_4":[5,260,1292,256,256,6,37,244,182,75.8],"fx_thaw_steam_5":[5,518,1292,256,256,5,53,245,149,94.4],"proj_arrow":[5,776,1292,64,20,26,1,10,19,6.8],"proj_boulder":[5,842,1292,32,32,4,1,20,29,8.5],"proj_fire":[5,876,1292,48,48,9,2,29,45,22.3],"proj_ice":[5,926,1292,32,24,8,1,16,23,6.5],"proj_spear":[5,960,1292,72,18,30,1,11,17,6.4],"icon_boss_fenrir":[6,2,2,256,256,23,5,209,245,88.5],"icon_boss_jarl":[6,260,2,256,256,22,5,211,245,80.1],"ui_btn_blue":[6,518,2,240,56,1,1,238,54,118.7],"ui_btn_gold":[6,760,2,240,56,1,1,238,54,118.7],"ui_btn_green":[6,1002,2,240,56,1,1,238,54,118.7],"ui_coin":[6,1244,2,32,32,2,1,28,30,9.9],"ui_heart":[6,1278,2,32,32,4,1,20,30,10.7],"ui_level_node":[6,1312,2,96,96,8,2,80,92,25.0],"ui_lock":[6,1410,2,32,32,3,1,25,30,8.3],"ui_panel":[6,1444,2,320,160,1,1,318,158,158.7],"ui_silver":[6,1766,2,32,32,2,1,28,30,9.2],"ui_star_off":[6,1800,2,48,48,3,1,36,46,13.6],"ui_star_on":[6,1850,2,48,48,3,1,42,46,13.9],"tower_archer_1_a3":[7,2,2,125,246,0,0,125,246,62.6],"tower_archer_1_a5":[7,129,2,118,246,0,0,118,246,58.6],"tower_archer_2_a1":[7,249,2,126,246,0,0,126,246,60.3],"tower_archer_2_a3":[7,377,2,128,246,0,0,128,246,64.2],"tower_archer_2_a5":[7,507,2,128,246,0,0,128,246,63.3],"tower_archer_2_a7":[7,637,2,128,246,0,0,128,246,62.4],"tower_archer_3_a5":[7,767,2,134,246,0,0,134,246,67.7],"tower_ballista_3_a6":[7,903,2,175,246,0,0,175,246,89.0],"tower_archer_1_a1":[7,1080,2,123,245,0,0,123,245,60.8],"tower_archer_1_a4":[7,1205,2,124,245,0,0,124,245,58.6],"tower_archer_1_a7":[7,1331,2,123,245,0,0,123,245,62.8],"tower_archer_2_a4":[7,1456,2,128,245,0,0,128,245,62.2],"tower_archer_2_a0":[7,1586,2,128,244,0,0,128,244,64.4],"tower_archer_2_a2":[7,1716,2,123,244,0,0,123,244,61.5],"tower_archer_3_a1":[7,1841,2,130,244,0,0,130,244,66.7],"tower_archer_3_a3":[7,2,250,131,244,0,0,131,244,64.6],"tower_archer_3_a6":[7,135,250,133,244,0,0,133,244,66.4],"tower_ballista_2_a6":[7,270,250,172,244,0,0,172,244,86.5],"tower_archer_3_a2":[7,444,250,131,243,0,0,131,243,65.7],"tower_archer_3_a4":[7,577,250,132,243,0,0,132,243,66.6],"tower_archer_3_a7":[7,711,250,132,243,0,0,132,243,67.7],"tower_ballista_3_a5":[7,845,250,171,243,0,0,171,243,87.1],"tower_ballista_3_a7":[7,1018,250,173,243,0,0,173,243,88.3],"tower_archer_3_a0":[7,1193,250,135,242,0,0,135,242,69.6],"tower_ballista_3_a3":[7,1330,250,171,241,0,0,171,241,86.2],"tower_archer_1_a0":[7,1503,250,119,240,0,0,119,240,59.7],"tower_archer_1_a2":[7,1624,250,104,239,0,0,104,239,51.7],"tower_archer_1_a6":[7,1730,250,106,239,0,0,106,239,52.2],"tower_ballista_3_a1":[7,1838,250,173,239,0,0,173,239,88.4],"tower_archer_2_a6":[7,2,496,121,238,0,0,121,238,59.5],"tower_ballista_3_a2":[7,125,496,174,237,0,0,174,237,88.1],"tower_catapult_3_a5":[7,301,496,158,236,0,0,158,236,76.6],"tower_catapult_3_a7":[7,461,496,155,236,0,0,155,236,75.9],"tower_ballista_1_a6":[7,618,496,175,234,0,0,175,234,105.7],"tower_catapult_3_a1":[7,795,496,178,232,13,0,165,232,81.0],"tower_catapult_3_a3":[7,975,496,182,232,0,0,166,232,83.6],"tower_catapult_3_a2":[7,1159,496,134,230,0,0,134,230,66.5],"tower_catapult_3_a6":[7,1295,496,129,230,0,0,129,230,63.8],"tower_ballista_1_a7":[7,1426,496,162,227,0,0,162,227,94.9],"tower_ballista_1_a5":[7,1590,496,165,224,0,0,165,224,97.7],"tower_ballista_1_a1":[7,1757,496,164,219,0,0,164,219,94.8],"tower_ballista_3_a0":[7,2,736,181,218,0,0,181,218,87.1],"tower_ballista_1_a2":[7,185,736,179,217,0,0,179,217,107.3],"tower_ballista_1_a3":[7,366,736,160,217,0,0,160,217,90.9],"tower_ballista_2_a7":[7,528,736,160,217,0,0,160,217,74.9],"tower_ballista_1_a0":[7,690,736,177,216,0,0,177,216,87.7],"tower_ballista_1_a4":[7,869,736,182,216,0,0,182,216,113.7],"tower_ballista_3_a4":[7,1053,736,181,216,0,0,181,216,95.2],"tower_ballista_2_a2":[7,1236,736,182,213,0,0,182,213,89.8],"tower_ballista_2_a5":[7,1420,736,165,213,0,0,165,213,89.2],"tower_catapult_2_a2":[7,1587,736,126,213,0,0,126,213,62.4],"tower_ballista_2_a3":[7,1715,736,160,212,0,0,160,212,74.8],"tower_catapult_2_a6":[7,1877,736,126,211,0,0,126,211,62.2],"tower_ballista_2_a1":[7,2,956,157,209,0,0,157,209,79.2],"tower_catapult_3_a0":[7,161,956,145,207,0,0,145,207,69.8],"tower_catapult_3_a4":[7,308,956,145,207,0,0,145,207,74.1],"tower_ballista_2_a4":[7,455,956,176,206,0,0,176,206,98.8],"tower_catapult_2_a3":[7,633,956,159,206,0,0,159,206,95.7],"tower_ballista_2_a0":[7,794,956,172,205,0,0,172,205,75.2],"tower_catapult_2_a7":[7,968,956,179,205,0,0,179,205,80.6],"tower_catapult_2_a5":[7,1149,956,174,201,0,0,174,201,96.0],"tower_catapult_2_a1":[7,1325,956,155,200,0,0,155,200,60.4],"tower_catapult_2_a0":[7,1482,956,182,186,0,0,182,186,63.1],"tower_catapult_2_a4":[7,1666,956,181,186,0,0,181,186,116.1],"boss_jarl_death_0":[7,1849,956,139,182,0,0,139,182,72.0],"tower_catapult_1_a5":[7,2,1167,169,180,0,0,169,180,95.8],"boss_draugr_move_s":[7,173,1167,136,180,0,0,136,180,74.8],"boss_jarl_move_n":[7,311,1167,121,180,0,0,121,180,55.9],"tower_catapult_1_a7":[7,434,1167,181,179,0,0,181,179,77.9],"boss_draugr_move_n":[7,617,1167,149,178,0,0,149,178,90.9],"boss_draugr_move_ne":[7,768,1167,119,178,0,0,119,178,71.6],"tower_catapult_1_a6":[7,889,1167,127,177,0,0,127,177,62.9],"boss_jarl_move_ne":[7,1018,1167,127,176,0,0,127,176,48.4],"boss_jarl_move_s":[7,1147,1167,120,176,0,0,120,176,58.5],"boss_draugr_move_se":[7,1269,1167,152,175,0,0,152,175,88.7],"boss_draugr_move_e":[7,1423,1167,154,174,0,0,154,174,82.4],"boss_fenrir_death_0":[7,1579,1167,182,174,0,0,182,174,70.8],"boss_jarl_move_se":[7,1763,1167,143,174,0,0,143,174,81.0],"tower_catapult_1_a3":[7,2,1349,173,173,0,0,173,173,94.0],"boss_jarl_move_e":[7,177,1349,141,172,0,0,141,172,77.1],"tower_catapult_1_a2":[7,320,1349,128,171,0,0,128,171,63.4],"boss_draugr_death_0":[7,450,1349,150,171,0,0,150,171,68.9],"boss_jarl_death_1":[7,602,1349,129,169,0,0,129,169,53.2],"tower_catapult_1_a1":[7,733,1349,182,168,0,0,182,168,79.7],"tower_catapult_1_a4":[7,917,1349,174,157,0,0,174,157,96.1],"boss_jarl_death_2":[7,1093,1349,149,156,0,0,149,156,73.1],"boss_fenrir_death_1":[7,1244,1349,147,155,0,0,147,155,92.0],"boss_fenrir_death_3":[7,1393,1349,155,155,0,0,155,155,74.8],"tower_catapult_1_a0":[7,1550,1349,180,154,0,0,180,154,73.3],"boss_draugr_death_1":[7,1732,1349,120,151,0,0,120,151,36.3],"boss_fenrir_death_2":[7,1854,1349,133,147,0,0,133,147,76.1],"boss_fenrir_move_s":[7,2,1524,73,147,0,0,73,147,31.3],"boss_fenrir_move_se":[7,77,1524,141,146,0,0,141,146,103.3],"boss_fenrir_move_n":[7,220,1524,66,141,0,0,66,141,33.4],"boss_fenrir_move_ne":[7,288,1524,134,139,0,0,134,139,42.6],"boss_draugr_death_2":[7,424,1524,134,133,0,0,134,133,90.2],"boss_fenrir_move_e":[7,560,1524,180,126,0,0,180,126,96.7],"enemy_berserk_death_0":[7,742,1524,79,122,0,0,79,122,46.2],"enemy_jarl_death_0":[7,823,1524,73,122,0,0,73,122,43.5],"enemy_raider_death_0":[7,898,1524,87,122,0,0,87,122,44.1],"enemy_raven_death_0":[7,987,1524,105,122,0,0,105,122,37.6],"enemy_scout_death_0":[7,1094,1524,86,122,0,0,86,122,56.2],"enemy_shaman_death_0":[7,1182,1524,85,122,0,0,85,122,43.8],"enemy_shield_death_0":[7,1269,1524,79,122,0,0,79,122,43.2],"enemy_berserk_move_ne":[7,1350,1524,81,120,0,0,81,120,29.5],"enemy_jarl_move_n":[7,1433,1524,81,120,0,0,81,120,37.5],"enemy_raider_move_n":[7,1516,1524,70,120,0,0,70,120,27.7],"enemy_raider_move_ne":[7,1588,1524,73,120,0,0,73,120,22.8],"enemy_scout_move_n":[7,1663,1524,75,120,0,0,75,120,41.8],"enemy_scout_move_ne":[7,1740,1524,83,120,0,0,83,120,39.1],"enemy_scout_move_s":[7,1825,1524,79,120,0,0,79,120,39.6],"enemy_shaman_move_n":[7,1906,1524,78,120,0,0,78,120,39.4],"enemy_shaman_move_ne":[7,2,1673,75,120,0,0,75,120,30.5],"enemy_shaman_move_s":[7,79,1673,80,120,0,0,80,120,33.9],"enemy_shield_move_n":[7,161,1673,66,120,0,0,66,120,38.3],"enemy_shield_move_ne":[7,229,1673,75,120,0,0,75,120,36.2],"enemy_jarl_death_1":[7,306,1673,94,119,0,0,94,119,32.0],"enemy_scout_move_se":[7,402,1673,93,119,0,0,93,119,59.5],"enemy_berserk_move_n":[7,497,1673,75,118,0,0,75,118,35.4],"enemy_raider_move_s":[7,574,1673,70,118,0,0,70,118,32.2],"enemy_scout_move_e":[7,646,1673,85,118,0,0,85,118,54.7],"enemy_berserk_move_s":[7,733,1673,74,117,0,0,74,117,37.1],"enemy_shield_move_s":[7,809,1673,72,117,0,0,72,117,31.9],"enemy_shield_move_se":[7,883,1673,73,117,0,0,73,117,36.0],"enemy_jarl_move_ne":[7,958,1673,92,116,0,0,92,116,50.4],"enemy_raider_move_se":[7,1052,1673,76,116,0,0,76,116,49.8],"enemy_jarl_move_s":[7,1130,1673,73,115,0,0,73,115,36.6],"enemy_jarl_move_se":[7,1205,1673,81,115,0,0,81,115,49.1],"enemy_berserk_move_se":[7,1288,1673,87,114,0,0,87,114,54.6],"boss_jarl_death_3":[7,1377,1673,143,114,0,0,143,114,79.9],"enemy_shield_move_e":[7,1522,1673,78,114,0,0,78,114,40.3],"enemy_berserk_move_e":[7,1602,1673,88,113,0,0,88,113,47.5],"enemy_raider_move_e":[7,1692,1673,74,113,0,0,74,113,40.6],"enemy_raven_death_1":[7,1768,1673,113,112,0,0,113,112,47.2],"enemy_shield_death_1":[7,1883,1673,77,112,0,0,77,112,40.6],"boss_fenrir_death_4":[7,2,1795,178,111,0,0,178,111,109.7],"enemy_jarl_move_e":[7,182,1795,74,111,0,0,74,111,42.9],"enemy_shaman_move_se":[7,258,1795,98,110,0,0,98,110,50.6],"enemy_jarl_death_2":[7,358,1795,94,109,0,0,94,109,46.5],"enemy_shaman_move_e":[7,454,1795,102,109,0,0,102,109,47.7],"enemy_raider_death_1":[7,558,1795,77,106,0,0,77,106,30.5],"enemy_scout_death_1":[7,637,1795,86,106,0,0,86,106,63.4],"enemy_shaman_death_1":[7,725,1795,88,106,0,0,88,106,42.1],"enemy_berserk_death_1":[7,815,1795,84,105,0,0,84,105,53.3],"enemy_shaman_death_2":[7,901,1795,97,97,0,0,97,97,50.2],"boss_draugr_death_5":[7,1000,1795,128,92,0,0,128,92,86.4],"boss_jarl_death_4":[7,1130,1795,151,91,0,0,151,91,105.2],"enemy_raider_death_2":[7,1283,1795,92,91,0,0,92,91,44.6],"enemy_raven_death_2":[7,1377,1795,108,90,0,0,108,90,59.8],"enemy_berserk_death_2":[7,1487,1795,84,88,0,0,84,88,48.8],"boss_draugr_death_4":[7,1573,1795,182,88,0,0,182,88,118.2],"boss_draugr_death_3":[7,1757,1795,131,86,0,0,131,86,59.1],"enemy_shield_death_2":[7,1890,1795,90,83,0,0,90,83,45.1],"enemy_jarl_death_3":[7,2,1908,95,82,0,0,95,82,46.4],"enemy_shaman_death_3":[7,99,1908,80,78,0,0,80,78,34.4],"enemy_raven_move_ne":[7,181,1908,92,77,0,0,92,77,53.5],"boss_jarl_death_5":[7,275,1908,163,75,0,0,163,75,109.0],"boss_fenrir_death_5":[7,440,1908,171,74,0,0,171,74,118.3],"enemy_raven_move_se":[7,613,1908,90,73,0,0,90,73,62.9],"enemy_scout_death_2":[7,705,1908,87,73,0,0,87,73,66.7],"enemy_raven_death_3":[7,794,1908,112,72,0,0,112,72,68.0],"enemy_raven_move_s":[7,908,1908,106,71,0,0,106,71,53.1],"enemy_raven_move_e":[7,1016,1908,97,70,0,0,97,70,32.9],"enemy_raider_death_3":[7,1115,1908,102,69,0,0,102,69,65.5],"enemy_raven_move_n":[7,1219,1908,120,69,0,0,120,69,59.9],"enemy_shield_death_3":[7,1341,1908,92,69,0,0,92,69,65.5],"enemy_shaman_death_4":[7,1435,1908,95,68,0,0,95,68,44.6],"enemy_berserk_death_3":[7,1532,1908,100,65,0,0,100,65,54.5],"enemy_berserk_death_4":[7,1634,1908,78,65,0,0,78,65,36.8],"enemy_shaman_death_5":[7,1714,1908,102,64,0,0,102,64,66.9],"enemy_jarl_death_5":[7,1818,1908,112,58,0,0,112,58,88.8],"enemy_jarl_death_4":[7,1932,1908,89,57,0,0,89,57,65.2],"enemy_shield_death_4":[8,2,2,87,56,0,0,87,56,59.3],"enemy_scout_death_3":[8,91,2,99,54,0,0,99,54,86.8],"enemy_raider_death_4":[8,192,2,90,52,0,0,90,52,73.9],"enemy_raven_death_4":[8,284,2,117,49,0,0,117,49,55.8],"enemy_shield_death_5":[8,403,2,106,48,0,0,106,48,86.8],"enemy_raider_death_5":[8,511,2,105,47,0,0,105,47,90.6],"enemy_raven_death_5":[8,618,2,116,47,0,0,116,47,55.6],"enemy_berserk_death_5":[8,736,2,103,42,0,0,103,42,52.5],"enemy_scout_death_4":[8,841,2,94,42,0,0,94,42,34.5],"enemy_scout_death_5":[8,937,2,102,41,0,0,102,41,58.8]};
-const ART={ base:'assets/atlases/', img:[], n:0,
-  init(){ if(typeof Image==='undefined') return;
+const ART={ base:'assets/atlases/', img:[], n:0, done:0, total:ATLAS_FILES.length,
+  init(){ if(typeof Image==='undefined'){ this.done=this.total; return; }
     ATLAS_FILES.forEach((f,i)=>{ const im=new Image();
-      im.onload=()=>{ ART.img[i]=im; ART.n++; }; im.onerror=()=>{}; im.src=ART.base+f+'.webp'; }); },
+      im.onload=()=>{ ART.img[i]=im; ART.n++; ART.done++; };
+      im.onerror=()=>{ ART.done++; };            // нет файла — не ждём, рисуем векторно
+      im.src=ART.base+f+'.webp'; }); },
+  ready(){ return this.done>=this.total; },
   f(n){ const d=ATLAS_DATA[n]; return (d && this.img[d[0]]) ? d : null; },
   has(n){ return !!this.f(n); } };
 ART.init();
@@ -1636,6 +1660,20 @@ function glyphPause(x,y,paused){
   if(paused){ ctx.beginPath(); ctx.moveTo(x-6,y-9); ctx.lineTo(x+9,y); ctx.lineTo(x-6,y+9); ctx.closePath(); ctx.fill(); }
   else { rr(x-7,y-9,5,18,2); ctx.fill(); rr(x+2,y-9,5,18,2); ctx.fill(); }
 }
+function glyphVibe(x,y,on){                   // телефон с волнами по бокам
+  ctx.save(); ctx.translate(x,y);
+  ctx.strokeStyle=on?'#e9f0f4':'#6b7f8c'; ctx.lineWidth=2.2; ctx.lineCap='round';
+  rr(-6,-10,12,20,3); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(-3.5,-6.5); ctx.lineTo(3.5,-6.5); ctx.stroke();
+  if(on){
+    ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(-11,-4); ctx.lineTo(-11,4); ctx.moveTo(-14.5,-7); ctx.lineTo(-14.5,7);
+    ctx.moveTo(11,-4); ctx.lineTo(11,4); ctx.moveTo(14.5,-7); ctx.lineTo(14.5,7); ctx.stroke();
+  } else {
+    ctx.beginPath(); ctx.moveTo(-13,-9); ctx.lineTo(13,9); ctx.stroke();
+  }
+  ctx.restore();
+}
 function glyphSound(x,y,on){
   ctx.fillStyle='#e9f0f4';
   ctx.beginPath(); ctx.moveTo(x-8,y-4); ctx.lineTo(x-3,y-4); ctx.lineTo(x+2,y-10);
@@ -1996,6 +2034,8 @@ function drawTopBar(g){
   let bx=(STRIP?W:CW)-8-bw;
   btn('exit',bx,by,bw,bh,'',{}); glyphHome(bx+bw/2,by+bh/2); bx-=bw+gap;
   btn('sound',bx,by,bw,bh,'',{}); glyphSound(bx+bw/2-3,by+bh/2,save.sound); bx-=bw+gap;
+  if(TOUCH){ btn('vibe',bx,by,bw,bh,'',{c1:save.vibe!==false?'#3a5766':'#2b3b46',c2:save.vibe!==false?'#24404e':'#1d2a33'});
+    glyphVibe(bx+bw/2,by+bh/2,save.vibe!==false); bx-=bw+gap; }
   btn('speed',bx,by,bw,bh,g.speed===1?'1x':'2x',{fs:17,c1:g.speed===2?'#4a7a52':'#3a5766',c2:g.speed===2?'#2f5a37':'#24404e'}); bx-=bw+gap;
   btn('pause',bx,by,bw,bh,'',{}); glyphPause(bx+bw/2,by+bh/2,g.paused); bx-=bw+gap;
   btn('restart',bx,by,bw,bh,'',{c1:g.askRestart?'#8a4a44':'#3a5766',c2:g.askRestart?'#5d2f2b':'#24404e'});
@@ -2004,6 +2044,29 @@ function drawTopBar(g){
 }
 function drawHud(){
   const g=game; uiBtns=[];
+  if(g.rotAsk && PORTRAIT){                       // просьба повернуть — не блокирует игру
+    ctx.fillStyle='rgba(8,16,22,.88)'; ctx.fillRect(0,0,CW,H);
+    const cy=H*0.34;
+    ctx.save(); ctx.translate(CW/2,cy); ctx.scale(2.4,2.4);
+    const a=Math.sin(game.time*2)*0.22;             // телефон покачивается, показывая поворот
+    ctx.rotate(-0.5+a);
+    ctx.strokeStyle='#e7b74e'; ctx.lineWidth=2.4; ctx.lineJoin='round';
+    rr(-11,-19,22,38,4); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-5,-14); ctx.lineTo(5,-14); ctx.stroke();
+    ctx.restore();
+    ctx.save(); ctx.translate(CW/2,cy);
+    ctx.strokeStyle='rgba(231,183,78,.55)'; ctx.lineWidth=3; ctx.lineCap='round';
+    ctx.beginPath(); ctx.arc(0,0,74,-2.5,-0.7); ctx.stroke();
+    ctx.fillStyle='rgba(231,183,78,.55)';
+    ctx.beginPath(); ctx.moveTo(60,-44); ctx.lineTo(74,-30); ctx.lineTo(54,-28); ctx.closePath(); ctx.fill();
+    ctx.restore();
+    txt('Turn your phone sideways',CW/2,H*0.53,26,'#e9f0f4','center',true);
+    txt('The board becomes 60% bigger and the whole',CW/2,H*0.585,15,'#9fb3c0','center');
+    txt('village fits on screen without zooming.',CW/2,H*0.615,15,'#9fb3c0','center');
+    btn('rotok',CW/2-150,H*0.68,300,58,'Play in portrait anyway',{fs:17,c1:'#44606f',c2:'#2c4451'});
+    txt('You can turn the phone at any time.',CW/2,H*0.68+86,13,'#6f8a9a','center');
+    return;                                         // остальной интерфейс под оверлеем не нужен
+  }
   drawTopBar(g);
 
   const boss=g.enemies.find(e=>e.d.boss && !e.dead);
@@ -2293,7 +2356,7 @@ function onBoard(p){
   if(!PORTRAIT) return p.y>=BY && p.y<PY;
   return p.y>=PORT_BOARD_Y && p.y<PORT_BOARD_Y+PORT_BOARD_H;
 }
-function buzz(ms){ try{ if(TOUCH && save.sound!==undefined && navigator.vibrate) navigator.vibrate(ms||10); }catch(e){} }
+function buzz(ms){ try{ if(TOUCH && save.vibe!==false && navigator.vibrate) navigator.vibrate(ms||10); }catch(e){} }
 function hitBtn(p){
   const s=TOUCH?10:0;                 // палец толще курсора
   for(let i=uiBtns.length-1;i>=0;i--){ const b=uiBtns[i];
@@ -2408,6 +2471,8 @@ async function onButton(id){
   if(id==='pause'){ g.paused=!g.paused; return; }
   if(id==='speed'){ g.speed = g.speed===1?2:1; return; }
   if(id==='sound'){ save.sound=!save.sound; persist(); if(save.sound) startWind(); else stopWind(); return; }
+  if(id==='vibe'){ save.vibe = save.vibe===false; persist(); if(save.vibe) buzz(25); return; }
+  if(id==='rotok'){ g.rotAsk=false; save.portraitOk=true; persist(); return; }
   if(id==='exit'){ stopWind(); game=null; screen('scLevels'); renderLevels(); return; }
   if(id==='early'){ startWave(true); return; }
   if(id==='up'){ const t=g.selTower, c=t.upCost();
@@ -2669,7 +2734,7 @@ let last=performance.now();
 function loop(now){
   let dt=(now-last)/1000; last=now;
   dt=Math.min(dt,0.05);
-  if(game && game.running && !game.paused && !platformPaused){
+  if(game && game.running && !game.paused && !game.rotAsk && !platformPaused){
     const steps=game.speed;
     for(let i=0;i<steps;i++) update(dt);
   }
@@ -2683,10 +2748,29 @@ function loop(now){
   setLayout(touch, window.innerHeight > window.innerWidth*1.04);
   window.addEventListener('resize',()=>{
     const port = window.innerHeight > window.innerWidth*1.04;
-    if(TOUCH && port!==PORTRAIT) setLayout(true, port);
+    if(TOUCH && port!==PORTRAIT){ setLayout(true, port); if(!port && game) game.rotAsk=false; }
   });
   screen('scMenu'); renderLevels();
   requestAnimationFrame(loop);
+
+  // Ждём графику, чтобы игрок не увидел полупустое меню. Не дольше 9 секунд:
+  // если файлов нет или сеть медленная, игра всё равно стартует и рисует векторно.
+  const fill=document.getElementById('bootfill'), tip=document.getElementById('boottip'), boot=document.getElementById('boot');
+  const splash=new Image(); let splashDone=false;
+  splash.onload=splash.onerror=()=>{ splashDone=true; };
+  splash.src='assets/splash.webp';
+  const t0=Date.now();
+  await new Promise(res=>{
+    const iv=setInterval(()=>{
+      const part=(ART.done + (splashDone?1:0)) / (ART.total+1);
+      if(fill) fill.style.width=Math.round(Math.max(0.06,part)*100)+'%';
+      if(ART.ready() && splashDone || Date.now()-t0>9000){ clearInterval(iv); res(); }
+    },90);
+  });
+  if(tip) tip.textContent='Ready';
+  if(fill) fill.style.width='100%';
+  await new Promise(r=>setTimeout(r,180));
+  if(boot){ boot.classList.add('gone'); setTimeout(()=>boot.remove(),600); }
   try{ if(window.bridge && bridge.initialize) await bridge.initialize(); }catch(e){}
   bindPlatformEvents();
   try{ if(window.bridge && bridge.platform && bridge.platform.sendMessage) bridge.platform.sendMessage('game_ready'); }catch(e){}

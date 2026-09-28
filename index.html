@@ -26,7 +26,7 @@
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   html,body{margin:0;height:100%;overflow:hidden;background:#0a141b;font-family:var(--f);color:var(--snow)}
-  #wrap{position:fixed;inset:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px);overflow:hidden;
+  #wrap{position:fixed;inset:0;overflow:hidden;
         background:radial-gradient(120% 90% at 50% 0%,#1b3446 0%,#0a141b 70%)}
   #stage{position:absolute;left:0;top:0;width:960px;height:640px;transform-origin:center center;overflow:hidden;
          border-radius:10px;box-shadow:0 24px 70px rgba(0,0,0,.6)}
@@ -107,18 +107,6 @@
 
   .back .btn{min-width:0;min-height:44px;padding:10px 20px;font-size:15px;margin:0}
 
-
-  body.portrait .screen{padding:24px 18px;overflow-y:auto;border-radius:0}
-  body.portrait .screen.scroll{padding:20px 18px 28px}
-  body.portrait .screen .btn{min-height:60px;font-size:20px;max-width:100%}
-  body.portrait .screen p.sub{font-size:18px}
-  body.portrait .levels{grid-template-columns:repeat(3,1fr)}
-  body.portrait .lv{height:100px}
-  body.portrait .lv span{font-size:12px}
-  body.portrait .perks{grid-template-columns:1fr}
-  body.portrait .hdr{top:-20px}
-  body.portrait .back,body.portrait .bar{top:0}
-  body.portrait ul.help{font-size:18px}
 </style>
 </head>
 <body>
@@ -137,7 +125,7 @@
       <button class="btn sec" id="bHelp">How to play</button>
     </div>
     <div class="bar"><div class="silver"><img src="assets/icons/icon_silver.png" alt=""><b id="silv1">0</b></div></div>
-    <div class="build">build 16.09 · 26</div>
+    <div class="build">build 28.09 · 1</div>
   </div>
 
   <!-- ВЫБОР УРОВНЯ -->
@@ -778,7 +766,7 @@ class Enemy{
     }
     if(this.wp>=p.length && !this.escaped){
       this.escaped=true; this.dead=true;
-      game.lives-=this.leak; SFX.leak(); game.shake=0.35;
+      game.lives-=this.leak; SFX.leak(); buzz(55); game.shake=0.35;
       floatText(480,BY+30,'-'+this.leak+' lives','#e06060');
     }
   }
@@ -990,7 +978,6 @@ const clamp=(v,a,b)=>v<a?a:v>b?b:v;
 
 /* ---------- 7. ЛОГИКА УРОВНЯ -------------------------------------------- */
 function startLevel(idx, sandbox, endless){
-  BV.zoom=1; BV.panX=0; BV.panY=0; updateBoardView();
   screen(null);                       // закрываем меню сразу, что бы дальше ни случилось
   const L=LEVELS[idx];
   game={
@@ -1150,7 +1137,6 @@ function btn(id,x,y,w,h,label,opt){
 function draw(){
   const g=game;
   ctx.clearRect(0,0,CW,H);
-  if(PORTRAIT){ const bg=ctx.createLinearGradient(0,PORT_BOARD_Y,0,PORT_BOARD_Y+PORT_BOARD_H); bg.addColorStop(0,'#142d39'); bg.addColorStop(.5,'#0b1b23'); bg.addColorStop(1,'#142d39'); ctx.fillStyle=bg; ctx.fillRect(0,PORT_BOARD_Y,CW,PORT_BOARD_H); }
   ctx.save();
   if(g&&g.shake>0){ const s=g.shake*7; ctx.translate((Math.random()-.5)*s,(Math.random()-.5)*s); }
   if(!g){ ctx.restore(); return; }
@@ -2014,59 +2000,8 @@ function drawTopBar(g){
   glyphRestart(bx+bw/2,by+bh/2);
   if(g.askRestart) txt('again?',bx+bw/2,by+bh+10,11,'#e59a95','center',true);
 }
-
-/* Portrait: overview above, stable thumb controls below. No controls cover the map. */
-function drawPortraitHud(g){
-  const dock=PORT_BOARD_Y+PORT_BOARD_H;
-  ctx.fillStyle='#0e1c25'; ctx.fillRect(0,0,CW,PORT_BOARD_Y); ctx.fillRect(0,dock,CW,H-dock);
-  txt(g.L.n,14,23,19,'#e9f0f4','left',true);
-  txt('Wave '+Math.min(g.wave+1,g.waves.length)+' / '+g.waves.length,14,49,16,'#9fb3c0');
-  drawAxes(210,25); txt(g.lives,230,25,20,'#e9f0f4','left',true);
-  drawCoin(316,25); txt(Math.floor(g.gold),336,25,20,'#e7b74e','left',true);
-  ['exit','sound','restart','pause'].forEach((id,i)=>{
-    const x=14+i*68; btn(id,x,61,60,46,'',{});
-    if(id==='exit') glyphHome(x+30,84);
-    if(id==='sound') glyphSound(x+27,84,save.sound);
-    if(id==='restart') glyphRestart(x+30,84);
-    if(id==='pause') glyphPause(x+30,84,g.paused);
-  });
-  txt(g.askRestart?'Tap restart again':Math.round(BV.zoom*100)+'%',CW-14,84,16,g.askRestart?'#e59a95':'#9fb3c0','right');
-  if(g.paused){ ctx.fillStyle='rgba(8,16,22,.55)'; ctx.fillRect(0,PORT_BOARD_Y,CW,PORT_BOARD_H); txt('Paused',CW/2,PORT_BOARD_Y+PORT_BOARD_H/2,34,'#fff','center',true); }
-  const boss=g.enemies.find(e=>e.d.boss&&!e.dead);
-  let status=g.selTower?g.selTower.def.name+' · level '+(g.selTower.lvl+1):g.sel?(towerUnlocked(g.sel)?'Tap a cell, then tap again to build':'Locked · unlock in the Forge'):'Pinch to zoom · drag the map';
-  if(boss&&!g.sel&&!g.selTower) status=boss.d.name+' · '+Math.ceil(boss.hp)+' HP';
-  txt(status,14,dock+19,16,'#cfe0ea');
-  if(g.selTower){
-    const t=g.selTower;
-    btn('up',12,dock+36,224,58,t.lvl>=2?'Max level':'Upgrade '+t.upCost(),{fs:18,on:t.lvl<2&&t.canUp()&&g.gold>=t.upCost()});
-    btn('sell',244,dock+36,224,58,(t.cancelable()?'Cancel +':'Sell +')+t.sellValue(),{fs:18,c1:'#6a4750',c2:'#4a2f36'});
-  }else{
-    btn('zout',12,dock+36,60,58,'−',{fs:26});
-    btn('fit',80,dock+36,184,58,'Full map',{fs:18});
-    btn('zin',272,dock+36,60,58,'+',{fs:26});
-    btn('cancel',340,dock+36,128,58,'Deselect',{fs:16,on:!!g.sel});
-  }
-  TKEYS.forEach((k,i)=>{
-    const x=12+(i%4)*116,y=dock+104+Math.floor(i/4)*90,w=108,h=82;
-    const lock=!towerUnlocked(k),cost=towerCost(k),selected=g.sel===k;
-    ctx.fillStyle=selected?'#394438':'#162833'; rr(x,y,w,h,8); ctx.fill();
-    ctx.strokeStyle=selected?'#e7b74e':'#365365'; ctx.lineWidth=selected?3:1.5; ctx.stroke();
-    ctx.save(); ctx.globalAlpha=lock?.35:(g.gold>=cost?1:.5); if(!sprite('icon_tower_'+k+'_1',x+w/2,y+46,40,68)){ ctx.translate(x+w/2,y+24); ctx.scale(.55,.55); drawTowerIcon(k,0,0); } ctx.restore();
-    txt(TOWERS[k].short,x+w/2,y+56,15,'#dce9ef','center',true);
-    txt(lock?'Locked':cost+' gold',x+w/2,y+73,14,lock?'#8ea6b5':g.gold>=cost?'#e7b74e':'#e58d80','center');
-    uiBtns.push({id:'t_'+k,x,y,w,h,on:true});
-  });
-  if(g.sandbox){ btn('sp_raider',360,dock+194,108,82,'Raider +',{fs:16}); }
-  else{ txt('NEXT WAVE',414,dock+218,12,'#8ea6b5','center'); txt(g.waveState==='idle'?Math.ceil(g.waveTimer)+'s':g.enemies.length+g.spawnQ.length+' left',414,dock+247,20,'#e7b74e','center',true); }
-  const y=dock+286;
-  btn('early',12,y,184,60,g.waveState==='idle'?'Wave +'+Math.round(Math.ceil(g.waveTimer)*(2+g.wave*0.35)*goldMul())+' gold':'Wave in progress',{fs:17,c1:'#4a7a52',c2:'#2f5a37',on:g.waveState==='idle'&&!g.sandbox});
-  btn('speed',204,y,76,60,g.speed+'x',{fs:22});
-  btn('adgold',288,y,180,60,g.adGold?'Ad · +50 gold':'Ad used',{fs:18,c1:'#5fbf72',c2:'#2f8a48',tc:'#062211',on:g.adGold});
-}
-
 function drawHud(){
   const g=game; uiBtns=[];
-  if(PORTRAIT){ drawPortraitHud(g); return; }
   drawTopBar(g);
 
   const boss=g.enemies.find(e=>e.d.boss && !e.dead);
@@ -2078,16 +2013,17 @@ function drawHud(){
     txt(boss.d.name, bx+bw/2, by+24, 12.5, '#e7b74e', 'center', true);
   }
 
-  if(PORTRAIT){                                   // кнопки масштаба поля
-    btn('zin', CW-50, PORT_BOARD_Y+PORT_BOARD_H-100, 42, 42, '+', {fs:24});
-    btn('zout',CW-50, PORT_BOARD_Y+PORT_BOARD_H-52, 42, 42, '\u2212', {fs:24});
+  if(PORTRAIT && BV.zoom>1.02){                   // подсказка про сброс приближения
+    btn('zout', CW-46, PORT_BOARD_Y+6, 40, 34, '1:1', {fs:14});
   }
 
-  const PANY = PORTRAIT ? (PORT_BOARD_Y+PORT_BOARD_H+34) : PY;
+  const PANY = PORTRAIT ? (PORT_BOARD_Y+PORT_BOARD_H+30) : PY;
   ctx.fillStyle='#0e1c25'; ctx.fillRect(0,PANY,CW,H-PANY);
   ctx.fillStyle='#2b4353'; ctx.fillRect(0,PANY,CW,2);
-  const cols=PORTRAIT?4:(TOUCH?4:7), cw=PORTRAIT?118:(TOUCH?132:84),
-        ch=PORTRAIT?PORT_CARD_H:(TOUCH?92:88), gap=PORTRAIT?6:(TOUCH?8:4);
+  const gap=PORTRAIT?6:(TOUCH?8:4);
+  const cols=PORTRAIT?4:(TOUCH?4:7),
+        cw=PORTRAIT?Math.floor((CW-12-3*gap)/4):(TOUCH?132:84),
+        ch=PORTRAIT?PORT_CARD_H:(TOUCH?92:88);
   const BIG = PORTRAIT||TOUCH;
   TKEYS.forEach((k,i)=>{
     const t=TOWERS[k];
@@ -2097,7 +2033,7 @@ function drawHud(){
     if(selq){ ctx.fillStyle='rgba(231,183,78,.16)'; rr(x,y,w,h,7); ctx.fill(); }
     ctx.strokeStyle=selq?'#e7b74e':'#2f4a5a'; ctx.lineWidth=selq?3:2; rr(x,y,w,h,7); ctx.stroke();
     ctx.save(); ctx.globalAlpha=lock?0.3:(afford?1:0.45);
-    ctx.save(); ctx.translate(x+w/2,y+(PORTRAIT?Math.round(ch*0.37):(TOUCH?36:32))); if(PORTRAIT) ctx.scale(ch/97,ch/97);
+    ctx.save(); ctx.translate(x+w/2,y+(PORTRAIT?Math.round(ch*0.33):(TOUCH?36:32))); if(PORTRAIT){ const k=Math.min(1.05,ch/150); ctx.scale(k,k); }
     drawTowerIcon(k,0,0); ctx.restore();
     txt(t.short,x+w/2,y+(PORTRAIT?Math.round(ch*0.66):(TOUCH?68:56)),PORTRAIT?13:(TOUCH?13:11.5),'#cfe0ea','center',true);
     ctx.restore();
@@ -2118,19 +2054,23 @@ function drawHud(){
   });
 
   const rows=Math.ceil(TKEYS.length/cols);
-  const px = PORTRAIT ? (6+cols*(cw+gap)) : (TOUCH ? 6+cols*(cw+gap) : 630);
-  const pw = PORTRAIT ? (CW-6-px) : (W-px-8);
-  const pyy = PANY+8;
-  const ph = PORTRAIT ? (rows*(ch+8)-8) : (TOUCH ? (ch*2+8) : 88);
-  ctx.fillStyle='#162833'; rr(px,pyy,pw,ph,7); ctx.fill();
-  ctx.strokeStyle='#2f4a5a'; ctx.lineWidth=2; rr(px,pyy,pw,ph,7); ctx.stroke();
-  const bH = PORTRAIT?(ch):(TOUCH?56:30), adH = PORTRAIT?(ch):(TOUCH?46:26);
+  const px = PORTRAIT ? 6 : (TOUCH ? 6+cols*(cw+gap) : 630);
+  const pw = PORTRAIT ? (CW-12) : (W-px-8);
+  const pyy = PORTRAIT ? (PANY+8+rows*(ch+gap)) : (PANY+8);
+  const ph = PORTRAIT ? PORT_ACT_H : (TOUCH ? (ch*2+8) : 88);
+  if(!PORTRAIT){
+    ctx.fillStyle='#162833'; rr(px,pyy,pw,ph,7); ctx.fill();
+    ctx.strokeStyle='#2f4a5a'; ctx.lineWidth=2; rr(px,pyy,pw,ph,7); ctx.stroke();
+  }
+  const bH = TOUCH?56:30, adH = TOUCH?46:26;
   if(g.selTower){
     const t=g.selTower, s2=t.st;
-    txt(t.def.name+'  lv.'+(t.lvl+1),px+12,pyy+24,BIG?17:15,'#e9f0f4','left',true);
-    txt(s2.ab||'',px+12,pyy+46,BIG?13:12,'#8ea6b5');
+    ctx.fillStyle='#162833'; rr(px,pyy,pw,ph,8); ctx.fill();
+    ctx.strokeStyle='#2f4a5a'; ctx.lineWidth=2; rr(px,pyy,pw,ph,8); ctx.stroke();
+    txt(t.def.name+'  lv.'+(t.lvl+1),px+16,pyy+(PORTRAIT?30:24),PORTRAIT?19:(BIG?17:15),'#e9f0f4','left',true);
+    txt(s2.ab||'',px+16,pyy+(PORTRAIT?56:46),PORTRAIT?14:(BIG?13:12),'#8ea6b5');
     txt('range '+s2.range+(s2.dps?('  ·  '+Math.round(s2.dps*t.dmgMul)+' dps'):(s2.dmg?('  ·  '+Math.round(s2.dmg*t.dmgMul)+' dmg'):'')),
-        px+12,pyy+66,BIG?13:12,'#6f8a9a');
+        px+16,pyy+(PORTRAIT?80:66),PORTRAIT?14:(BIG?13:12),'#6f8a9a');
   } else if(g.sandbox){
     txt('Sandbox: spawn enemies',px+12,pyy+18,13,'#cfe0ea','left',true);
     const list=['raider','scout','shield','raven','shaman','berserk','jarl','draugr','fenrir'];
@@ -2141,28 +2081,28 @@ function drawHud(){
     });
     btn('sp_clear', px+12+4*(bw2+2), pyy+26+(bh2+4), bw2, bh2, 'Clear',{fs:BIG?12:11,c1:'#6a4750',c2:'#4a2f36'});
   } else {
-    if(PORTRAIT){                                  // две квадратные кнопки вровень с карточками
-      const bx=px+6, bw3=pw-12;
+    if(PORTRAIT){                                  // широкая строка: волна слева, реклама справа
+      const bw3=Math.floor((pw-gap)/2), h3=ph;
       if(g.waveState==='idle'){
-        btn('early',bx,pyy,bw3,ch,'',{c1:'#4a7a52',c2:'#2f5a37'});
-        txt('Call wave',bx+bw3/2,pyy+ch*0.26,16,'#e9f0f4','center',true);
-        txt('early',bx+bw3/2,pyy+ch*0.44,16,'#e9f0f4','center',true);
-        txt('+'+Math.round(Math.ceil(g.waveTimer)*(2+g.wave*0.35)*goldMul())+' gold',bx+bw3/2,pyy+ch*0.68,16,'#cfe9d2','center',true);
-        txt(Math.ceil(g.waveTimer)+'s',bx+bw3/2,pyy+ch*0.85,13,'#9ec7aa','center');
+        btn('early',px,pyy,bw3,h3,'',{c1:'#4a7a52',c2:'#2f5a37'});
+        txt('Call wave early',px+bw3/2,pyy+h3*0.30,19,'#e9f0f4','center',true);
+        txt('+'+Math.round(Math.ceil(g.waveTimer)*(2+g.wave*0.35)*goldMul())+' gold',px+bw3/2,pyy+h3*0.58,20,'#cfe9d2','center',true);
+        txt('next in '+Math.ceil(g.waveTimer)+'s',px+bw3/2,pyy+h3*0.80,15,'#9ec7aa','center');
       } else {
         const left=g.spawnQ.length+g.enemies.length;
-        ctx.fillStyle='#16303c'; rr(bx,pyy,bw3,ch,7); ctx.fill();
-        ctx.strokeStyle='#2f4a5a'; ctx.lineWidth=2; rr(bx,pyy,bw3,ch,7); ctx.stroke();
-        txt('In battle',bx+bw3/2,pyy+ch*0.25,16,'#cfe0ea','center',true);
-        txt(left+' left',bx+bw3/2,pyy+ch*0.47,21,'#e7b74e','center',true);
+        ctx.fillStyle='#16303c'; rr(px,pyy,bw3,h3,8); ctx.fill();
+        ctx.strokeStyle='#2f4a5a'; ctx.lineWidth=2; rr(px,pyy,bw3,h3,8); ctx.stroke();
+        txt('In battle',px+bw3/2,pyy+h3*0.28,18,'#cfe0ea','center',true);
+        txt(left+' enemies left',px+bw3/2,pyy+h3*0.54,20,'#e7b74e','center',true);
         const wv=g.waves[Math.min(g.wave,g.waves.length-1)];
         const tot=wv.groups.reduce((a,b)=>a+b.count,0)||1;
-        ctx.fillStyle='#23394a'; rr(bx+14,pyy+ch*0.66,bw3-28,12,6); ctx.fill();
-        ctx.fillStyle='#e7b74e'; rr(bx+14,pyy+ch*0.66,(bw3-28)*clamp(1-left/tot,0,1),12,6); ctx.fill();
+        ctx.fillStyle='#23394a'; rr(px+22,pyy+h3*0.72,bw3-44,14,7); ctx.fill();
+        ctx.fillStyle='#e7b74e'; rr(px+22,pyy+h3*0.72,(bw3-44)*clamp(1-left/tot,0,1),14,7); ctx.fill();
       }
-      btn('adgold',bx,pyy+ch+8,bw3,ch,'',{c1:'#5fbf72',c2:'#2f8a48',on:g.adGold});
-      txt(g.adGold?'Watch ad':'Ad used',bx+bw3/2,pyy+ch+8+ch*0.38,17,'#062211','center',true);
-      if(g.adGold) txt('+50 gold',bx+bw3/2,pyy+ch+8+ch*0.62,17,'#062211','center',true);
+      const ax=px+bw3+gap;
+      btn('adgold',ax,pyy,bw3,h3,'',{c1:'#5fbf72',c2:'#2f8a48',on:g.adGold});
+      txt(g.adGold?'Watch ad':'Ad used',ax+bw3/2,pyy+h3*(g.adGold?0.36:0.5),19,'#062211','center',true);
+      if(g.adGold) txt('+50 gold',ax+bw3/2,pyy+h3*0.62,20,'#062211','center',true);
     } else if(g.waveState==='idle'){
       txt('Next wave in '+Math.ceil(g.waveTimer)+'s',px+12,pyy+(BIG?20:12),BIG?15:12.5,'#cfe0ea','left',true);
       btn('early',px+12,pyy+(BIG?30:18),pw-24,bH,'Call wave early  +'+Math.round(Math.ceil(g.waveTimer)*(2+g.wave*0.35)*goldMul())+' gold',
@@ -2241,64 +2181,61 @@ function drawTowerIcon(k,x,y){
 }
 
 /* ---------- 9. ВВОД ----------------------------------------------------- */
-/* Адаптивный холст: отдельная вертикальная панель и независимая камера поля. */
+/* Вписываем поле в экран вручную. На вертикальном телефоне поворачиваем всю сцену
+   на 90°, чтобы игра занимала весь экран, а не узкую полоску посередине. */
 let VIEW={s:1, rot:0, vw:960, vh:640};
 function setLayout(touch, portrait){
   TOUCH=!!touch;
-  PORTRAIT = !!portrait;
-  document.body.classList.toggle("portrait",PORTRAIT);
+  PORTRAIT = !!portrait && TOUCH;
   if(PORTRAIT){
-    CW=480;
-    const vv=window.visualViewport;
-    const bounds=document.getElementById("wrap").getBoundingClientRect();
-    const vw=Math.min(bounds.width,vv?vv.width:window.innerWidth), vh=Math.min(bounds.height,vv?vv.height:window.innerHeight);
-    H=Math.max(640,Math.round(CW*vh/vw));
-    PORT_BOARD_H=H-PORT_BOARD_Y-360;
-    PORT_CARD_H=88;
+    CW=720;
+    const vw=window.innerWidth||390, vh=window.innerHeight||844;
+    BV.zoom = 1;                                        // вся карта видна сразу, приближать не нужно
+    PORT_BOARD_H = Math.round(ROWS*TS*(CW/W)) + 16;      // ровно под поле целиком
+    const want = Math.round(CW*vh/vw);                   // сколько влезает по пропорциям экрана
+    let rest = want - PORT_BOARD_Y - PORT_BOARD_H - 30 - 22;
+    PORT_CARD_H = clamp(Math.round((rest-150)/2), 132, 210);   // карточки почти квадратные
+    PORT_ACT_H  = clamp(rest - 2*(PORT_CARD_H+8) - 8, 104, 176);
+    H = PORT_BOARD_Y + PORT_BOARD_H + 30 + 2*(PORT_CARD_H+8) + 8 + PORT_ACT_H + 14;
   }
-  else { CW=960; H = TOUCH ? 728 : 640; }
+  else { CW=960; H = TOUCH ? 752 : 640; }
   const cv2=document.getElementById('cv'), st=document.getElementById('stage');
   if(cv2){ cv2.width=CW; cv2.height=H; cv2.style.width=CW+'px'; cv2.style.height=H+'px'; }
   if(st){ st.style.width=CW+'px'; st.style.height=H+'px'; }
-  if(typeof fingers!=="undefined"){ fingers.clear(); drag=null; pinch=null; gestureUsed=false; }
   updateBoardView();
   fit();
 }
 function updateBoardView(){
   if(PORTRAIT){
-    BV.s = Math.min(CW/W, PORT_BOARD_H/(ROWS*TS)) * BV.zoom;                     // по умолчанию поле ровно по ширине экрана
+    BV.s = (CW/W) * BV.zoom;                     // по умолчанию поле ровно по ширине экрана
     const bw=W*BV.s, bh=ROWS*TS*BV.s;
     const areaH = PORT_BOARD_H;
     BV.x = (bw<=CW) ? (CW-bw)/2 : clamp(BV.panX, CW-bw, 0);
     BV.y = PORT_BOARD_Y + ((bh<=areaH) ? (areaH-bh)/2 : clamp(BV.panY, areaH-bh, 0));
-    BV.panX=BV.x; BV.panY=BV.y-PORT_BOARD_Y;
   } else {
     BV.s=1; BV.x=0; BV.y=BY; BV.zoom=1; BV.panX=0; BV.panY=0;
   }
 }
-const PORT_BOARD_Y=112;
-let PORT_BOARD_H=500, PORT_CARD_H=112;   // считаются под пропорции конкретного экрана
+const PORT_BOARD_Y=96;
+let PORT_BOARD_H=500, PORT_CARD_H=112, PORT_ACT_H=140;   // считаются под пропорции конкретного экрана
 function fit(){
   const vv = window.visualViewport;
-  const bounds=document.getElementById("wrap").getBoundingClientRect();
-  const vw = Math.round(Math.min(bounds.width,vv? vv.width : window.innerWidth));
-  const vh = Math.round(Math.min(bounds.height,vv? vv.height : window.innerHeight));
+  const vw = Math.round(vv? vv.width : window.innerWidth);
+  const vh = Math.round(vv? vv.height : window.innerHeight);
   const s = Math.min(vw/CW, vh/H);
   VIEW={s, rot:0, vw, vh};
   const st=document.getElementById('stage');
   st.style.transformOrigin='0 0';
   st.style.transform='translate('+(vw/2)+'px,'+(vh/2)+'px) scale('+s+') translate('+(-CW/2)+'px,'+(-H/2)+'px)';
 }
-function resizeLayout(){ setLayout(TOUCH,window.innerHeight>window.innerWidth*1.04); }
-window.addEventListener('resize',resizeLayout);
-window.addEventListener('orientationchange',()=>setTimeout(resizeLayout,250));
-if(window.visualViewport){ visualViewport.addEventListener('resize',resizeLayout); }
+window.addEventListener('resize',fit);
+window.addEventListener('orientationchange',()=>setTimeout(fit,250));
+if(window.visualViewport){ visualViewport.addEventListener('resize',fit); }
 
 function toGame(ev){            // координаты холста
   const cx=(ev.touches? ev.touches[0].clientX : ev.clientX);
   const cy=(ev.touches? ev.touches[0].clientY : ev.clientY);
-  const bounds=cv.getBoundingClientRect();
-  return {x:(cx-bounds.left)*CW/bounds.width,y:(cy-bounds.top)*H/bounds.height};
+  return { x: (cx-VIEW.vw/2)/VIEW.s + CW/2, y: (cy-VIEW.vh/2)/VIEW.s + H/2 };
 }
 function toBoard(p){           // координаты поля с учётом масштаба и сдвига
   return { x:(p.x-BV.x)/BV.s, y:(p.y-BV.y)/BV.s + BY };
@@ -2307,8 +2244,9 @@ function onBoard(p){
   if(!PORTRAIT) return p.y>=BY && p.y<PY;
   return p.y>=PORT_BOARD_Y && p.y<PORT_BOARD_Y+PORT_BOARD_H;
 }
+function buzz(ms){ try{ if(TOUCH && save.sound!==undefined && navigator.vibrate) navigator.vibrate(ms||10); }catch(e){} }
 function hitBtn(p){
-  const s=PORTRAIT?0:(TOUCH?4:0);                 // палец толще курсора
+  const s=TOUCH?10:0;                 // палец толще курсора
   for(let i=uiBtns.length-1;i>=0;i--){ const b=uiBtns[i];
     if(p.x>=b.x-s&&p.x<=b.x+b.w+s&&p.y>=b.y-s&&p.y<=b.y+b.h+s) return b; }
   return null;
@@ -2316,102 +2254,90 @@ function hitBtn(p){
 
 /* Ввод: мышь работает по нажатию, палец по отпусканию — чтобы отличать тап от протяжки,
    которой в портрете двигают поле. */
-let drag=null;
+let drag=null, pinch=null;
+const touches=new Map();
 function handleTap(p){
   const g=game; if(!g) return;
   const b=hitBtn(p);
-  if(b){ if(b.on) onButton(b.id); else SFX.no(); return; }
+  if(b){ if(b.on){ buzz(12); onButton(b.id); } else { buzz([18,40,18]); SFX.no(); } return; }
   if(!onBoard(p)) return;
   const bp=toBoard(p);
   const c=Math.floor(bp.x/TS), r=Math.floor((bp.y-BY)/TS);
   if(c<0||r<0||c>=COLS||r>=ROWS) return;
   const t=g.towers.find(t=>t.c===c&&t.r===r);
-  if(t){ g.selTower=t; g.sel=null; haptic(12); return; }
+  if(t){ g.selTower=t; g.sel=null; buzz(10); return; }
   g.selTower=null;
   if(g.sel){
     if(!towerUnlocked(g.sel)){ SFX.no(); return; }
     const cost=towerCost(g.sel);
     if(!buildable(c,r)){ SFX.no(); return; }
     const block=placeBlock(g.sel,c,r);
-    if(block){ SFX.no(); floatText(tx(c),ty(r)-10,block,'#e0a0a0'); return; }
-    if(TOUCH && (g.hoverC!==c || g.hoverR!==r)){ g.hoverC=c; g.hoverR=r; return; }
-    if(g.gold<cost){ SFX.no(); floatText(tx(c),ty(r),'not enough gold','#d6584f'); return; }
+    if(block){ SFX.no(); buzz([18,40,18]); floatText(tx(c),ty(r)-10,block,'#e0a0a0'); return; }
+    if(TOUCH && (g.hoverC!==c || g.hoverR!==r)){ g.hoverC=c; g.hoverR=r; buzz(8); return; }
+    if(g.gold<cost){ SFX.no(); buzz([18,40,18]); floatText(tx(c),ty(r),'not enough gold','#d6584f'); return; }
     const nt=new Tower(g.sel,c,r); nt.spent=cost;
-    g.towers.push(nt); g.gold-=cost; SFX.build(); haptic([20,30,30]); hint('building');
+    g.towers.push(nt); g.gold-=cost; SFX.build(); buzz(20); hint('building');
     if(g.sel==='rune') hint('rune');
     for(let i=0;i<6;i++) particle(tx(c),ty(r),'#caa84f');
   }
 }
-const fingers=new Map();
-let pinch=null, gestureUsed=false;
-function haptic(pattern){ try{ if(navigator.vibrate) navigator.vibrate(pattern); }catch(e){} }
-function zoomAt(z,p){
-  const bp=toBoard(p); BV.zoom=clamp(z,1,3); updateBoardView();
-  BV.panX=p.x-bp.x*BV.s;
-  BV.panY=p.y-PORT_BOARD_Y-(bp.y-BY)*BV.s;
-  updateBoardView();
-  if(game) game.hoverC=-1;
-}
-function beginPinch(){
-  const [a,b]=[...fingers.values()];
-  pinch={distance:Math.max(1,Math.hypot(b.x-a.x,b.y-a.y)),zoom:BV.zoom,
-    anchor:toBoard({x:(a.x+b.x)/2,y:(a.y+b.y)/2})};
-  gestureUsed=true; drag=null;
-  if(game) game.hoverC=-1;
-}
 cv.addEventListener('pointerdown',e=>{
-  e.preventDefault(); if(!game || !game.running) return;
+  e.preventDefault(); if(!game) return;
+  if(e.pointerType==='touch' && !TOUCH) setLayout(true, window.innerHeight > window.innerWidth*1.04);
   if(save.sound){ audio(); if(actx && actx.state==='suspended') actx.resume(); startWind(); }
   const p=toGame(e);
   if(e.pointerType==='touch'){
-    game.touch=true; cv.setPointerCapture(e.pointerId);
-    if(!fingers.size) gestureUsed=false;
-    fingers.set(e.pointerId,p);
-    if(fingers.size===2 && PORTRAIT && [...fingers.values()].every(onBoard)){ beginPinch(); return; }
-    if(fingers.size>1){ gestureUsed=true; drag=null; return; }
-    drag={p,moved:false,panX:BV.panX,panY:BV.panY,board:onBoard(p)&&!hitBtn(p)};
+    game.touch=true;
+    touches.set(e.pointerId,p);
+    if(touches.size===2 && PORTRAIT){                  // два пальца — масштабируем поле
+      const [a,b]=[...touches.values()];
+      pinch={ d:Math.hypot(a.x-b.x,a.y-b.y), zoom:BV.zoom,
+              cx:(a.x+b.x)/2, cy:(a.y+b.y)/2 };
+      drag=null; return;
+    }
+    drag={p, moved:false, panX:BV.panX, panY:BV.panY};
     return;
   }
   handleTap(p);
 });
 cv.addEventListener('pointermove',e=>{
   if(!game) return;
-  const p=toGame(e);
   if(e.pointerType!=='touch'){
+    const p=toGame(e);
     if(onBoard(p)){ const bp=toBoard(p); game.hoverC=Math.floor(bp.x/TS); game.hoverR=Math.floor((bp.y-BY)/TS); }
     else game.hoverC=-1;
     return;
   }
-  if(!fingers.has(e.pointerId)) return;
-  fingers.set(e.pointerId,p);
-  if(pinch && fingers.size>=2){
-    const [a,b]=[...fingers.values()];
-    BV.zoom=clamp(pinch.zoom*Math.hypot(b.x-a.x,b.y-a.y)/pinch.distance,1,3);
-    updateBoardView();
-    BV.panX=(a.x+b.x)/2-pinch.anchor.x*BV.s;
-    BV.panY=(a.y+b.y)/2-PORT_BOARD_Y-(pinch.anchor.y-BY)*BV.s;
-    updateBoardView(); return;
+  if(touches.has(e.pointerId)) touches.set(e.pointerId, toGame(e));
+  if(pinch && touches.size>=2){                        // щипок: масштабируется только поле
+    const [a,b]=[...touches.values()];
+    const d=Math.hypot(a.x-b.x,a.y-b.y);
+    if(pinch.d>10){
+      const bx=(pinch.cx-BV.x)/BV.s, by=(pinch.cy-BV.y)/BV.s;   // точка поля под пальцами
+      BV.zoom=clamp(pinch.zoom*(d/pinch.d), 1, 3);
+      const ns=(CW/W)*BV.zoom;
+      BV.panX = pinch.cx - bx*ns;                      // удерживаем её на месте
+      BV.panY = pinch.cy - PORT_BOARD_Y - by*ns;
+      updateBoardView();
+    }
+    return;
   }
-  if(!drag || gestureUsed) return;
-  const dx=p.x-drag.p.x,dy=p.y-drag.p.y;
-  if(Math.hypot(dx,dy)*VIEW.s>8) drag.moved=true;
-  if(drag.moved && PORTRAIT && drag.board){
-    BV.panX=drag.panX+dx; BV.panY=drag.panY+dy; updateBoardView(); game.hoverC=-1;
+  if(!drag) return;
+  const p=toGame(e), dx=p.x-drag.p.x, dy=p.y-drag.p.y;
+  if(Math.abs(dx)>12 || Math.abs(dy)>12) drag.moved=true;
+  if(drag.moved && PORTRAIT && onBoard(drag.p)){
+    BV.panX=drag.panX+dx; BV.panY=drag.panY+dy; updateBoardView();
   }
 });
-function endPointer(e,cancelled){
-  if(!fingers.has(e.pointerId)) return;
-  const d=drag; fingers.delete(e.pointerId);
-  if(cancelled) gestureUsed=true;
-  if(!fingers.size){
-    if(!gestureUsed && d && !d.moved && game) handleTap(toGame(e));
-    drag=null; pinch=null; gestureUsed=false;
-  } else { gestureUsed=true; pinch=null; drag=null; }
-}
-cv.addEventListener('pointerup',e=>endPointer(e,false));
-cv.addEventListener('pointercancel',e=>endPointer(e,true));
-cv.addEventListener('lostpointercapture',e=>endPointer(e,true));
-window.addEventListener('blur',()=>{ fingers.clear(); drag=null; pinch=null; gestureUsed=false; });
+cv.addEventListener('pointerup',e=>{
+  if(!game || e.pointerType!=='touch') return;
+  touches.delete(e.pointerId);
+  const wasPinch=!!pinch;
+  if(touches.size<2) pinch=null;
+  const d=drag; drag=null;
+  if(d && !d.moved && !wasPinch) handleTap(toGame(e));
+});
+cv.addEventListener('pointercancel',e=>{ touches.delete(e.pointerId); drag=null; if(touches.size<2) pinch=null; });
 cv.addEventListener('pointerleave',e=>{ if(game && e.pointerType!=='touch' && !TOUCH) game.hoverC=-1; });
 cv.addEventListener('contextmenu',e=>e.preventDefault());
 window.addEventListener('keydown',e=>{
@@ -2429,9 +2355,7 @@ async function onButton(id){
     setTimeout(()=>{ if(game){ game.askRestart=false; game.paused=false; } },2500);
     return;
   }
-  if(id==='fit'){ BV.zoom=1; BV.panX=0; BV.panY=0; updateBoardView(); return; }
-  if(id==='zin' || id==='zout'){ zoomAt(BV.zoom*(id==='zin'?1.25:0.8),{x:CW/2,y:PORT_BOARD_Y+PORT_BOARD_H/2}); return; }
-  if(id==='cancel'){ g.sel=null; g.selTower=null; g.hoverC=-1; return; }
+  if(id==='zout'){ BV.zoom=1; BV.panX=0; BV.panY=0; updateBoardView(); return; }
   if(id==='pause'){ g.paused=!g.paused; return; }
   if(id==='speed'){ g.speed = g.speed===1?2:1; return; }
   if(id==='sound'){ save.sound=!save.sound; persist(); if(save.sound) startWind(); else stopWind(); return; }
@@ -2463,7 +2387,7 @@ async function onButton(id){
   if(id.startsWith('t_')){ const k=id.slice(2);
     if(!towerUnlocked(k)){ SFX.no(); g.sel=k; g.selTower=null;
       floatText(480,BY+40,TOWERS[k].name+' — buy rank I in the Workshop','#8ea6b5'); return; }
-    g.sel = g.sel===k? null : k; if(g.sel) haptic(12); g.selTower=null; if(TOUCH){ g.hoverC=-1; g.hoverR=-1; } return; }
+    g.sel = g.sel===k? null : k; g.selTower=null; if(TOUCH){ g.hoverC=-1; g.hoverR=-1; } return; }
 }
 
 /* ---------- 10. ЭКРАНЫ -------------------------------------------------- */

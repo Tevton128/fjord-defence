@@ -189,7 +189,7 @@
       <button class="btn sec" id="bHelp">How to play</button>
     </div>
     <div class="bar"><div class="silver"><img src="assets/icons/icon_silver.png" alt=""><b id="silv1">0</b></div></div>
-    <div class="build">build 29.09 · 6</div>
+    <div class="build">build 29.09 · 7</div>
   </div>
 
   <!-- ВЫБОР УРОВНЯ -->
@@ -375,16 +375,28 @@ const Ads = {
   ready:false, showing:false,
   bridgeReady(){ if(!this.ready) return false;
     try{ return !!(window.bridge && bridge.advertisement); }catch(e){ return false; } },
-  available(){ return this.bridgeReady() || !!(window.ytgame && ytgame.ads); },
+  /* Наличие Bridge ещё не значит, что площадка умеет показывать рекламу: на неизвестном
+     хосте он встаёт в режим mock и честно отвечает, что ничего не поддерживает.
+     Раньше available() этого не различал, поэтому на GitHub Pages кнопка уходила в ветку
+     YouTube, падала на отсутствующем ytgame и молча возвращала отказ. */
+  bridgeAds(kind){
+    if(!this.bridgeReady()) return false;
+    try{
+      const a=bridge.advertisement;
+      return kind==='rewarded' ? a.isRewardedSupported!==false : a.isInterstitialSupported!==false;
+    }catch(e){ return false; }
+  },
+  ytAds(){ try{ return !!(window.ytgame && ytgame.ads); }catch(e){ return false; } },
+  available(kind){ return this.bridgeAds(kind) || this.ytAds(); },
 
   async interstitial(){                             // между уровнями
-    if(this.bridgeReady() && bridge.advertisement.isInterstitialSupported!==false){
+    if(this.bridgeAds('interstitial')){
       adPaused=true;
       await this._wait('interstitial');
       adPaused=false;
       return true;
     }
-    if(this.available()){
+    if(this.ytAds()){
       try{ adPaused=true; await ytgame.ads.requestInterstitialAd(); }
       catch(e){}
       finally{ adPaused=false; }
@@ -421,13 +433,13 @@ const Ads = {
   },
 
   async rewarded(id, title){                        // за награду
-    if(this.bridgeReady() && bridge.advertisement.isRewardedSupported!==false){
+    if(this.bridgeAds('rewarded')){
       adPaused=true;
       const ok = await this._wait('rewarded');
       adPaused=false;
       return ok;
     }
-    if(this.available()){
+    if(this.ytAds()){
       try{ await ytgame.ads.requestRewardedAd(id); return true; }
       catch(e){ return false; }
     }

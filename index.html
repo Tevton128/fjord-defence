@@ -189,7 +189,7 @@
       <button class="btn sec" id="bHelp">How to play</button>
     </div>
     <div class="bar"><div class="silver"><img src="assets/icons/icon_silver.png" alt=""><b id="silv1">0</b></div></div>
-    <div class="build">build 29.09 · 5</div>
+    <div class="build">build 29.09 · 6</div>
   </div>
 
   <!-- ВЫБОР УРОВНЯ -->
@@ -322,14 +322,12 @@ function platformPause(v){
   platformPaused=!!v;
   if(platformPaused) stopWind();
   else if(save.sound && !platformMuted && game) startWind();
-  syncMusic();
 }
 function platformMute(v){
   platformMuted=!!v;
   if(platformMuted) stopWind();
   else if(save.sound && game) startWind();
   if(master && actx){ try{ master.gain.value = platformMuted?0:1.7; }catch(e){} }
-  syncMusic();
 }
 /* Событие возобновления от платформы может не прийти вовсе — например, если реклама
    закрылась нештатно. Поэтому любое возвращение на экран снимает внешние паузы само. */
@@ -407,6 +405,7 @@ const Ads = {
         clearTimeout(t); clearTimeout(late);
         try{ ad.off(ev, h); }catch(e){}
         Ads.showing=false;
+        unlockAudio();            // ролик мог усыпить наш контекст
         res(v); };
       const h=st=>{
         if(st==='rewarded'){ got=true; fin(true); }
@@ -471,23 +470,36 @@ function audio(){
   }catch(e){ actx=null; }
   return actx;
 }
-/* Мобильные браузеры создают AudioContext в состоянии suspended и разрешают запуск
-   только из обработчика реального касания. Без этого звука не будет вообще, что и
-   происходило на телефоне. Поэтому цепляемся к первому же касанию страницы. */
-let audioUnlocked=false;
+/* На телефоне звук пропадает не только на старте. iOS уводит AudioContext в suspended
+   или interrupted после рекламы, звонка или сворачивания вкладки, и сам обратно его не
+   поднимает. Поэтому обработчики касаний НЕ снимаются никогда: любое касание, возврат
+   на экран или смена состояния контекста — повод попробовать снова. */
+let audioUnlocked=false, lastWake=0;
 function unlockAudio(){
   if(!save.sound) return;
   const c=audio(); if(!c) return;
-  if(c.state==='suspended'){ try{ c.resume(); }catch(e){} }
-  if(c.state==='running'){ audioUnlocked=true; syncMusic(); }
+  if(c.state!=='running'){ try{ c.resume(); }catch(e){} }
+  audioUnlocked = c.state==='running';
 }
 function bindAudioUnlock(){
   if(typeof document==='undefined') return;
-  const h=()=>{ unlockAudio(); if(audioUnlocked) off(); };
-  const off=()=>['pointerdown','pointerup','touchend','keydown','click']
-    .forEach(e=>document.removeEventListener(e,h,true));
+  const h=()=>unlockAudio();
   ['pointerdown','pointerup','touchend','keydown','click']
     .forEach(e=>document.addEventListener(e,h,true));
+  const c=audio();
+  if(c && c.addEventListener) c.addEventListener('statechange',()=>{
+    audioUnlocked = c.state==='running';
+    if(c.state!=='running' && save.sound) { try{ c.resume(); }catch(e){} }
+  });
+}
+/* Дешёвая проверка из игрового цикла: раз в секунду убеждаемся, что контекст жив.
+   Без неё молчание после рекламы лечится только перезагрузкой страницы. */
+function keepAudioAlive(now){
+  if(!save.sound || platformMuted || !actx) return;
+  if(now-lastWake < 1000) return;
+  lastWake=now;
+  if(actx.state!=='running'){ try{ actx.resume(); }catch(e){} }
+  else if(game && game.running && !windNode) startWind();
 }
 function noiseBuf(sec){
   const n=Math.floor(audio().sampleRate*sec), b=actx.createBuffer(1,n,actx.sampleRate), d=b.getChannelData(0);
@@ -533,120 +545,6 @@ function startWind(){                      // тихий ветер фьорда
   windNode={src,lfo,g};
 }
 function stopWind(){ if(windNode){ try{ windNode.src.stop(); windNode.lfo.stop(); }catch(e){} windNode=null; } }
-/* ---------- МУЗЫКА ------------------------------------------------------
-   Полностью синтезируется: дрон на кварте с квинтой, рамочный барабан и редкая
-   мелодия в эоловом ладу. Ни одного чужого сэмпла, прав ни у кого не возникает.
-   Планировщик смотрит вперёд на 0.7 с, поэтому вкладка в фоне не срывает ритм. */
-const Music={
-  bus:null, timer:null, step:0, next:0, on:false, mood:'menu', intensity:0,
-  ROOT:110,                                        // A2
-  SCALE:[0,2,3,5,7,8,10],                          // эолийский
-  MEL:[0,2,3,4,2,0,-3,0, 4,5,4,2,0,2,-1,0],        // ступени лада
-  hz(deg){
-    const o=Math.floor(deg/7), i=((deg%7)+7)%7;
-    return this.ROOT*Math.pow(2,o+this.SCALE[i]/12);
-  },
-  start(mood){
-    if(!save.sound||platformMuted||!audio()) return;
-    this.mood=mood||this.mood;
-    if(this.on) return;
-    this.on=true;
-    this.bus=actx.createGain(); this.bus.gain.value=0; this.bus.connect(master);
-    this.bus.gain.setTargetAtTime(0.5,actx.currentTime,1.2);   // плавный вход
-    this.drone();
-    this.next=actx.currentTime+0.1; this.step=0;
-    this.timer=setInterval(()=>this.tick(),120);
-  },
-  stop(fade){
-    if(!this.on) return;
-    this.on=false;
-    clearInterval(this.timer); this.timer=null;
-    const b=this.bus, d=this.drones; this.bus=null; this.drones=null;
-    if(b&&actx){ try{ b.gain.setTargetAtTime(0,actx.currentTime,fade===0?0.02:0.35); }catch(e){} }
-    setTimeout(()=>{ if(d) d.forEach(o=>{ try{o.stop();}catch(e){} }); if(b) try{b.disconnect();}catch(e){} }, fade===0?80:1400);
-  },
-  drone(){                                          // основа: тоника и квинта
-    this.drones=[];
-    [[1,0.055],[1.4983,0.035],[2,0.02]].forEach(([mul,vol],i)=>{
-      const o=actx.createOscillator(); o.type=i===2?'triangle':'sawtooth';
-      o.frequency.value=this.ROOT*mul;
-      o.detune.value=(i-1)*6;                       // лёгкая расстройка, чтобы не звенело
-      const lp=actx.createBiquadFilter();
-      lp.type='lowpass'; lp.frequency.value=520; lp.Q.value=0.7;
-      const g=actx.createGain(); g.gain.value=vol;
-      const lfo=actx.createOscillator(); lfo.frequency.value=0.05+i*0.017;
-      const lg=actx.createGain(); lg.gain.value=vol*0.45;
-      lfo.connect(lg); lg.connect(g.gain);
-      o.connect(lp); lp.connect(g); g.connect(this.bus);
-      o.start(); lfo.start(); this.drones.push(o,lfo);
-    });
-  },
-  pluck(f,t,vol,dur){                               // щипковый голос мелодии
-    const o=actx.createOscillator(); o.type='triangle'; o.frequency.setValueAtTime(f,t);
-    const g=actx.createGain();
-    g.gain.setValueAtTime(0.0001,t);
-    g.gain.exponentialRampToValueAtTime(vol,t+0.012);
-    g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
-    const o2=actx.createOscillator(); o2.type='sine'; o2.frequency.setValueAtTime(f*2,t);
-    const g2=actx.createGain(); g2.gain.setValueAtTime(0.0001,t);
-    g2.gain.exponentialRampToValueAtTime(vol*0.3,t+0.01);
-    g2.gain.exponentialRampToValueAtTime(0.0001,t+dur*0.6);
-    o.connect(g); g.connect(this.bus); o2.connect(g2); g2.connect(this.bus);
-    o.start(t); o.stop(t+dur+0.05); o2.start(t); o2.stop(t+dur*0.6+0.05);
-  },
-  drum(t,hard){                                     // рамочный барабан
-    const o=actx.createOscillator(); o.type='sine';
-    o.frequency.setValueAtTime(hard?150:120,t);
-    o.frequency.exponentialRampToValueAtTime(48,t+0.16);
-    const g=actx.createGain();
-    g.gain.setValueAtTime(0.0001,t);
-    g.gain.exponentialRampToValueAtTime(hard?0.12:0.07,t+0.008);
-    g.gain.exponentialRampToValueAtTime(0.0001,t+0.24);
-    o.connect(g); g.connect(this.bus); o.start(t); o.stop(t+0.28);
-    const n=actx.createBufferSource(); n.buffer=noiseBuf(0.12);
-    const bp=actx.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=1800; bp.Q.value=0.9;
-    const ng=actx.createGain();
-    ng.gain.setValueAtTime(0.0001,t);
-    ng.gain.exponentialRampToValueAtTime(hard?0.035:0.018,t+0.006);
-    ng.gain.exponentialRampToValueAtTime(0.0001,t+0.1);
-    n.connect(bp); bp.connect(ng); ng.connect(this.bus); n.start(t); n.stop(t+0.14);
-  },
-  tick(){
-    if(!this.on||!this.bus||!actx) return;
-    if(platformMuted||!save.sound){ this.stop(0); return; }
-    const spb=60/72, beat=spb/2;                    // 72 bpm, шаг — восьмая
-    while(this.next < actx.currentTime+0.7){
-      const t=this.next, st=this.step, bar=Math.floor(st/8);
-      const battle=this.mood==='battle';
-      if(battle){
-        if(st%8===0) this.drum(t,true);
-        else if(st%8===4) this.drum(t,false);
-        else if(this.intensity>0.5 && st%8===6) this.drum(t,false);
-      }
-      // мелодия: в меню редко и тихо, в бою плотнее
-      const every = battle ? 2 : 4;
-      if(st%every===0){
-        const deg=this.MEL[(st/every|0)%this.MEL.length];
-        const vol=(battle?0.05:0.035)*(0.8+this.intensity*0.4);
-        this.pluck(this.hz(deg), t, vol, battle?0.5:0.9);
-        if(battle && bar%4===3 && st%8===0) this.pluck(this.hz(deg-7),t,vol*0.7,1.1);
-      }
-      this.next+=beat; this.step++;
-    }
-  }
-};
-/* Одна точка правды: музыка звучит, если звук включён, площадка не глушит и игра
-   не свёрнута. Настроение зависит от того, идёт бой или игрок в меню. */
-function syncMusic(){
-  if(typeof Music==='undefined') return;
-  const want = save.sound && !platformMuted && !platformPaused;
-  if(!want){ Music.stop(); return; }
-  const battle = !!(game && game.running);
-  Music.mood = battle ? 'battle' : 'menu';
-  if(battle && game.wave) Music.intensity = Math.min(1, game.wave/10);
-  else Music.intensity = 0;
-  Music.start(Music.mood);
-}
 const SFX={
   bow(){ if(sfxBudget-- <0) return; noise(0.09,2600,700,1.6,0.05); tone(300,140,0.07,'triangle',0.03); },
   spear(){ if(sfxBudget-- <0) return; noise(0.14,1400,320,1.2,0.07); tone(160,70,0.12,'sawtooth',0.04); },
@@ -1280,7 +1178,6 @@ function startLevel(idx, sandbox, endless){
   game.hints=[]; hint('build');
   game.rotAsk = VERT && TOUCH;               // вертикально не играем вовсе
   if(save.sound) startWind();
-  syncMusic();
   screen(null);
 }
 function towerCost(key){ return Math.round(TOWERS[key].L[0].cost*(1-perkVal('cost')/100)); }
@@ -1307,7 +1204,6 @@ function buildable(c,r){
   return !game.towers.some(t=>t.c===c&&t.r===r);
 }
 function startWave(bonus){
-  if(typeof syncMusic==='function') syncMusic();          // с волнами музыка плотнее
   const w=game.waves[game.wave];
   if(bonus && game.waveTimer>0){ const b=Math.round(Math.ceil(game.waveTimer)*(2+game.wave*0.35)*goldMul()); game.gold+=b; floatText(480,BY+40,'+'+b+' gold for rushing','#e7b74e'); }
   game.spawnQ=[];
@@ -2638,7 +2534,6 @@ cv.addEventListener('pointerdown',e=>{
   e.preventDefault(); if(!game) return;
   if(e.pointerType==='touch' && !TOUCH) setLayout(true, window.innerHeight > window.innerWidth*1.04);
   if(save.sound){ audio(); if(actx && actx.state==='suspended') actx.resume(); startWind(); }
-  syncMusic();
   const p=toGame(e);
   if(e.pointerType==='touch'){
     game.touch=true;
@@ -2712,7 +2607,14 @@ async function onButton(id){
   if(id==='zout'){ BV.zoom=1; BV.panX=0; BV.panY=0; updateBoardView(); return; }
   if(id==='pause'){ g.paused=!g.paused; return; }
   if(id==='speed'){ g.speed = g.speed===1?2:1; return; }
-  if(id==='sound'){ save.sound=!save.sound; persist(); if(save.sound) startWind(); else stopWind(); return; }
+  if(id==='sound'){
+    save.sound=!save.sound; persist();
+    if(save.sound){
+      unlockAudio(); startWind();
+      // на iPhone беззвучный режим глушит WebAudio целиком — подскажем, а то это не угадать
+      if(actx && actx.state!=='running') floatText(CW/2, BY+40, 'Check the silent switch on your phone', '#e5a04a');
+    } else stopWind();
+    return; }
   if(id==='vibe'){
     if(!VIBE_OK){ floatText(CW/2, BY+40, 'This device has no vibration', '#8ea6b5'); SFX.no(); return; }
     save.vibe = save.vibe===false; persist();
@@ -2757,7 +2659,6 @@ async function onButton(id){
 /* ---------- 10. ЭКРАНЫ -------------------------------------------------- */
 const $=s=>document.querySelector(s);
 function screen(id){
-  setTimeout(syncMusic,0);                       // меню или бой — музыка подстроится
   if(id && id!=='scResult') game=null;     // ни один уровень не работает за открытым меню
   document.querySelectorAll('.screen').forEach(s=>{ if(s.id!=='adOv') s.classList.remove('on'); });
   if(id) $('#'+id).classList.add('on');
@@ -3005,6 +2906,7 @@ function loop(now){
   /* Страховка от вечной заморозки: внешние паузы живут ровно столько, сколько длится
      их причина. Нет рекламы — снимаем adPaused; документ на экране — снимаем паузу
      платформы, даже если событие возобновления так и не пришло. */
+  keepAudioAlive(now);
   if(adPaused && !Ads.showing) adPaused=false;
   if(platformPaused && !Ads.showing && typeof document!=='undefined'
      && document.visibilityState!=='hidden') platformPause(false);

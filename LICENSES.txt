@@ -26,3 +26,11 @@ THIRD PARTY SERVICES
   The YouTube Playables SDK (https://www.youtube.com/game_api/v1) is loaded only
   when the game runs inside a frame on YouTube. On any other host the game makes
   no network requests at all.
+
+---
+Playgama Bridge (playgama-bridge.js) v2.2.0
+Copyright (c) Playgama. Licensed under the GNU Lesser General Public License v3.0.
+Full licence text: LICENSE-playgama-bridge.txt
+Source: https://github.com/playgama/bridge
+The library is included unmodified as a separate file and is not statically linked
+into the game code, so it can be replaced by the user.

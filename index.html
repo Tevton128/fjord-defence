@@ -4,12 +4,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>Fjord Defence</title>
+<script src="playgama-bridge.js"></script>
 <script>
-/* SDK Playables нужен только внутри YouTube (игра там открывается во фрейме).
-   На обычном хостинге ничего не грузим — публичная демо-ссылка остаётся без внешних запросов. */
+/* SDK Playables грузим только когда игра реально открыта на YouTube. Признак тот же,
+   по которому платформу определяет сам Bridge: на Playables игра отдаётся с домена
+   usercontent.goog. Bridge не подключает этот SDK сам — он ждёт готовый window.ytgame,
+   поэтому тег нужен здесь. На остальных площадках внешних запросов нет вовсе. */
 (function(){
   try{
-    if(window.self === window.top) return;
+    if(!/(^|\.)usercontent\.goog$/.test(location.hostname)) return;
     var sc=document.createElement('script');
     sc.src='https://www.youtube.com/game_api/v1';
     sc.onerror=function(){ window.__noYT=1; };
@@ -186,7 +189,7 @@
       <button class="btn sec" id="bHelp">How to play</button>
     </div>
     <div class="bar"><div class="silver"><img src="assets/icons/icon_silver.png" alt=""><b id="silv1">0</b></div></div>
-    <div class="build">build 28.09 · 5</div>
+    <div class="build">build 29.09 · 5</div>
   </div>
 
   <!-- ВЫБОР УРОВНЯ -->
@@ -310,23 +313,39 @@ function persist(){ clearTimeout(saveTimer); saveTimer=setTimeout(()=>Store.set(
 
 /* Платформа (YouTube или Bridge) может в любой момент потребовать паузу и отключение звука.
    Это обязательное требование сертификации: игра обязана слушаться мгновенно. */
-let platformPaused=false, platformMuted=false;
+let platformPaused=false, platformMuted=false, adPaused=false;
+/* Раньше пауза платформы выставляла game.paused и никогда его не снимала: после рекламы
+   или сворачивания игра оставалась замороженной навсегда. Теперь game.paused — это
+   исключительно пауза, которую нажал игрок, а остановки от платформы и рекламы живут
+   в своих флагах и снимаются сами. */
 function platformPause(v){
   platformPaused=!!v;
-  if(game) game.paused = platformPaused ? true : game.paused;
   if(platformPaused) stopWind();
   else if(save.sound && !platformMuted && game) startWind();
+  syncMusic();
 }
 function platformMute(v){
   platformMuted=!!v;
   if(platformMuted) stopWind();
   else if(save.sound && game) startWind();
-  if(master && actx){ try{ master.gain.value = platformMuted?0:0.9; }catch(e){} }
+  if(master && actx){ try{ master.gain.value = platformMuted?0:1.7; }catch(e){} }
+  syncMusic();
+}
+/* Событие возобновления от платформы может не прийти вовсе — например, если реклама
+   закрылась нештатно. Поэтому любое возвращение на экран снимает внешние паузы само. */
+function wakeUp(){
+  platformPause(false);
+  if(adPaused && !Ads.showing) adPaused=false;
+  unlockAudio();
 }
 function bindPlatformEvents(){
-  document.addEventListener('visibilitychange',()=>platformPause(document.hidden));
-  window.addEventListener('blur',()=>platformPause(true));
-  window.addEventListener('focus',()=>platformPause(false));
+  document.addEventListener('visibilitychange',()=>{
+    if(document.hidden) platformPause(true); else wakeUp(); });
+  /* blur/focus срабатывают при любой передаче фокуса во фрейм рекламы, а обратный
+     focus на мобильных приходит не всегда — из-за этого игра застревала на паузе.
+     Достоверный признак только один: видим документ или нет. */
+  window.addEventListener('focus',wakeUp);
+  window.addEventListener('pageshow',wakeUp);
   try{
     if(window.ytgame && ytgame.system){
       if(ytgame.system.onPause) ytgame.system.onPause(()=>platformPause(true));
@@ -337,45 +356,77 @@ function bindPlatformEvents(){
   }catch(e){}
   try{
     if(window.bridge && bridge.game && bridge.game.on){
-      bridge.game.on('visibility_state_changed', st=>platformPause(st==='hidden'));
+      bridge.game.on('visibility_state_changed', st=>{ if(st==='hidden') platformPause(true); else wakeUp(); });
+      // площадка может держать звук выключенным — уважаем её состояние
+      try{
+        if(typeof bridge.platform.isAudioEnabled==='boolean') platformMute(!bridge.platform.isAudioEnabled);
+        if(bridge.platform.on) bridge.platform.on('audio_state_changed', on=>platformMute(!on));
+      }catch(e){}
     }
   }catch(e){}
 }
 /* ---------- 1. РЕКЛАМА --------------------------------------------------
    Один слой над всеми показами. Сейчас — демо-ролик 5 секунд.
    Чтобы включить настоящую монетизацию YouTube Playables, раскомментируй
-   блоки ytgame ниже (SDK подключается тегом <script src="https://www.youtube.com/game_api/v1">
+   блоки ytgame ниже (SDK подключается тегом в начале страницы
    в head — только в сборке для Playables). Сторонние сети (AdMob и т.п.)
    на Playables запрещены. */
 const Ads = {
-  bridgeReady(){ try{ return !!(window.bridge && bridge.advertisement); }catch(e){ return false; } },
+  /* Обращаться к модулям Bridge до initialize() нельзя — SDK пишет об этом ошибку
+     в консоль. Поэтому ждём флаг, который ставится после успешной инициализации. */
+  ready:false, showing:false,
+  bridgeReady(){ if(!this.ready) return false;
+    try{ return !!(window.bridge && bridge.advertisement); }catch(e){ return false; } },
   available(){ return this.bridgeReady() || !!(window.ytgame && ytgame.ads); },
 
   async interstitial(){                             // между уровнями
-    if(this.bridgeReady()){
-      try{
-        if(bridge.advertisement.isInterstitialSupported===false) return false;
-        if(game) game.paused=true;
-        await bridge.advertisement.showInterstitial();
-      }catch(e){} finally{ if(game) game.paused=false; }
+    if(this.bridgeReady() && bridge.advertisement.isInterstitialSupported!==false){
+      adPaused=true;
+      await this._wait('interstitial');
+      adPaused=false;
       return true;
     }
     if(this.available()){
-      try{ if(game) game.paused=true; await ytgame.ads.requestInterstitialAd(); }
+      try{ adPaused=true; await ytgame.ads.requestInterstitialAd(); }
       catch(e){}
-      finally{ if(game) game.paused=false; }
+      finally{ adPaused=false; }
       return true;
     }
     return this._demo('Advertisement', 5);
   },
 
-  async rewarded(id, title){                        // за награду
-    if(this.bridgeReady()){
+  /* showInterstitial/showRewarded ничего не возвращают — о результате Bridge сообщает
+     событием состояния. Ждём именно его, иначе награда выдаётся за пропущенный ролик. */
+  _wait(kind){
+    this.showing=true;
+    const ev = kind==='rewarded' ? 'rewarded_state_changed' : 'interstitial_state_changed';
+    const ad = bridge.advertisement;
+    return new Promise(res=>{
+      let done=false, got=false, late=0;
+      const fin=v=>{ if(done) return; done=true;
+        clearTimeout(t); clearTimeout(late);
+        try{ ad.off(ev, h); }catch(e){}
+        Ads.showing=false;
+        res(v); };
+      const h=st=>{
+        if(st==='rewarded'){ got=true; fin(true); }
+        else if(st==='closed'){ late=setTimeout(()=>fin(got),350); }   // награда может прийти следом
+        else if(st==='failed'){ fin(false); }
+      };
+      const t=setTimeout(()=>fin(got), kind==='rewarded'?180000:45000);
       try{
-        if(bridge.advertisement.isRewardedSupported===false) return false;
-        const r=await bridge.advertisement.showRewarded();
-        return r!==false;
-      }catch(e){ return false; }
+        ad.on(ev,h);
+        if(kind==='rewarded') ad.showRewarded(); else ad.showInterstitial();
+      }catch(e){ fin(false); }
+    });
+  },
+
+  async rewarded(id, title){                        // за награду
+    if(this.bridgeReady() && bridge.advertisement.isRewardedSupported!==false){
+      adPaused=true;
+      const ok = await this._wait('rewarded');
+      adPaused=false;
+      return ok;
     }
     if(this.available()){
       try{ await ytgame.ads.requestRewardedAd(id); return true; }
@@ -385,6 +436,7 @@ const Ads = {
   },
 
   _demo(title, secs){
+    this.showing=true;
     return new Promise(res=>{
       const ov=$('#adOv'); $('#adTitle').textContent=title; ov.classList.add('on');
       let t=secs; $('#adTimer').textContent=t; $('#adSkip').disabled=true;
@@ -392,7 +444,7 @@ const Ads = {
         t--; $('#adTimer').textContent=Math.max(t,0);
         if(t<=0){ clearInterval(iv); $('#adSkip').disabled=false; $('#adTimer').textContent='Done'; }
       },1000);
-      $('#adSkip').onclick=()=>{ clearInterval(iv); ov.classList.remove('on'); res(true); };
+      $('#adSkip').onclick=()=>{ clearInterval(iv); ov.classList.remove('on'); Ads.showing=false; res(true); };
     });
   }
 };
@@ -405,9 +457,37 @@ function audio(){
   if(actx) return actx;
   try{
     actx=new (window.AudioContext||window.webkitAudioContext)();
-    master=actx.createGain(); master.gain.value=0.9; master.connect(actx.destination);
+    master=actx.createGain(); master.gain.value=1.7;   // громче: на телефонном динамике 0.9 почти не слышно
+    /* Лимитер на выходе: позволяет поднять громкость, не боясь, что залп катапульт
+       поверх музыки уйдёт в клиппинг и захрипит. */
+    let out=master;
+    try{
+      const lim=actx.createDynamicsCompressor();
+      lim.threshold.value=-8; lim.knee.value=6; lim.ratio.value=12;
+      lim.attack.value=0.003; lim.release.value=0.18;
+      master.connect(lim); out=lim;
+    }catch(e){}
+    out.connect(actx.destination);
   }catch(e){ actx=null; }
   return actx;
+}
+/* Мобильные браузеры создают AudioContext в состоянии suspended и разрешают запуск
+   только из обработчика реального касания. Без этого звука не будет вообще, что и
+   происходило на телефоне. Поэтому цепляемся к первому же касанию страницы. */
+let audioUnlocked=false;
+function unlockAudio(){
+  if(!save.sound) return;
+  const c=audio(); if(!c) return;
+  if(c.state==='suspended'){ try{ c.resume(); }catch(e){} }
+  if(c.state==='running'){ audioUnlocked=true; syncMusic(); }
+}
+function bindAudioUnlock(){
+  if(typeof document==='undefined') return;
+  const h=()=>{ unlockAudio(); if(audioUnlocked) off(); };
+  const off=()=>['pointerdown','pointerup','touchend','keydown','click']
+    .forEach(e=>document.removeEventListener(e,h,true));
+  ['pointerdown','pointerup','touchend','keydown','click']
+    .forEach(e=>document.addEventListener(e,h,true));
 }
 function noiseBuf(sec){
   const n=Math.floor(audio().sampleRate*sec), b=actx.createBuffer(1,n,actx.sampleRate), d=b.getChannelData(0);
@@ -453,6 +533,120 @@ function startWind(){                      // тихий ветер фьорда
   windNode={src,lfo,g};
 }
 function stopWind(){ if(windNode){ try{ windNode.src.stop(); windNode.lfo.stop(); }catch(e){} windNode=null; } }
+/* ---------- МУЗЫКА ------------------------------------------------------
+   Полностью синтезируется: дрон на кварте с квинтой, рамочный барабан и редкая
+   мелодия в эоловом ладу. Ни одного чужого сэмпла, прав ни у кого не возникает.
+   Планировщик смотрит вперёд на 0.7 с, поэтому вкладка в фоне не срывает ритм. */
+const Music={
+  bus:null, timer:null, step:0, next:0, on:false, mood:'menu', intensity:0,
+  ROOT:110,                                        // A2
+  SCALE:[0,2,3,5,7,8,10],                          // эолийский
+  MEL:[0,2,3,4,2,0,-3,0, 4,5,4,2,0,2,-1,0],        // ступени лада
+  hz(deg){
+    const o=Math.floor(deg/7), i=((deg%7)+7)%7;
+    return this.ROOT*Math.pow(2,o+this.SCALE[i]/12);
+  },
+  start(mood){
+    if(!save.sound||platformMuted||!audio()) return;
+    this.mood=mood||this.mood;
+    if(this.on) return;
+    this.on=true;
+    this.bus=actx.createGain(); this.bus.gain.value=0; this.bus.connect(master);
+    this.bus.gain.setTargetAtTime(0.5,actx.currentTime,1.2);   // плавный вход
+    this.drone();
+    this.next=actx.currentTime+0.1; this.step=0;
+    this.timer=setInterval(()=>this.tick(),120);
+  },
+  stop(fade){
+    if(!this.on) return;
+    this.on=false;
+    clearInterval(this.timer); this.timer=null;
+    const b=this.bus, d=this.drones; this.bus=null; this.drones=null;
+    if(b&&actx){ try{ b.gain.setTargetAtTime(0,actx.currentTime,fade===0?0.02:0.35); }catch(e){} }
+    setTimeout(()=>{ if(d) d.forEach(o=>{ try{o.stop();}catch(e){} }); if(b) try{b.disconnect();}catch(e){} }, fade===0?80:1400);
+  },
+  drone(){                                          // основа: тоника и квинта
+    this.drones=[];
+    [[1,0.055],[1.4983,0.035],[2,0.02]].forEach(([mul,vol],i)=>{
+      const o=actx.createOscillator(); o.type=i===2?'triangle':'sawtooth';
+      o.frequency.value=this.ROOT*mul;
+      o.detune.value=(i-1)*6;                       // лёгкая расстройка, чтобы не звенело
+      const lp=actx.createBiquadFilter();
+      lp.type='lowpass'; lp.frequency.value=520; lp.Q.value=0.7;
+      const g=actx.createGain(); g.gain.value=vol;
+      const lfo=actx.createOscillator(); lfo.frequency.value=0.05+i*0.017;
+      const lg=actx.createGain(); lg.gain.value=vol*0.45;
+      lfo.connect(lg); lg.connect(g.gain);
+      o.connect(lp); lp.connect(g); g.connect(this.bus);
+      o.start(); lfo.start(); this.drones.push(o,lfo);
+    });
+  },
+  pluck(f,t,vol,dur){                               // щипковый голос мелодии
+    const o=actx.createOscillator(); o.type='triangle'; o.frequency.setValueAtTime(f,t);
+    const g=actx.createGain();
+    g.gain.setValueAtTime(0.0001,t);
+    g.gain.exponentialRampToValueAtTime(vol,t+0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+    const o2=actx.createOscillator(); o2.type='sine'; o2.frequency.setValueAtTime(f*2,t);
+    const g2=actx.createGain(); g2.gain.setValueAtTime(0.0001,t);
+    g2.gain.exponentialRampToValueAtTime(vol*0.3,t+0.01);
+    g2.gain.exponentialRampToValueAtTime(0.0001,t+dur*0.6);
+    o.connect(g); g.connect(this.bus); o2.connect(g2); g2.connect(this.bus);
+    o.start(t); o.stop(t+dur+0.05); o2.start(t); o2.stop(t+dur*0.6+0.05);
+  },
+  drum(t,hard){                                     // рамочный барабан
+    const o=actx.createOscillator(); o.type='sine';
+    o.frequency.setValueAtTime(hard?150:120,t);
+    o.frequency.exponentialRampToValueAtTime(48,t+0.16);
+    const g=actx.createGain();
+    g.gain.setValueAtTime(0.0001,t);
+    g.gain.exponentialRampToValueAtTime(hard?0.12:0.07,t+0.008);
+    g.gain.exponentialRampToValueAtTime(0.0001,t+0.24);
+    o.connect(g); g.connect(this.bus); o.start(t); o.stop(t+0.28);
+    const n=actx.createBufferSource(); n.buffer=noiseBuf(0.12);
+    const bp=actx.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=1800; bp.Q.value=0.9;
+    const ng=actx.createGain();
+    ng.gain.setValueAtTime(0.0001,t);
+    ng.gain.exponentialRampToValueAtTime(hard?0.035:0.018,t+0.006);
+    ng.gain.exponentialRampToValueAtTime(0.0001,t+0.1);
+    n.connect(bp); bp.connect(ng); ng.connect(this.bus); n.start(t); n.stop(t+0.14);
+  },
+  tick(){
+    if(!this.on||!this.bus||!actx) return;
+    if(platformMuted||!save.sound){ this.stop(0); return; }
+    const spb=60/72, beat=spb/2;                    // 72 bpm, шаг — восьмая
+    while(this.next < actx.currentTime+0.7){
+      const t=this.next, st=this.step, bar=Math.floor(st/8);
+      const battle=this.mood==='battle';
+      if(battle){
+        if(st%8===0) this.drum(t,true);
+        else if(st%8===4) this.drum(t,false);
+        else if(this.intensity>0.5 && st%8===6) this.drum(t,false);
+      }
+      // мелодия: в меню редко и тихо, в бою плотнее
+      const every = battle ? 2 : 4;
+      if(st%every===0){
+        const deg=this.MEL[(st/every|0)%this.MEL.length];
+        const vol=(battle?0.05:0.035)*(0.8+this.intensity*0.4);
+        this.pluck(this.hz(deg), t, vol, battle?0.5:0.9);
+        if(battle && bar%4===3 && st%8===0) this.pluck(this.hz(deg-7),t,vol*0.7,1.1);
+      }
+      this.next+=beat; this.step++;
+    }
+  }
+};
+/* Одна точка правды: музыка звучит, если звук включён, площадка не глушит и игра
+   не свёрнута. Настроение зависит от того, идёт бой или игрок в меню. */
+function syncMusic(){
+  if(typeof Music==='undefined') return;
+  const want = save.sound && !platformMuted && !platformPaused;
+  if(!want){ Music.stop(); return; }
+  const battle = !!(game && game.running);
+  Music.mood = battle ? 'battle' : 'menu';
+  if(battle && game.wave) Music.intensity = Math.min(1, game.wave/10);
+  else Music.intensity = 0;
+  Music.start(Music.mood);
+}
 const SFX={
   bow(){ if(sfxBudget-- <0) return; noise(0.09,2600,700,1.6,0.05); tone(300,140,0.07,'triangle',0.03); },
   spear(){ if(sfxBudget-- <0) return; noise(0.14,1400,320,1.2,0.07); tone(160,70,0.12,'sawtooth',0.04); },
@@ -1086,6 +1280,7 @@ function startLevel(idx, sandbox, endless){
   game.hints=[]; hint('build');
   game.rotAsk = VERT && TOUCH;               // вертикально не играем вовсе
   if(save.sound) startWind();
+  syncMusic();
   screen(null);
 }
 function towerCost(key){ return Math.round(TOWERS[key].L[0].cost*(1-perkVal('cost')/100)); }
@@ -1112,6 +1307,7 @@ function buildable(c,r){
   return !game.towers.some(t=>t.c===c&&t.r===r);
 }
 function startWave(bonus){
+  if(typeof syncMusic==='function') syncMusic();          // с волнами музыка плотнее
   const w=game.waves[game.wave];
   if(bonus && game.waveTimer>0){ const b=Math.round(Math.ceil(game.waveTimer)*(2+game.wave*0.35)*goldMul()); game.gold+=b; floatText(480,BY+40,'+'+b+' gold for rushing','#e7b74e'); }
   game.spawnQ=[];
@@ -2415,6 +2611,9 @@ function handleTap(p){
   const b=hitBtn(p);
   if(b){ if(b.on){ buzz(12); onButton(b.id); } else { buzz([18,40,18]); SFX.no(); } return; }
   if(!onBoard(p)) return;
+  /* На паузе поле не принимает нажатий. Иначе можно было наставить башен при
+     остановленном времени и снять паузу, когда всё уже построено. */
+  if(g.paused || platformPaused || adPaused){ SFX.no(); return; }
   const bp=toBoard(p);
   const c=Math.floor(bp.x/TS), r=Math.floor((bp.y-BY)/TS);
   if(c<0||r<0||c>=COLS||r>=ROWS) return;
@@ -2439,6 +2638,7 @@ cv.addEventListener('pointerdown',e=>{
   e.preventDefault(); if(!game) return;
   if(e.pointerType==='touch' && !TOUCH) setLayout(true, window.innerHeight > window.innerWidth*1.04);
   if(save.sound){ audio(); if(actx && actx.state==='suspended') actx.resume(); startWind(); }
+  syncMusic();
   const p=toGame(e);
   if(e.pointerType==='touch'){
     game.touch=true;
@@ -2522,6 +2722,8 @@ async function onButton(id){
   }
   if(id==='exit'){ stopWind(); game=null; screen('scLevels'); renderLevels(); return; }
   if(id==='early'){ startWave(true); return; }
+  // апгрейд и продажа — тоже действия на поле, на паузе они недоступны
+  if((id==='up'||id==='sell') && (g.paused||platformPaused||adPaused)){ SFX.no(); return; }
   if(id==='up'){ const t=g.selTower, c=t.upCost();
     if(g.gold>=c && t.canUp()){ g.gold-=c; t.spent+=c; t.lvl++; SFX.build();
       t.btMax=(TOWERS[t.key].build||3)*0.6; t.bt=t.btMax; t.upPaid=c;
@@ -2534,9 +2736,10 @@ async function onButton(id){
     game.towers=game.towers.filter(x=>x!==t); g.selTower=null; SFX.sell(); return; }
   if(id==='adgold'){
     if(!g.adGold) return;
-    g.paused=true;
-    const ok=await Ads.rewarded('gold-50-ingame','Ad for 50 gold');
-    g.paused=false;
+    adPaused=true;                                   // своя пауза, не пауза игрока
+    let ok=false;
+    try{ ok=await Ads.rewarded('gold-50-ingame','Ad for 50 gold'); }
+    finally{ adPaused=false; }
     if(ok){ g.adGold=false; g.gold+=50; floatText(480,BY+40,'+50 gold','#e7b74e'); }
     return;
   }
@@ -2554,6 +2757,7 @@ async function onButton(id){
 /* ---------- 10. ЭКРАНЫ -------------------------------------------------- */
 const $=s=>document.querySelector(s);
 function screen(id){
+  setTimeout(syncMusic,0);                       // меню или бой — музыка подстроится
   if(id && id!=='scResult') game=null;     // ни один уровень не работает за открытым меню
   document.querySelectorAll('.screen').forEach(s=>{ if(s.id!=='adOv') s.classList.remove('on'); });
   if(id) $('#'+id).classList.add('on');
@@ -2798,7 +3002,13 @@ let last=performance.now();
 function loop(now){
   let dt=(now-last)/1000; last=now;
   dt=Math.min(dt,0.05);
-  if(game && game.running && !game.paused && !game.rotAsk && !platformPaused){
+  /* Страховка от вечной заморозки: внешние паузы живут ровно столько, сколько длится
+     их причина. Нет рекламы — снимаем adPaused; документ на экране — снимаем паузу
+     платформы, даже если событие возобновления так и не пришло. */
+  if(adPaused && !Ads.showing) adPaused=false;
+  if(platformPaused && !Ads.showing && typeof document!=='undefined'
+     && document.visibilityState!=='hidden') platformPause(false);
+  if(game && game.running && !game.paused && !game.rotAsk && !platformPaused && !adPaused){
     const steps=game.speed;
     for(let i=0;i<steps;i++) update(dt);
   }
@@ -2859,7 +3069,9 @@ function loop(now){
     await new Promise(r=>setTimeout(r,180));
   }
   if(boot){ boot.classList.add('gone'); setTimeout(()=>boot.remove(),600); }
-  try{ if(window.bridge && bridge.initialize) await bridge.initialize(); }catch(e){}
+  // Bridge может добавить отступы под «чёлку» уже после первой раскладки — пересчитываем.
+  try{ if(window.bridge && bridge.initialize){ await bridge.initialize(); Ads.ready=true; fit(); } }catch(e){}
+  bindAudioUnlock();
   bindPlatformEvents();
   try{ if(window.bridge && bridge.platform && bridge.platform.sendMessage) bridge.platform.sendMessage('game_ready'); }catch(e){}
   // Playables: сообщаем платформе, что кадр отрисован и игра готова принимать ввод

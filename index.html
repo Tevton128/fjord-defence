@@ -48,7 +48,7 @@
      color:var(--snow);text-shadow:0 5px 0 #0c1a24, 0 0 34px rgba(231,183,78,.28)}
   h1 small{display:block;font-size:30px;letter-spacing:.34em;color:var(--rune);margin-top:12px;font-weight:bold;text-indent:.34em;text-shadow:0 3px 0 #0c1a24}
   h2{font-size:34px;margin:0 0 6px}
-  p.sub{color:#9fb3c0;font-size:15px;max-width:520px;line-height:1.5;margin:10px 0 22px}
+  p.sub,div.sub{color:#9fb3c0;font-size:15px;max-width:560px;line-height:1.5;margin:10px auto 22px}
   .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-width:230px;min-height:54px;padding:14px 26px;margin:7px;
        font-family:var(--f);font-size:18px;font-weight:bold;color:#241708;cursor:pointer;border:0;
        background:linear-gradient(180deg,#f0c766,#cf9a2f);border-radius:8px;
@@ -124,6 +124,7 @@
   #bBoard{background:linear-gradient(180deg,#7a55c7,#553597);color:#f3edff;
           box-shadow:0 4px 0 #34205e,0 8px 18px rgba(0,0,0,.35)}
   #bBoard:active{box-shadow:0 1px 0 #34205e}
+  .btn.board{background:linear-gradient(180deg,#7a55c7,#553597);color:#f3edff;box-shadow:0 4px 0 #34205e,0 8px 18px rgba(0,0,0,.35)}
   #scMenu .bar{position:absolute;top:16px;right:18px}
   .bar{display:flex;gap:14px;align-items:center;font-size:15px}
   .silver{display:inline-flex;align-items:center;gap:7px;color:var(--snow);background:#162833;border:1px solid #33505f;padding:5px 14px 5px 7px;border-radius:20px}
@@ -139,8 +140,8 @@
   #lvload{position:fixed;inset:0;z-index:55;background:#0a141b;display:none;align-items:center;
           justify-content:center;text-align:center;padding:24px;pointer-events:auto}
   #lvload.on{display:flex}
-  #lvload h2{margin:18px 0 8px;font:700 22px/1.25 var(--ff);color:#e9f0f4}
-  #lvload p{margin:0;font:400 14px/1.5 var(--ff);color:#6f8a9a}
+  #lvload h2{margin:18px 0 8px;font:700 22px/1.25 var(--f);color:#e9f0f4}
+  #lvload p{margin:0;font:400 14px/1.5 var(--f);color:#6f8a9a}
   .lvspin{width:46px;height:46px;margin:0 auto;border:4px solid rgba(231,183,78,.22);
           border-top-color:#e7b74e;border-radius:50%;animation:lvsp .9s linear infinite}
   @keyframes lvsp{to{transform:rotate(360deg)}}
@@ -148,21 +149,82 @@
        text-align:center;padding:24px;pointer-events:auto}
   #rot.on{display:flex}
   #rot .rotin{max-width:340px}
-  #rot h2{margin:14px 0 10px;font:700 24px/1.25 var(--ff);color:#e9f0f4}
-  #rot p{margin:0 0 8px;font:400 15px/1.5 var(--ff);color:#9fb3c0}
+  #rot h2{margin:14px 0 10px;font:700 24px/1.25 var(--f);color:#e9f0f4}
+  #rot p{margin:0 0 8px;font:400 15px/1.5 var(--f);color:#9fb3c0}
   #rot p.sub{font-size:13px;color:#6f8a9a}
   #rot .rotskip{margin-top:26px;background:none;border:0;padding:12px 18px;min-height:44px;
-       font:400 14px/1 var(--ff);color:#5d7686;text-decoration:underline;cursor:pointer;
+       font:400 14px/1 var(--f);color:#5d7686;text-decoration:underline;cursor:pointer;
        opacity:0;pointer-events:none;transition:opacity .4s}
   #rot.late .rotskip{opacity:1;pointer-events:auto}
   #rot #rotph{transform-origin:60px 60px;animation:rotsway 2.2s ease-in-out infinite}
   @keyframes rotsway{0%,100%{transform:rotate(0deg)}50%{transform:rotate(-78deg)}}
-  .boardlist{display:flex;flex-direction:column;gap:4px}
-  .boardrow{display:flex;align-items:center;gap:10px;background:#14242f;border:1px solid #23404f;
-            border-radius:8px;padding:8px 12px;font-size:14px}
-  .boardrow b{min-width:28px;color:var(--rune)}
-  .boardrow span{flex:1;color:#cfe0ea;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .boardrow i{font-style:normal;font-weight:700;color:#e9f0f4}
+  #pausePanel{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:25;display:none;
+     width:min(92vw,460px);box-sizing:border-box;padding:18px 16px 16px;border-radius:14px;
+     background:rgba(10,22,30,.94);border:1px solid #2f4a5a;box-shadow:0 10px 40px rgba(0,0,0,.5);
+     flex-direction:column;align-items:center;gap:14px;pointer-events:auto;text-align:center}
+  #pausePanel.on{display:flex}
+  #pausePanel .ptitle{font:700 30px/1 var(--f);color:#e9f0f4;letter-spacing:.04em}
+  #pausePanel .vol{margin:0;flex-direction:column;gap:10px}
+  #pausePanel .vol label{flex:0 0 auto}
+  #pausePanel .btn{min-width:180px}
+  /* Ползунки громкости */
+  .vol{display:flex;gap:18px;justify-content:center;flex-wrap:wrap;margin:14px 0 0;width:100%;max-width:520px}
+  .vol label{display:flex;align-items:center;gap:10px;flex:1 1 200px;min-width:0;
+             background:rgba(14,28,37,.78);border:1px solid #23404f;border-radius:10px;padding:8px 12px}
+  .vol span{font-size:13px;color:#9fb3c0;min-width:48px;text-align:left}
+  .vol b{font-size:13px;color:#e9f0f4;min-width:34px;text-align:right;font-variant-numeric:tabular-nums}
+  .vol input{flex:1;min-width:0;height:28px;accent-color:#e7b74e;cursor:pointer}
+  /* Лидерборд: непрозрачный фон (раньше сквозь него просвечивал бой), всё по центру */
+  #scBoard{background:#0a161e}
+  .bwrap{width:100%;max-width:820px;display:flex;flex-direction:column;align-items:center;gap:14px;margin:0 auto 30px}
+  .bwrap h2{margin:4px 0 0}
+  .bsum{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;width:100%}
+  .bsum div{flex:1 1 0;min-width:0;max-width:200px;background:#122430;border:1px solid #23404f;border-radius:10px;padding:10px 12px;text-align:center}
+  .bsum i{display:block;font-style:normal;font-size:12px;color:#8ea6b5;margin-bottom:2px}
+  .bsum b{font-size:22px;color:#e7b74e;font-variant-numeric:tabular-nums}
+  .btabs{display:flex;gap:6px;background:#0f1f29;border:1px solid #23404f;border-radius:12px;padding:4px}
+  .btab{border:0;background:none;color:#8ea6b5;font:700 15px/1 var(--f);padding:10px 22px;border-radius:9px;cursor:pointer;min-height:40px}
+  .btab.on{background:linear-gradient(180deg,#7a55c7,#553597);color:#f3edff}
+  #boardBody{width:100%}
+  .bt{width:100%;border-collapse:separate;border-spacing:0 5px;font-size:14px}
+  .bt th{font-size:11px;font-weight:700;color:#6f8a9a;text-transform:uppercase;letter-spacing:.06em;padding:0 10px 2px;text-align:left}
+  .bt th.n,.bt td.n{text-align:right}
+  .bt td{text-align:left;background:#122430;padding:10px;color:#cfe0ea;border-top:1px solid #1d3542;border-bottom:1px solid #1d3542;
+         white-space:nowrap;font-variant-numeric:tabular-nums}
+  .bt td:first-child{border-left:1px solid #1d3542;border-radius:9px 0 0 9px;color:#e7b74e;font-weight:800;text-align:center;width:36px}
+  .bt td:last-child{border-right:1px solid #1d3542;border-radius:0 9px 9px 0}
+  .bt td.nm{font-weight:700;color:#e9f0f4}   /* ник не длиннее 16 символов — обрезка не нужна, а она давала шов в строке */
+  .bt td.wv{font-weight:800;color:#e9f0f4;font-size:16px}
+  .bt td.sm{color:#8ea6b5;font-size:12.5px}
+  .bt tr.me td{background:#1c2f22;border-color:#3d6b4a}
+  .bt tr.top1 td:first-child{color:#ffd66e} .bt tr.top2 td:first-child{color:#d8e2ea} .bt tr.top3 td:first-child{color:#d49a6a}
+  .bempty{color:#8ea6b5;font-size:14px;line-height:1.55;text-align:center;max-width:520px;margin:10px auto}
+  /* Телефон стоя: таблица в две строки на запись, лишние колонки уходят во вторую */
+  @media (max-width:640px){
+    .bt thead{display:none}
+    .bt tr{display:grid;grid-template-columns:36px 1fr auto;grid-template-areas:"r nm wv" "r meta meta";
+           background:#122430;border:1px solid #1d3542;border-radius:10px;margin-bottom:6px;padding:6px 4px}
+    .bt tr.me{background:#1c2f22;border-color:#3d6b4a}
+    .bt td{background:none!important;border:0!important;padding:3px 8px}
+    .bt td:first-child{grid-area:r;align-self:center}
+    .bt td.nm{grid-area:nm;max-width:none}
+    .bt td.wv{grid-area:wv;text-align:right}
+    .bt td.meta{grid-area:meta;display:block;white-space:normal;text-align:left}
+    .bsum b{font-size:18px}
+    .bsum i{font-size:11px}
+    .bt td.hide-m{display:none}
+  }
+  @media (min-width:641px){ .bt td.meta{display:none} }
+  /* Ввод ника после рейда */
+  .nick{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:6px 0 2px;width:100%;max-width:460px}
+  .nick input{flex:1 1 200px;min-width:0;background:#0f1f29;border:2px solid #2f4a5a;border-radius:10px;color:#e9f0f4;
+              font:700 16px/1 var(--f);padding:12px 14px;text-align:center}
+  .nick input:focus{outline:none;border-color:#e7b74e}
+  .nick .btn{margin:0;min-width:120px}
+  .rstats{display:flex;gap:8px;justify-content:center;margin:4px 0 8px}
+  .rstats div{white-space:nowrap}
+  .rstats div{background:#122430;border:1px solid #23404f;border-radius:9px;padding:7px 12px;font-size:13px;color:#8ea6b5}
+  .rstats b{color:#e9f0f4;margin-left:4px}
   #boot{position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;
         background:linear-gradient(180deg,#0f2330,#0a141b);transition:opacity .45s}
   #boot.gone{opacity:0;pointer-events:none}
@@ -214,6 +276,15 @@
   <button id="rotok" class="rotskip" type="button">Play in portrait anyway</button>
 </div></div>
 
+  <!-- ПАУЗА В БОЮ: громкость крутим там, где музыка реально играет -->
+  <div id="pausePanel">
+    <div class="ptitle">Paused</div>
+    <div class="vol">
+      <label><span>Music</span><input type="range" min="0" max="100" data-vol="mus"><b></b></label>
+      <label><span>Effects</span><input type="range" min="0" max="100" data-vol="sfx"><b></b></label>
+    </div>
+    <button class="btn" id="bResume">Resume</button>
+  </div>
   <!-- ГЛАВНОЕ МЕНЮ -->
   <div class="screen on" id="scMenu" style="background-image:linear-gradient(180deg,rgba(9,20,28,.72),rgba(9,20,28,.93)),url(assets/splash.webp);background-size:cover;background-position:center">
     <h1>FJORD<small>DEFENCE</small></h1>
@@ -226,7 +297,7 @@
       <button class="btn sec" id="bHelp">How to play</button>
     </div>
     <div class="bar"><div class="silver"><img src="assets/icons/icon_silver.png" alt=""><b id="silv1">0</b></div></div>
-    <div class="build">build 30.09 · 6</div>
+    <div class="build">build 30.09 · 8</div>
   </div>
 
   <!-- ВЫБОР УРОВНЯ -->
@@ -255,10 +326,16 @@
 
   <!-- КУЗНИЦА -->
   <div class="screen scroll" id="scBoard">
-    <div class="hdr"><button class="btn sec" id="boardBack">&larr; Back</button></div>
-    <h2>Endless Raids</h2>
-    <p class="sub" style="margin:6px 0 0">Waves held in an endless raid. Your best is kept on this device; the table is per platform.</p>
-    <div id="boardBody" style="width:100%;max-width:700px;margin:14px 0"></div>
+    <div class="hdr"><button class="btn sec" id="boardBack">&larr; Back</button><div></div></div>
+    <div class="bwrap">
+      <h2>Endless Raids</h2>
+      <div class="bsum" id="boardSum"></div>
+      <div class="btabs">
+        <button class="btab on" data-tab="mine">My raids</button>
+        <button class="btab" data-tab="world">World</button>
+      </div>
+      <div id="boardBody"></div>
+    </div>
   </div>
   <div class="screen scroll" id="scPerks">
     <div class="hdr"><button class="btn sec" id="forgeBack">&larr; Back</button><div class="silver"><img src="assets/icons/icon_silver.png" alt=""><b class="silvv">0</b></div></div>
@@ -295,7 +372,7 @@
   <div class="screen" id="scResult">
     <h2 id="resTitle">Fjord Held</h2>
     <div class="stars" id="resStars"></div>
-    <p class="sub" id="resText"></p>
+    <div class="sub" id="resText"></div>
     <div class="row" id="resBtns"></div>
   </div>
 
@@ -512,7 +589,16 @@ const Ads = {
 /* ---------- 2. ЗВУК ------------------------------------------------------
    Всё синтезируется на лету через WebAudio: ни одного чужого сэмпла,
    вопрос авторских прав закрыт по построению. */
-let actx=null, master=null, windNode=null, sfxBudget=0;
+let actx=null, master=null, sfxBus=null, windNode=null, sfxBudget=0;
+/* Громкость: два ползунка, музыка и эффекты. Кривая квадратичная — так слух
+   воспринимает ползунок равномерным; значения по умолчанию дают прежний баланс. */
+const VOL_DEF={mus:0.7, sfx:0.8};
+function volMus(){ const v=save.musVol??VOL_DEF.mus; return 0.42*(v/VOL_DEF.mus)**2; }
+function volSfx(){ const v=save.sfxVol??VOL_DEF.sfx; return (v/VOL_DEF.sfx)**2; }
+function applyVolumes(){
+  if(sfxBus && actx){ try{ sfxBus.gain.setTargetAtTime(volSfx(),actx.currentTime,0.05); }catch(e){} }
+  if(Music.bus && actx){ try{ Music.bus.gain.setTargetAtTime(volMus(),actx.currentTime,0.05); }catch(e){} }
+}
 function audio(){
   if(actx) return actx;
   try{
@@ -528,6 +614,7 @@ function audio(){
       master.connect(lim); out=lim;
     }catch(e){}
     out.connect(actx.destination);
+    sfxBus=actx.createGain(); sfxBus.gain.value=volSfx(); sfxBus.connect(master);
   }catch(e){ actx=null; }
   return actx;
 }
@@ -590,7 +677,7 @@ function env(node, vol, dur, delay){
   g.gain.setValueAtTime(0.0001,t);
   g.gain.exponentialRampToValueAtTime(vol,t+0.008);
   g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
-  node.connect(g); g.connect(master);
+  node.connect(g); g.connect(sfxBus);
   return t;
 }
 function tone(freq,freq2,dur,type,vol,delay){
@@ -619,7 +706,7 @@ function startWind(){                      // тихий ветер фьорда
   const lfo=actx.createOscillator(); lfo.frequency.value=0.07;
   const lfoG=actx.createGain(); lfoG.gain.value=160;
   lfo.connect(lfoG); lfoG.connect(lp.frequency);
-  src.connect(lp); lp.connect(g); g.connect(master);
+  src.connect(lp); lp.connect(g); g.connect(sfxBus);
   src.start(); lfo.start();
   windNode={src,lfo,g};
 }
@@ -660,7 +747,7 @@ const Music={
   ensureBus(){
     if(this.bus || !audio()) return;
     this.duck=actx.createGain(); this.duck.gain.value=1; this.duck.connect(master);
-    this.bus=actx.createGain(); this.bus.gain.value=this.VOL; this.bus.connect(this.duck);
+    this.bus=actx.createGain(); this.bus.gain.value=volMus(); this.bus.connect(this.duck);
   },
   /* Одна итерация петли: чуть раньше loopStart и чуть дальше loopEnd, края
      плавно гасятся — соседние итерации перекрываются ровно на стыке. */
@@ -682,8 +769,9 @@ const Music={
     const tr={name, gain:actx.createGain(), srcs:[], next:0, timer:0};
     tr.gain.connect(this.bus);
     const t=actx.currentTime+0.02;
-    tr.gain.gain.setValueAtTime(0.0001,t);
-    tr.gain.gain.linearRampToValueAtTime(1,t+Math.max(0.02,fadeIn));
+    // экспонента звучит как ровное нарастание; линейная рампа «выстреливает» в начале
+    tr.gain.gain.setValueAtTime(0.001,t);
+    tr.gain.gain.exponentialRampToValueAtTime(1,t+Math.max(0.05,fadeIn));
     this._iter(tr,t);
     // подкладываем следующую итерацию заранее, пока текущая ещё играет
     tr.timer=setInterval(()=>{ if(actx.currentTime > tr.next-2.0) this._iter(tr,tr.next); },400);
@@ -703,7 +791,7 @@ const Music={
     tr.gain.connect(this.bus);
     const t=actx.currentTime+0.02, src=actx.createBufferSource();
     src.buffer=this.buf[name]; src.connect(tr.gain);
-    tr.gain.gain.setValueAtTime(0.0001,t); tr.gain.gain.linearRampToValueAtTime(1,t+fadeIn);
+    tr.gain.gain.setValueAtTime(0.001,t); tr.gain.gain.exponentialRampToValueAtTime(1,t+Math.max(0.05,fadeIn));
     src.start(t); tr.srcs.push(src);
     return tr;
   },
@@ -713,9 +801,11 @@ const Music={
     const prev=this.cur, from=this.want;
     this.want=state;
     if(state==='none'){ this._stop(prev,1.4); this.cur=null; return; }
-    // рог сменяется волной почти встык — удар волны не должен ждать
-    const fadeOld = from==='horn' ? 0.25 : 0.9;
-    const fadeNew = state==='heavy' && from==='horn' ? 0.08 : state==='horn' ? 0.05 : 0.6;
+    /* Вступления мягкие: из тишины музыка набирает громкость за 2.5 с, рог — за 1.2 с.
+       Смена трека в бою — перекрёстная, за 1–1.5 с, без провала посередине. */
+    const fromSilence = !prev;
+    const fadeNew = state==='horn' ? 1.2 : fromSilence ? 2.5 : (from==='horn' ? 1.0 : 1.5);
+    const fadeOld = from==='horn' ? 1.2 : 1.5;
     this._stop(prev,fadeOld);
     this.cur = state==='horn' ? this._one('horn',fadeNew) : this._startLoop(state,fadeNew);
     if(this.sting){ this._stop(this.sting,0.6); this.sting=null; }
@@ -769,7 +859,7 @@ const SFX={
     g.gain.setValueAtTime(0.0001,t);
     g.gain.exponentialRampToValueAtTime(0.10+0.16*p,t+0.006);
     g.gain.exponentialRampToValueAtTime(0.0001,t+0.34);
-    o.connect(g); g.connect(master); o.start(t); o.stop(t+0.4);
+    o.connect(g); g.connect(sfxBus); o.start(t); o.stop(t+0.4);
     noise(0.1,1500,420,0.9,0.03+0.04*p);
   },
   /* Боевой клич: формантный синтез. Каждый голос — пила низкой мужской высоты
@@ -779,7 +869,7 @@ const SFX={
   warcry(big){
     if(!save.sound||platformMuted||!audio()) return;
     const shout=(t0, voices, vol)=>{
-      const out=actx.createGain(); out.gain.value=vol; out.connect(master);
+      const out=actx.createGain(); out.gain.value=vol; out.connect(sfxBus);
       for(let v=0; v<voices; v++){
         const st=t0+Math.random()*0.09;
         const f0=98+Math.random()*60;
@@ -818,7 +908,7 @@ const SFX={
       const og=actx.createGain(); og.gain.value=[0.6,0.3,0.14][i];
       o.connect(og); og.connect(lp); o.start(t); o.stop(t+2.0);
     });
-    lp.connect(g); g.connect(master);
+    lp.connect(g); g.connect(sfxBus);
   },
   bow(){ if(sfxBudget-- <0) return; noise(0.09,2600,700,1.6,0.05); tone(300,140,0.07,'triangle',0.03); },
   spear(){ if(sfxBudget-- <0) return; noise(0.14,1400,320,1.2,0.07); tone(160,70,0.12,'sawtooth',0.04); },
@@ -2730,7 +2820,7 @@ function drawHud(){
   if(g.paused){
     const by0=PORTRAIT?PORT_BOARD_Y:BY, bh0=PORTRAIT?PORT_BOARD_H:(PY-BY);
     ctx.fillStyle='rgba(8,16,22,.55)'; ctx.fillRect(0,by0,CW,bh0);
-    txt('Paused',CW/2,by0+bh0/2,44,'#e9f0f4','center',true);
+    if(!pausePanelOn) txt('Paused',CW/2,by0+bh0/2,44,'#e9f0f4','center',true);
   }
   if(g.sel && !g.selTower && !STRIP){
     const tip = towerUnlocked(g.sel) ? TOWERS[g.sel].tip : 'Locked. Buy rank I for this weapon in the Workshop.';
@@ -3100,47 +3190,142 @@ $('#bPlay').onclick=()=>{ renderLevels(); screen('scLevels'); };
 /* Таблица рекордов по волнам бесконечного рейда. Bridge отдаёт её по-разному:
    где-то это своя таблица, где-то нативное окно площадки, а где-то её нет вовсе —
    тогда показываем хотя бы личный рекорд, чтобы экран не был пустым. */
+/* Рекорды бесконечного рейда.
+   «Мои рейды» — полная история на этом устройстве: ник, фьорд, сложность, волны,
+   время боя и среднее на волну.
+   «Мир» — таблица площадки через Bridge. Туда уходит только число волн: имя
+   площадка берёт из аккаунта игрока, свой ник передать нельзя без собственного
+   сервера, а внешние запросы Playgama и Playables запрещают. */
 const Board={
-  ID:'endless',
+  ID:'endless', MAX:50, tab:'mine', lastId:null,
   mod(){ try{ return (Ads.ready && window.bridge && bridge.leaderboards) || null; }catch(e){ return null; } },
   kind(){ const m=this.mod(); try{ return m ? m.type : 'not_available'; }catch(e){ return 'not_available'; } },
-  best(){ return (save.bestWaves|0); },
+  list(){ return Array.isArray(save.raids) ? save.raids : (save.raids=[]); },
+  best(){ return this.list().reduce((m,r)=>Math.max(m,r.waves|0), save.bestWaves|0); },
+  platformName(){ try{ const n=window.bridge && Ads.ready && bridge.player && bridge.player.name; return n||''; }catch(e){ return ''; } },
+  nick(){ return save.nick || this.platformName() || 'Viking'; },
+  /* Рекорд пишется сразу, даже если игрок не нажмёт «Сохранить»: ник можно поменять потом */
+  record(g){
+    const waves=g.wave|0, time=Math.round(g.time||0);
+    const r={ id:Date.now().toString(36)+Math.random().toString(36).slice(2,6), name:this.nick(),
+      lv:g.idx, diff:save.diff||0, waves, time, avg: waves? +(time/waves).toFixed(1) : 0, date:Date.now() };
+    const L=this.list(); L.push(r);
+    L.sort((x,y)=> y.waves-x.waves || x.time-y.time || y.date-x.date);
+    save.raids=L.slice(0,this.MAX);
+    if(waves>(save.bestWaves|0)) save.bestWaves=waves;
+    persist(); this.lastId=r.id;
+    return r;
+  },
+  rename(id,name){
+    // теги вырезаем целиком, а не только скобки — иначе от <b> остаётся «b»
+    name=String(name||'').replace(/<[^>]*>?/g,'').replace(/[<>&"]/g,'').replace(/\s+/g,' ').trim().slice(0,16) || 'Viking';
+    save.nick=name;
+    const r=this.list().find(x=>x.id===id); if(r) r.name=name;
+    persist(); return name;
+  },
   async submit(waves){
-    if(waves>this.best()){ save.bestWaves=waves; persist(); }
     const m=this.mod(); if(!m) return false;
     try{ await m.setScore(this.ID, waves); return true; }catch(e){ return false; }
   },
   async entries(){
     const m=this.mod(); if(!m) return null;
-    try{ const list=await m.getEntries(this.ID); return Array.isArray(list)? list : null; }catch(e){ return null; }
+    try{ const l=await m.getEntries(this.ID); return Array.isArray(l)? l : null; }catch(e){ return null; }
   },
-  async open(from){
-    boardReturn=from||'scMenu';
+  fmtT(sec){ sec=Math.max(0,sec|0); const m=Math.floor(sec/60), s=sec%60; return m+':'+String(s).padStart(2,'0'); },
+  fmtD(ms){ try{ const d=new Date(ms); return d.toLocaleDateString(undefined,{day:'numeric',month:'short'}); }catch(e){ return ''; } },
+  esc(v){ return String(v==null?'':v).replace(/[<>&"]/g,''); },
+  renderSum(){
+    const L=this.list();
+    const tot=L.length, best=this.best(), fastest=L.filter(r=>r.waves>=5).reduce((m,r)=>Math.min(m,r.avg||1e9),1e9);
+    $('#boardSum').innerHTML=
+      '<div><i>Best raid</i><b>'+best+'</b></div>'+
+      '<div><i>Raids fought</i><b>'+tot+'</b></div>'+
+      '<div><i>Fastest wave</i><b>'+(fastest<1e9? fastest+'s' : '—')+'</b></div>';
+  },
+  renderMine(){
+    const L=this.list();
+    if(!L.length){ $('#boardBody').innerHTML='<p class="bempty">No raids yet. Clear a fjord, then start an endless raid from its battle screen — every raid you fight is recorded here.</p>'; return; }
+    const rows=L.map((r,i)=>{
+      const L_=LEVELS[r.lv]||{n:'?'}, D=(DIFFS[r.diff]||{n:'?'}).n;
+      const cls=(r.id===this.lastId?'me ':'')+(i<3?'top'+(i+1):'');
+      return '<tr class="'+cls+'"><td>'+(i+1)+'</td>'+
+        '<td class="nm">'+this.esc(r.name)+'</td>'+
+        '<td class="hide-m">'+(r.lv+1)+' · '+this.esc(L_.n)+'</td>'+
+        '<td class="hide-m">'+D+'</td>'+
+        '<td class="n wv">'+r.waves+'</td>'+
+        '<td class="n hide-m">'+this.fmtT(r.time)+'</td>'+
+        '<td class="n hide-m">'+(r.avg? r.avg+'s':'—')+'</td>'+
+        '<td class="n sm hide-m">'+this.fmtD(r.date)+'</td>'+
+        '<td class="meta sm">'+(r.lv+1)+' · '+this.esc(L_.n)+' · '+D+' · '+this.fmtT(r.time)+' · '+(r.avg? r.avg+'s/wave':'')+' · '+this.fmtD(r.date)+'</td></tr>';
+    }).join('');
+    $('#boardBody').innerHTML='<table class="bt"><thead><tr><th>#</th><th>Name</th><th>Fjord</th><th>Difficulty</th>'+
+      '<th class="n">Waves</th><th class="n">Time</th><th class="n">Per wave</th><th class="n">Date</th></tr></thead><tbody>'+rows+'</tbody></table>';
+  },
+  async renderWorld(){
     const body=$('#boardBody');
-    body.innerHTML='<p class="sub">Your best: <b>'+this.best()+'</b> waves.</p><p class="sub">Loading…</p>';
-    screen('scBoard');
     const k=this.kind();
     if(k==='native_popup'){
-      body.innerHTML='<p class="sub">Your best: <b>'+this.best()+'</b> waves.</p>';
-      const b=document.createElement('button'); b.className='btn';
-      b.textContent='Open platform leaderboard';
+      body.innerHTML='<p class="bempty">This platform keeps the world table in its own window.</p>';
+      const b=document.createElement('button'); b.className='btn'; b.textContent='Open world leaderboard';
       b.onclick=()=>{ try{ this.mod().showNativePopup(this.ID); }catch(e){} };
-      body.appendChild(b); return;
+      const w=document.createElement('div'); w.className='row'; w.appendChild(b); body.appendChild(w); return;
     }
+    if(k==='not_available'){
+      body.innerHTML='<p class="bempty">The world table works where the game is published — on YouTube Playables and Playgama. '+
+        'This copy runs outside a game platform, so only your own raids are kept.</p>'; return;
+    }
+    body.innerHTML='<p class="bempty">Loading the world table…</p>';
     const list=await this.entries();
-    if(!list || !list.length){
-      body.innerHTML='<p class="sub">Your best: <b>'+this.best()+'</b> waves.</p>'+
-        '<p class="sub">No table here yet — this platform does not share scores between players, '+
-        'so only your own record is kept.</p>';
-      return;
-    }
-    body.innerHTML='<p class="sub">Your best: <b>'+this.best()+'</b> waves.</p>'+
-      '<div class="boardlist">'+list.slice(0,25).map(e=>
-        '<div class="boardrow"><b>'+(e.rank||'')+'</b><span>'+
-        String(e.name||'Viking').replace(/[<>&]/g,'')+'</span><i>'+(e.score|0)+'</i></div>').join('')+'</div>';
+    if(this.tab!=='world') return;                     // пока грузилось, игрок переключил вкладку
+    if(!list || !list.length){ body.innerHTML='<p class="bempty">No world records yet. Be the first to set one.</p>'; return; }
+    const me=this.platformName();
+    body.innerHTML='<table class="bt"><thead><tr><th>#</th><th>Name</th><th class="n">Waves</th></tr></thead><tbody>'+
+      list.slice(0,50).map((e,i)=>{
+        const rk=e.rank||i+1, cls=(me && e.name===me?'me ':'')+(rk<=3?'top'+rk:'');
+        return '<tr class="'+cls+'"><td>'+rk+'</td><td class="nm">'+this.esc(e.name||'Viking')+'</td><td class="n wv">'+(e.score|0)+'</td></tr>';
+      }).join('')+'</tbody></table>'+
+      '<p class="bempty" style="font-size:12.5px">Names come from player accounts on this platform.</p>';
+  },
+  show(tab){
+    this.tab=tab;
+    document.querySelectorAll('.btab').forEach(b=>b.classList.toggle('on',b.dataset.tab===tab));
+    this.renderSum();
+    if(tab==='world') this.renderWorld(); else this.renderMine();
+  },
+  open(from, tab){
+    boardReturn=from||'scMenu';
+    screen('scBoard');
+    this.show(tab||'mine');
   }
 };
+if(typeof document!=='undefined') document.querySelectorAll('.btab').forEach(b=>b.onclick=()=>Board.show(b.dataset.tab));
 let boardReturn='scMenu';
+/* Панель паузы: видна только в бою, когда игрок сам нажал паузу (не во время запроса рестарта). */
+let pausePanelOn=false;
+function syncPausePanel(){
+  const want=!!(game && game.running && !game.over && game.paused && !game.askRestart && inBattle());
+  if(want===pausePanelOn) return;
+  pausePanelOn=want;
+  const el=typeof document!=='undefined' && document.getElementById('pausePanel');
+  if(el){ el.classList.toggle('on',want); if(want) syncVolUI(); }
+}
+if(typeof document!=='undefined'){ const r=document.getElementById('bResume');
+  if(r) r.onclick=()=>{ if(game){ game.paused=false; syncPausePanel(); } }; }
+/* Ползунки громкости живут в панели паузы в бою. */
+function syncVolUI(){
+  document.querySelectorAll('.vol input').forEach(inp=>{
+    const k=inp.dataset.vol, v=Math.round(((k==='mus'? save.musVol : save.sfxVol) ?? VOL_DEF[k])*100);
+    inp.value=v; inp.nextElementSibling.textContent=v+'%';
+  });
+}
+if(typeof document!=='undefined') document.querySelectorAll('.vol input').forEach(inp=>{
+  inp.addEventListener('input',()=>{
+    const v=inp.value/100;
+    if(inp.dataset.vol==='mus') save.musVol=v; else save.sfxVol=v;
+    applyVolumes(); syncVolUI();
+  });
+  inp.addEventListener('change',()=>{ persist(); if(inp.dataset.vol==='sfx') SFX.coin && SFX.coin(); });   // слышно новую громкость
+});
 let perksReturn='scMenu';
 /* Кузницу открываем из трёх мест: из меню, с экрана подготовки и сразу после боя.
    Раньше она жила только в меню, и половина игроков её не находила. */
@@ -3376,24 +3561,43 @@ function showEndless(){
   const g=game, w=g.wave;
   const silver=Math.round(w*6*DIFFS[save.diff||0].silver);
   P().silver+=silver; persist();
-  $('#resTitle').textContent='Raid over';
-  $('#resStars').innerHTML='';
-  const wasBest = w > Board.best();
-  try{ Music.finale(wasBest); }catch(e){}          // новый рекорд — победный финал, иначе мрачный
-  $('#resText').textContent='You held '+w+' waves on '+g.L.n+'. Silver earned: '+silver+
-    '. Endless raids never touch your village lives.'+
-    (wasBest ? ' New personal best.' : ' Your best is '+Board.best()+' waves.');
-  Board.submit(w);                                  // рекорд уходит в таблицу площадки
+  const prevBest=Board.best();
+  const rec=Board.record(g);                       // рекорд сохранён сразу, ник можно поправить ниже
+  const isBest = w>prevBest;
+  try{ Music.finale(isBest); }catch(e){}           // новый рекорд — победный финал, иначе мрачный
+  Board.submit(w);                                 // в мировую таблицу площадки уходит число волн
+  const place=Board.list().findIndex(r=>r.id===rec.id)+1;
+  $('#resTitle').textContent = isBest ? 'New record!' : 'Raid over';
+  $('#resStars').innerHTML=''; $('#resStars').style.display='none';
+  $('#resText').innerHTML=
+    // числа одной строкой, где играли — другой: ряды всегда полные, без «висящей» плашки
+    '<div class="rstats">'+
+      '<div>Waves<b>'+w+'</b></div>'+
+      '<div>Time<b>'+Board.fmtT(rec.time)+'</b></div>'+
+      '<div>Per wave<b>'+(rec.avg? rec.avg+'s':'—')+'</b></div>'+
+    '</div>'+
+    '<div class="rstats">'+
+      '<div>Fjord<b>'+(g.idx+1)+' · '+Board.esc(g.L.n)+'</b></div>'+
+      '<div>Difficulty<b>'+DIFFS[save.diff||0].n+'</b></div>'+
+    '</div>'+
+    '<div>Silver earned: '+silver+'. Place in your raids: #'+place+'. Endless raids never touch your village lives.</div>'+
+    '<div class="nick"><input id="nickIn" maxlength="16" autocomplete="off" spellcheck="false" placeholder="Your name">'+
+    '<button class="btn" id="nickOk">Save name</button></div>';
+  const inp=$('#nickIn'); inp.value=rec.name;
+  const saveNick=()=>{ const n=Board.rename(rec.id, inp.value); inp.value=n; const b=$('#nickOk'); b.textContent='Saved'; setTimeout(()=>{ if(b) b.textContent='Save name'; },1200); };
+  $('#nickOk').onclick=saveNick;
+  inp.onkeydown=e=>{ if(e.key==='Enter'){ saveNick(); inp.blur(); } };
   const box=$('#resBtns'); box.innerHTML='';
   const mk=(label,cls,fn)=>{ const b=document.createElement('button'); b.className='btn '+cls; b.textContent=label; b.onclick=fn; box.appendChild(b); return b; };
-  mk('Leaderboard','',()=>Board.open('scResult'));
-  mk('Raid again','sec',()=>enterLevel(g.idx,true));
-  mk('Back to map','sec',()=>{ game=null; renderLevels(); screen('scLevels'); });
+  mk('Leaderboard','board',()=>{ Board.rename(rec.id, inp.value); Board.open('scResult','mine'); });
+  mk('Raid again','sec',()=>{ Board.rename(rec.id, inp.value); enterLevel(g.idx,true); });
+  mk('Back to map','sec',()=>{ Board.rename(rec.id, inp.value); game=null; renderLevels(); screen('scLevels'); });
   screen('scResult');
 }
 let levelsDone=0;
 function showResult(win){
   const g=game, i=g.idx;
+  $('#resStars').style.display='';
   if(!g.endless){ try{ Music.finale(win); }catch(e){} }
   const stars = win ? (g.lives>=g.maxLives*0.9?3 : g.lives>=g.maxLives*0.5?2 : 1) : 0;
   $('#resTitle').textContent = win ? 'Fjord Held' : 'The Gates Have Fallen';
@@ -3473,13 +3677,14 @@ function loop(now){
      их причина. Нет рекламы — снимаем adPaused; документ на экране — снимаем паузу
      платформы, даже если событие возобновления так и не пришло. */
   keepAudioAlive(now);
+  try{ syncPausePanel(); }catch(e){}
   if(adPaused && !Ads.showing) adPaused=false;
   if(platformPaused && !Ads.showing && typeof document!=='undefined'
      && document.visibilityState!=='hidden') platformPause(false);
   if(Music.ready && save.sound && !platformMuted){
     try{                                             // любая ошибка звука — не повод замораживать игру
       Music.set(musicWanted(now));
-      Music.setDuck(platformPaused||adPaused ? 0 : (game && (game.paused||game.rotAsk)) ? 0.35 : 1);
+      Music.setDuck(platformPaused||adPaused ? 0 : (game && game.rotAsk) ? 0.35 : 1);   // на паузе не глушим: игрок крутит громкость и должен слышать реальный уровень
     }catch(e){ console.warn('music', e); }
   }
   if(game && game.running && !game.paused && !game.rotAsk && !platformPaused && !adPaused){
@@ -3505,6 +3710,7 @@ function loop(now){
     }
   }catch(e){}
   await loadSave();
+  try{ syncVolUI(); }catch(e){}
   const touch=(navigator.maxTouchPoints||0)>0 || 'ontouchstart' in window;
   setLayout(touch, window.innerHeight > window.innerWidth*1.04);
   window.addEventListener('resize',()=>{

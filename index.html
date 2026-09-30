@@ -70,8 +70,12 @@
   .lv.lock:hover{border-color:#2a3a45}
   .perks{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;width:100%;max-width:700px;margin:14px 0}
   .perk{background:#162833;border:2px solid #2f4a5a;border-radius:9px;padding:12px 14px;text-align:left}
-  .hdr{position:sticky;top:-70px;z-index:6;display:flex;justify-content:space-between;align-items:center;
-        width:100%;padding:10px 0 4px;background:linear-gradient(180deg,rgba(9,20,28,.98) 70%,rgba(9,20,28,0))}
+  /* Шапка прилипает к самому верху и полностью непрозрачна во всю ширину экрана:
+     раньше над ней просвечивали кнопки прокрученных карточек. */
+  .screen.scroll{padding-top:0}
+  .hdr{position:sticky;top:0;z-index:6;display:flex;justify-content:space-between;align-items:center;
+        width:calc(100% + 52px);margin:0 -26px 6px;padding:14px 26px 12px;
+        background:#0a161e;box-shadow:0 8px 14px -6px rgba(0,0,0,.55)}
   .hdr .btn{min-width:0;min-height:44px;padding:10px 20px;font-size:15px;margin:0}
   .perk{display:flex;flex-direction:column}
   .perk .top{display:flex;align-items:center;gap:10px;margin-bottom:6px}
@@ -93,6 +97,25 @@
   .pip{width:26px;height:7px;border-radius:3px;background:#28414f}
   .pip.on{background:var(--rune)}
   .perk .btn{min-width:0;min-height:46px;width:100%;padding:10px;font-size:15px;margin:0}
+  /* Колонок столько, сколько влезает: на телефоне стоя две, лёжа и на компьютере три.
+     Раньше было жёстко три, и карточки вылезали за правый край экрана. */
+  #mastGrid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+  .perk{min-width:0}
+  .perk h3{overflow-wrap:anywhere}
+  .btn .coin{width:18px;height:18px;flex:0 0 18px;filter:drop-shadow(0 1px 1px rgba(0,0,0,.4))}
+  /* цена и монета держатся вместе и не переносятся */
+  .perk .btn{display:flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap;
+             margin-top:auto;padding:10px 8px}
+  .perk .btn .pr{display:inline-flex;align-items:center;gap:4px;font-weight:800}
+  .gain{font-size:12px;color:#93a8b6;line-height:1.5;margin:0 0 10px;text-align:left}
+  .gain b{color:#e9f0f4;font-weight:700}
+  .gain .up{color:#7fe0a0;font-weight:700}
+  .gain .new{display:block;color:#e7b74e;margin-top:3px}
+  #bPerks{background:linear-gradient(180deg,#e7b74e,#b8862a);color:#2a1a08;
+          box-shadow:0 4px 0 #6e4f14,0 8px 18px rgba(0,0,0,.35)}
+  #bPerks img{width:20px;height:20px;vertical-align:-4px;margin-right:6px}
+  #bPerks .dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#7fe0a0;
+          margin-left:6px;vertical-align:1px;box-shadow:0 0 6px #7fe0a0}
   #scMenu .bar{position:absolute;top:16px;right:18px}
   .bar{display:flex;gap:14px;align-items:center;font-size:15px}
   .silver{display:inline-flex;align-items:center;gap:7px;color:var(--snow);background:#162833;border:1px solid #33505f;padding:5px 14px 5px 7px;border-radius:20px}
@@ -191,12 +214,12 @@
       <button class="btn" id="bPlay">Play</button>
     </div>
     <div class="row">
-      <button class="btn sec" id="bPerks">Forge</button>
+      <button class="btn" id="bPerks"><img src="assets/icons/icon_silver.png" alt="">Forge</button>
       <button class="btn sec" id="bBoard">Leaderboard</button>
       <button class="btn sec" id="bHelp">How to play</button>
     </div>
     <div class="bar"><div class="silver"><img src="assets/icons/icon_silver.png" alt=""><b id="silv1">0</b></div></div>
-    <div class="build">build 30.09 · 2</div>
+    <div class="build">build 30.09 · 3</div>
   </div>
 
   <!-- ВЫБОР УРОВНЯ -->
@@ -232,12 +255,11 @@
   <div class="screen scroll" id="scPerks">
     <div class="hdr"><button class="btn sec" id="forgeBack">&larr; Back</button><div class="silver"><img src="assets/icons/icon_silver.png" alt=""><b class="silvv">0</b></div></div>
     <h2>Forge</h2>
-    <p class="sub" style="margin:6px 0 0">Everything here belongs to the difficulty you are playing. Switching difficulty switches profiles.</p>
-    <div class="perk" style="width:100%;max-width:700px" id="livesCard"></div>
+    <p class="sub" style="margin:6px 0 0">Spend silver to train your weapons. Rank I lets you build a tower, ranks II and III unlock its upgrades in battle.</p>
+    <div class="perks" id="mastGrid"></div>
+    <h2 style="font-size:22px;margin:18px 0 0">Village</h2>
+    <div class="perk" style="width:100%;max-width:700px;margin-top:12px" id="livesCard"></div>
     <div id="resetBox" style="width:100%;max-width:700px;margin:18px 0 6px"></div>
-    <h2 style="font-size:24px;margin:10px 0 0">Workshop</h2>
-    <p class="sub" style="margin:4px 0 0">Rank I unlocks the weapon so you can build it. Rank II and III unlock its in-battle upgrades. Archers come with rank I.</p>
-    <div class="perks" id="mastGrid" style="grid-template-columns:repeat(3,1fr)"></div>
   </div>
 
   <!-- ПРАВИЛА -->
@@ -499,9 +521,27 @@ function audio(){
    или interrupted после рекламы, звонка или сворачивания вкладки, и сам обратно его не
    поднимает. Поэтому обработчики касаний НЕ снимаются никогда: любое касание, возврат
    на экран или смена состояния контекста — повод попробовать снова. */
-let audioUnlocked=false, lastWake=0;
+let audioUnlocked=false, lastWake=0, sessionSet=false;
+/* Главная причина тишины на iPhone: WebAudio по умолчанию играет в категории
+   «ambient», и беззвучный переключатель сбоку глушит его полностью. Переводим
+   сессию в «playback» — как у видео и музыки, которые слышно всегда.
+   Safari 16.4+ даёт для этого navigator.audioSession, на более старых iOS ту же
+   категорию включает проигрывание обычного <audio> внутри касания. */
+const SILENT_WAV='data:audio/wav;base64,UklGRkQDAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YSADAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgA==';
+function setPlaybackSession(){
+  if(sessionSet) return;
+  try{ if(navigator.audioSession) navigator.audioSession.type='playback'; }catch(e){}
+  if(IS_IOS && typeof Audio!=='undefined'){
+    try{
+      const a=new Audio(SILENT_WAV); a.setAttribute('playsinline','');
+      const p=a.play(); if(p && p.catch) p.catch(()=>{});
+    }catch(e){}
+  }
+  sessionSet=true;
+}
 function unlockAudio(){
   if(!save.sound) return;
+  setPlaybackSession();
   const c=audio(); if(!c) return;
   if(c.state!=='running'){ try{ c.resume(); }catch(e){} }
   audioUnlocked = c.state==='running';
@@ -586,13 +626,42 @@ const SFX={
     o.connect(g); g.connect(master); o.start(t); o.stop(t+0.4);
     noise(0.1,1500,420,0.9,0.03+0.04*p);
   },
+  /* Боевой клич: формантный синтез. Каждый голос — пила низкой мужской высоты
+     через два полосовых фильтра, настроенных на гласную «о», с коротким подъёмом
+     и спадом тона. Несколько голосов с разбросом по высоте и времени дают толпу.
+     big — для боссов и тяжёлых волн: больше голосов, два выкрика подряд. */
+  warcry(big){
+    if(!save.sound||platformMuted||!audio()) return;
+    const shout=(t0, voices, vol)=>{
+      const out=actx.createGain(); out.gain.value=vol; out.connect(master);
+      for(let v=0; v<voices; v++){
+        const st=t0+Math.random()*0.09;
+        const f0=98+Math.random()*60;
+        const o=actx.createOscillator(); o.type='sawtooth';
+        o.frequency.setValueAtTime(f0*1.3,st);
+        o.frequency.exponentialRampToValueAtTime(f0,st+0.11);
+        o.frequency.exponentialRampToValueAtTime(f0*0.8,st+0.52);
+        const f1=actx.createBiquadFilter(); f1.type='bandpass'; f1.frequency.value=560+Math.random()*90; f1.Q.value=4.5;
+        const f2=actx.createBiquadFilter(); f2.type='bandpass'; f2.frequency.value=940+Math.random()*120; f2.Q.value=6;
+        const g=actx.createGain();
+        g.gain.setValueAtTime(0.0001,st); g.gain.exponentialRampToValueAtTime(1,st+0.035);
+        g.gain.setValueAtTime(1,st+0.26); g.gain.exponentialRampToValueAtTime(0.0001,st+0.58);
+        o.connect(f1); o.connect(f2); f1.connect(g); f2.connect(g); g.connect(out);
+        o.start(st); o.stop(st+0.62);
+      }
+    };
+    const t=actx.currentTime;
+    shout(t, big?8:5, big?0.27:0.24);            // громче барабанов, но без перегруза на выходе
+    noise(0.16,1900,700,1.1,big?0.05:0.035);
+    if(big){ shout(t+0.62, 8, 0.3); setTimeout(()=>noise(0.16,1900,700,1.1,0.05),620); }
+  },
   /* Рог фьорда: низкий протяжный зов, который слышно до появления врагов. */
   horn(){
     if(!save.sound||platformMuted||!audio()) return;
     const t=actx.currentTime, g=actx.createGain();
     g.gain.setValueAtTime(0.0001,t);
-    g.gain.exponentialRampToValueAtTime(0.14,t+0.25);
-    g.gain.setValueAtTime(0.14,t+1.0);
+    g.gain.exponentialRampToValueAtTime(0.075,t+0.25);
+    g.gain.setValueAtTime(0.075,t+1.0);
     g.gain.exponentialRampToValueAtTime(0.0001,t+1.9);
     const lp=actx.createBiquadFilter(); lp.type='lowpass';
     lp.frequency.setValueAtTime(700,t); lp.frequency.exponentialRampToValueAtTime(1600,t+0.5);
@@ -961,6 +1030,7 @@ class Enemy{
       else { this.chargeCd-=dt;
         if(this.chargeCd<=0 && this.stunT<=0){ this.chargeCd=6.5; this.charge=1.5;
           floatText(this.x,this.y-22,'CHARGE','#e08b3a');
+          if(Math.random()<0.5) SFX.warcry(false);
           for(let i=0;i<8;i++) particle(this.x,this.y,'#c9a06a'); } }
     }
     if(this.d.wreck){                                  // разрушитель выбивает башню надолго
@@ -1317,7 +1387,11 @@ function startWave(bonus){
   game.spawnQ.sort((a,b)=>a.t-b.t);
   game.spawnT=0; game.waveState='spawning';
   if(game.alarm){ game.alarm.on=false; game.alarm.lit=0; }
+  const heavyW = w.boss || (game.massBase>0 && w.mass>game.massBase*1.35);
   if(w.boss){ SFX.boss(); floatText(480,BY+60,'THE JARL COMES','#e06060'); } else SFX.wave();
+  // враги идут с кличем: на тяжёлой волне громче и дважды
+  setTimeout(()=>{ if(game && game.running) SFX.warcry(heavyW); }, 450);
+  game.battleBeat=0.6; game.heavyNow=heavyW;
 }
 function update(dt){
   const g=game; if(!g||!g.running||g.paused) return;
@@ -1327,6 +1401,25 @@ function update(dt){
   if(g.bgWait>0 && !g.bgImg){ g.bgWait-=dt;
     if(g.bgWait<=0 && !g.bg) buildTerrain(); }        // фон так и не пришёл — собираем процедурный
 
+  /* Бой звучит, пока враги на поле: ритм и сила удара растут с их числом.
+     Перед тяжёлой волной барабаны начинает тревога, со стартом волны их
+     подхватывает этот ритм — громче и плотнее, а между волнами остаётся ветер. */
+  {
+    let alive=0; for(const e of g.enemies) if(!e.dead) alive++;
+    const fighting = g.waveState==='spawning' || alive>0;
+    if(fighting && g.waveState!=='sand'){
+      const press = clamp(alive/12, 0, 1);
+      const heavy = !!g.heavyNow;
+      g.battleBeat = (g.battleBeat||0) - dt;
+      if(g.battleBeat<=0){
+        g.battleStep = (g.battleStep||0)+1;
+        const strong = g.battleStep%2===1;
+        const pow = (0.32 + 0.5*press + (heavy?0.3:0)) * (strong?1:0.62);
+        SFX.wardrum(Math.min(1,pow));
+        g.battleBeat = Math.max(0.28, (0.95 - 0.5*press - (heavy?0.15:0)) * (strong?0.55:0.45));
+      }
+    } else { g.battleStep=0; g.heavyNow=false; }
+  }
   if(g.waveState==='sand'){ /* полигон: волны не идут */ }
   else if(g.waveState==='idle'){
     g.waveTimer-=dt;
@@ -1339,7 +1432,7 @@ function update(dt){
       const prox = 1 - clamp(g.waveTimer/9, 0, 1);
       g.alarm.lit = prox;
       g.alarm.beat -= dt;
-      if(g.alarm.beat<=0){ SFX.wardrum(0.3+0.7*prox); g.alarm.beat = 1.05 - 0.6*prox; }
+      if(g.alarm.beat<=0){ SFX.wardrum(0.18+0.34*prox); g.alarm.beat = 1.05 - 0.6*prox; }   // разгон, кульминация — в бою
     } else if(!heavy && g.alarm.on){ g.alarm.on=false; g.alarm.lit=0; }
     if(g.waveTimer<=0) startWave(false);
   }else if(g.waveState==='spawning'){
@@ -2558,8 +2651,14 @@ let VIEW={s:1, rot:0, vw:960, vh:640};
    Поэтому на телефоне всегда горизонтальная компоновка, а в вертикальном положении она
    центрируется с леттербоксом и игра просит повернуть устройство. */
 let rotSkip=false, rotLateT=0;      // rotSkip — игрок сознательно выбрал вертикаль
+/* Просим повернуть телефон только в бою. Меню, кузница и таблица рекордов нормально
+   читаются стоя, и перекрывать их полноэкранной заглушкой незачем. */
+function inBattle(){
+  if(!game || !game.running) return false;
+  return ![...document.querySelectorAll('.screen')].some(el=>el.classList.contains('on') && el.id!=='adOv');
+}
 function syncRot(){
-  const need = VERT && TOUCH && !rotSkip;
+  const need = VERT && TOUCH && !rotSkip && inBattle();
   const el=(typeof document!=='undefined') && document.getElementById('rot');
   if(el){
     el.classList.toggle('on', need);
@@ -2643,10 +2742,36 @@ function onBoard(p){
 }
 /* Вибрация есть в Chrome на Android; в Safari на iPhone Vibration API отсутствует
    в принципе, поэтому там кнопка помечается как недоступная. */
-const VIBE_OK = (typeof navigator!=='undefined') && typeof navigator.vibrate === 'function';
+/* Android: обычный Vibration API.
+   iPhone: Vibration API в Safari нет вообще, но с iOS 18 системный переключатель
+   <input type="checkbox" switch> даёт тактильный щелчок при нажатии. Держим такой
+   переключатель спрятанным и щёлкаем его программно из обработчика касания —
+   так игра получает отклик и на iPhone. На старых iOS щелчок просто ничего не делает. */
+const IS_IOS = (typeof navigator!=='undefined') &&
+  (/iP(hone|ad|od)/.test(navigator.userAgent||'') ||
+   (navigator.platform==='MacIntel' && (navigator.maxTouchPoints||0)>1));
+const VIBE_API = (typeof navigator!=='undefined') && typeof navigator.vibrate === 'function';
+const VIBE_OK = VIBE_API || IS_IOS;
+let hapticLabel=null;
+function iosHaptic(){
+  if(typeof document==='undefined') return;
+  if(!hapticLabel){
+    const lab=document.createElement('label');
+    lab.setAttribute('aria-hidden','true');
+    lab.style.cssText='position:fixed;left:-100px;top:0;width:1px;height:1px;opacity:0;pointer-events:none;overflow:hidden';
+    const inp=document.createElement('input');
+    inp.type='checkbox'; inp.setAttribute('switch',''); inp.tabIndex=-1;
+    lab.appendChild(inp); document.body.appendChild(lab); hapticLabel=lab;
+  }
+  try{ hapticLabel.click(); }catch(e){}
+}
 function buzz(ms){
   if(!VIBE_OK || save.vibe===false) return;
-  try{ navigator.vibrate(ms||10); }catch(e){}
+  if(VIBE_API){ try{ navigator.vibrate(ms||10); }catch(e){} return; }
+  // на iPhone длительность не управляется — сильный отклик даём двойным щелчком
+  iosHaptic();
+  const total = Array.isArray(ms) ? ms.reduce((a,b)=>a+b,0) : (ms||10);
+  if(total>=45) setTimeout(iosHaptic, 70);
 }
 function hitBtn(p){
   const s=TOUCH?10:0;                 // палец толще курсора
@@ -2769,7 +2894,7 @@ async function onButton(id){
     if(save.sound){
       unlockAudio(); startWind();
       // на iPhone беззвучный режим глушит WebAudio целиком — подскажем, а то это не угадать
-      if(actx && actx.state!=='running') floatText(CW/2, BY+40, 'Check the silent switch on your phone', '#e5a04a');
+      if(actx && actx.state!=='running') floatText(CW/2, BY+40, 'Tap the screen once to wake the sound', '#e5a04a');
     } else stopWind();
     return; }
   if(id==='vibe'){
@@ -2816,6 +2941,7 @@ async function onButton(id){
 /* ---------- 10. ЭКРАНЫ -------------------------------------------------- */
 const $=s=>document.querySelector(s);
 function screen(id){
+  setTimeout(()=>{ try{ syncRot(); }catch(e){} },0);    // ушли в меню или вернулись в бой
   if(id && id!=='scResult') game=null;     // ни один уровень не работает за открытым меню
   document.querySelectorAll('.screen').forEach(s=>{ if(s.id!=='adOv') s.classList.remove('on'); });
   if(id) $('#'+id).classList.add('on');
@@ -2941,21 +3067,47 @@ function renderLevels(){
 function buyBtn(label, cost, max, maxLabel, onBuy){
   const b=document.createElement('button');
   const poor = !max && P().silver<cost;
-  b.className='btn'+(max||poor?' sec':''); b.style.fontSize='13.5px'; b.style.minHeight='46px';
-  b.textContent = max ? maxLabel : (poor ? ('Need '+cost+' silver') : (label+' · '+cost));
+  b.className='btn'+(max||poor?' sec':''); b.style.fontSize='14px'; b.style.minHeight='46px';
+  // монета прямо на кнопке: сразу видно, что здесь тратится серебро
+  const coin='<img class="coin" src="assets/icons/icon_silver.png" alt="">';
+  const price='<span class="pr">'+cost+coin+'</span>';
+  b.innerHTML = max ? maxLabel : (poor ? ('Need '+price) : (label+' '+price));
   b.disabled = max || poor;
-  b.onclick=()=>{ if(!max && P().silver>=cost){ P().silver-=cost; onBuy(); persist(); renderPerks(); renderLevels(); SFX.up(); } else SFX.no(); };
+  b.onclick=()=>{ if(!max && P().silver>=cost){ P().silver-=cost; onBuy(); persist(); renderPerks(); renderLevels(); SFX.up(); buzz(20); } else SFX.no(); };
   return b;
 }
 const RANK_TXT=['Rank I — lets you build it','Rank II — upgrade to level II','Rank III — upgrade to level III'];
+/* Что игрок получит за покупку: урон в секунду, дальность и новые свойства. DPS —
+   главная цифра, по ней сразу видно, стоит ли тратить серебро. */
+function towerDps(L){ if(!L.dmg||!L.cd) return 0; return L.dmg/L.cd*(L.twin?2:1); }
+function gainHtml(k, r){
+  const Ls=TOWERS[k].L;
+  const fmt=v=>Math.round(v*10)/10;
+  if(r===0){                                        // первый ранг — просто показываем башню
+    const a=Ls[0], d=towerDps(a);
+    return '<div class="gain">'+
+      (d? 'Damage <b>'+fmt(d)+'/s</b> · ' : '')+'Range <b>'+a.range+'</b>'+
+      '<span class="new">'+a.ab+'</span></div>';
+  }
+  if(r>=3) return '<div class="gain">Every upgrade unlocked.</div>';
+  const a=Ls[r-1], b=Ls[r];
+  const rows=[];
+  const d0=towerDps(a), d1=towerDps(b);
+  if(d0 && d1) rows.push('Damage <b>'+fmt(d0)+'</b> → <b>'+fmt(d1)+'/s</b> <span class="up">+'+Math.round((d1/d0-1)*100)+'%</span>');
+  if(a.cd && b.cd && fmt(1/a.cd)!==fmt(1/b.cd)) rows.push('Fire rate <b>'+fmt(1/a.cd)+'</b> → <b>'+fmt(1/b.cd)+'/s</b>');   // одинаковые после округления не показываем
+  if(a.range!==b.range) rows.push('Range <b>'+a.range+'</b> → <b>'+b.range+'</b>');
+  if(a.slow!==undefined && b.slow!==a.slow) rows.push('Slow <b>'+Math.round(a.slow*100)+'%</b> → <b>'+Math.round(b.slow*100)+'%</b>');
+  return '<div class="gain">'+rows.join('<br>')+(b.ab? '<span class="new">'+b.ab+'</span>' : '')+'</div>';
+}
 function renderMastery(){
   const grid=$('#mastGrid'); grid.innerHTML='';
   TKEYS.forEach(k=>{
     const t=TOWERS[k], r=mastRank(k), max=r>=3, cost=max?0:MAST_COST(k)[r];
     const el=document.createElement('div'); el.className='perk';
     el.innerHTML='<div class="top"><img src="assets/icons/'+k+'.png" alt=""><h3 style="font-size:15px">'+t.name+'</h3></div>'+
-      '<p style="min-height:0;font-size:12px">'+(max? 'Fully trained' : RANK_TXT[r])+'</p>'+
-      '<div class="pips">'+[0,1,2].map(i=>'<div class="pip'+(i<r?' on':'')+'"></div>').join('')+'</div>';
+      '<p style="min-height:0;font-size:12px;margin-bottom:6px">'+(max? 'Fully trained' : RANK_TXT[r])+'</p>'+
+      '<div class="pips">'+[0,1,2].map(i=>'<div class="pip'+(i<r?' on':'')+'"></div>').join('')+'</div>'+
+      gainHtml(k,r);
     el.appendChild(buyBtn(['Unlock','Rank II','Rank III'][r]||'Train', cost, max, 'Rank III', ()=>{ P().mast[k]=r+1; }));
     grid.appendChild(el);
   });
@@ -2995,8 +3147,14 @@ function renderPerks(){
 }
 /* Одна точка на все экраны: после любой траты серебро и доступность кнопок
    пересчитываются сразу, без выхода и возврата. */
+function canAffordSomething(){
+  for(const k of TKEYS){ const r=mastRank(k); if(r<3 && P().silver>=MAST_COST(k)[r]) return true; }
+  return false;
+}
 function refreshMoney(){
   document.querySelectorAll('.silvv,#silv1').forEach(el=>el.textContent=P().silver);
+  const fb=document.getElementById('bPerks');
+  if(fb) fb.innerHTML='<img src="assets/icons/icon_silver.png" alt="">Forge'+(canAffordSomething()?'<span class="dot"></span>':'');
   const res=document.getElementById('forgeBtn');
   if(res) res.textContent='Forge · '+P().silver+' silver';
   if(document.getElementById('scPrep') && document.getElementById('scPrep').classList.contains('on')) renderPrep();

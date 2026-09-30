@@ -196,7 +196,7 @@
       <button class="btn sec" id="bHelp">How to play</button>
     </div>
     <div class="bar"><div class="silver"><img src="assets/icons/icon_silver.png" alt=""><b id="silv1">0</b></div></div>
-    <div class="build">build 30.09 · 1</div>
+    <div class="build">build 30.09 · 2</div>
   </div>
 
   <!-- ВЫБОР УРОВНЯ -->
@@ -1268,6 +1268,7 @@ function startLevel(idx, sandbox, endless){
     game.blocked.add(c+','+r);
   }
   game.decor.sort((a,b)=>a.r-b.r);
+  game.alarm={on:false, beat:0, lit:0}; game.massBase=0;
   game.bgImg=null; game.roadImg=null; loadLevelBg(idx);
   preloadLevelBg(Math.min(idx+1, LEVELS.length-1));
   if(sandbox){ game.gold=99999; game.lives=999; game.maxLives=999; game.waveState='sand'; }
@@ -1332,6 +1333,7 @@ function update(dt){
     // за 9 секунд до тяжёлой волны поднимаем тревогу: рог, барабаны, огни
     const nw=g.waves[g.wave];
     const heavy = !!nw && (nw.boss || (g.massBase>0 && nw.mass > g.massBase*1.35));
+    if(!g.alarm) g.alarm={on:false, beat:0, lit:0};
     if(heavy && g.waveTimer<=9 && g.waveTimer>0){
       if(!g.alarm.on){ g.alarm.on=true; g.alarm.beat=0; g.shake=0.45; SFX.horn(); }
       const prox = 1 - clamp(g.waveTimer/9, 0, 1);
@@ -1512,7 +1514,7 @@ function loadLevelBg(idx){
   const rec=preloadLevelBg(idx);
   const apply=()=>{
     if(!game || game.idx!==idx) return;
-    if(rec.bg){ game.bgImg=rec.bg; buildRoadOverlay(); }
+    if(rec.bg){ game.bgImg=rec.bg; }             // дорогу рисует отдельная картинка road_level_NN
     if(rec.road) { game.roadImg=rec.road; game.roadFx=null; }
     if(!rec.bg && rec.bgDone && !game.bg) buildTerrain();
   };

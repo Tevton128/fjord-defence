@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<link rel="icon" type="image/png" href="assets/icon_64.png">   <!-- без неё браузер ищет /favicon.ico и пишет 404 в консоль -->
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>Fjord Defence</title>
@@ -111,11 +112,18 @@
   .gain b{color:#e9f0f4;font-weight:700}
   .gain .up{color:#7fe0a0;font-weight:700}
   .gain .new{display:block;color:#e7b74e;margin-top:3px}
-  #bPerks{background:linear-gradient(180deg,#e7b74e,#b8862a);color:#2a1a08;
-          box-shadow:0 4px 0 #6e4f14,0 8px 18px rgba(0,0,0,.35)}
-  #bPerks img{width:20px;height:20px;vertical-align:-4px;margin-right:6px}
-  #bPerks .dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#7fe0a0;
-          margin-left:6px;vertical-align:1px;box-shadow:0 0 6px #7fe0a0}
+  /* Кузница — красная, с монетой серебра: её видно сразу, и понятно, что здесь тратятся деньги. */
+  .btn.forge{background:linear-gradient(180deg,#d0554b,#9a2f29);color:#fff1ee;
+          box-shadow:0 4px 0 #5a1a16,0 8px 18px rgba(0,0,0,.35);
+          display:inline-flex;align-items:center;justify-content:center;gap:7px}
+  .btn.forge:active{box-shadow:0 1px 0 #5a1a16}
+  .btn.forge img{width:20px;height:20px;flex:0 0 20px;filter:drop-shadow(0 1px 1px rgba(0,0,0,.45))}
+  .btn.forge .dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#7fe0a0;
+          box-shadow:0 0 6px #7fe0a0}
+  /* Таблица рекордов — фиолетовая, чтобы не путалась с игровыми кнопками */
+  #bBoard{background:linear-gradient(180deg,#7a55c7,#553597);color:#f3edff;
+          box-shadow:0 4px 0 #34205e,0 8px 18px rgba(0,0,0,.35)}
+  #bBoard:active{box-shadow:0 1px 0 #34205e}
   #scMenu .bar{position:absolute;top:16px;right:18px}
   .bar{display:flex;gap:14px;align-items:center;font-size:15px}
   .silver{display:inline-flex;align-items:center;gap:7px;color:var(--snow);background:#162833;border:1px solid #33505f;padding:5px 14px 5px 7px;border-radius:20px}
@@ -214,12 +222,11 @@
       <button class="btn" id="bPlay">Play</button>
     </div>
     <div class="row">
-      <button class="btn" id="bPerks"><img src="assets/icons/icon_silver.png" alt="">Forge</button>
-      <button class="btn sec" id="bBoard">Leaderboard</button>
+      <button class="btn" id="bBoard">Leaderboard</button>
       <button class="btn sec" id="bHelp">How to play</button>
     </div>
     <div class="bar"><div class="silver"><img src="assets/icons/icon_silver.png" alt=""><b id="silv1">0</b></div></div>
-    <div class="build">build 30.09 · 3</div>
+    <div class="build">build 30.09 · 6</div>
   </div>
 
   <!-- ВЫБОР УРОВНЯ -->
@@ -228,7 +235,8 @@
     <h2>Choose a fjord</h2>
     <div class="row" id="diffRow" style="margin:2px 0 -4px"></div>
     <p class="sub" id="livesLine" style="margin:8px 0 0"></p>
-    <div class="row"><button class="btn sec" id="bSandbox" style="min-width:260px">Sandbox: everything unlocked</button></div>
+    <div class="row"><button class="btn forge" id="bPerks" style="min-width:200px"><img src="assets/icons/icon_silver.png" alt="">Forge</button>
+      <button class="btn sec" id="bSandbox" style="min-width:200px">Sandbox</button></div>
     <p class="sub" id="diffHint" style="margin:8px 0 0"></p>
     <div class="levels" id="lvGrid"></div>
   </div>
@@ -317,7 +325,13 @@
 const memStore = {};
 const Store = {
   async get(k){
-    try{ if(window.bridge && bridge.storage){ const v=await bridge.storage.get(k); if(v!=null) return v; } }catch(e){}
+    /* Второй аргумент false обязателен: по умолчанию Bridge сам разбирает JSON и
+       отдаёт объект, а игра ждёт строку и разбирает её ещё раз. Разбор падал,
+       сохранение считалось битым, и прогресс обнулялся при каждой перезагрузке. */
+    try{ if(Ads.ready && window.bridge && bridge.storage){
+      let v=await bridge.storage.get(k,false);
+      if(v!=null && typeof v!=='string') v=JSON.stringify(v);   // на всякий случай и для старых версий SDK
+      if(v!=null) return v; } }catch(e){}
     try{ if(window.ytgame && ytgame.game && ytgame.game.loadData){
       const s = await ytgame.game.loadData(); if(s) return JSON.parse(s)[k] ?? null; } }catch(e){}
     try{ if(window.storage){ const r = await window.storage.get(k,false); if(r) return r.value; } }catch(e){}
@@ -325,7 +339,7 @@ const Store = {
     return memStore[k] ?? null;
   },
   async set(k,v){
-    try{ if(window.bridge && bridge.storage){ await bridge.storage.set(k,v); return; } }catch(e){}
+    try{ if(Ads.ready && window.bridge && bridge.storage){ await bridge.storage.set(k,v); return; } }catch(e){}
     try{ if(window.ytgame && ytgame.game && ytgame.game.saveData){
       await ytgame.game.saveData(JSON.stringify({[k]:v})); return; } }catch(e){}
     try{ if(window.storage){ await window.storage.set(k,v,false); return; } }catch(e){}
@@ -610,6 +624,138 @@ function startWind(){                      // тихий ветер фьорда
   windNode={src,lfo,g};
 }
 function stopWind(){ if(windNode){ try{ windNode.src.stop(); windNode.lfo.stop(); }catch(e){} windNode=null; } }
+
+/* ---------- МУЗЫКА --------------------------------------------------------
+   Треки лежат в assets/music. Играют по реальным часам WebAudio, поэтому
+   ускорение игры их не трогает. Какой трек нужен, решает не таймер, а состояние
+   боя: если волну вызвали раньше, прямо во время рога, в следующем же кадре
+   состояние станет «волна идёт», и музыка переключится на неё.
+
+   Петли крутим сами, двумя источниками с перехлёстом 60 мс на границе такта,
+   а не встроенным loop. Так стык не зависит от того, сколько тишины браузер
+   срезает в начале MP3 — Safari и Chrome делают это по-разному. */
+const Music={
+  META:{ battle:{loop:[0.5,39.138]}, heavy:{loop:[0.5,68.1165]},
+         horn:{}, victory:{}, defeat:{} },
+  VOL:0.42,                      // музыка под эффектами, а не поверх
+  buf:{}, ready:false, loading:false,
+  bus:null, duck:null, cur:null, want:'none', sting:null,
+  holdUntil:0,
+  async load(){
+    if(this.loading || typeof fetch==='undefined') return;
+    const c=audio(); if(!c) return;
+    this.loading=true;
+    const names=Object.keys(this.META);
+    await Promise.all(names.map(async n=>{
+      try{
+        const r=await fetch('assets/music/'+n+'.mp3'); if(!r.ok) return;
+        const ab=await r.arrayBuffer();
+        this.buf[n]=await new Promise((ok,bad)=>{      // старый Safari не умеет промис-версию
+          const p=c.decodeAudioData(ab,ok,bad); if(p && p.then) p.then(ok,bad); });
+      }catch(e){}
+    }));
+    // музыка включается, только если есть обе петли; иначе остаётся синтез
+    this.ready = !!(this.buf.battle && this.buf.heavy);
+  },
+  ensureBus(){
+    if(this.bus || !audio()) return;
+    this.duck=actx.createGain(); this.duck.gain.value=1; this.duck.connect(master);
+    this.bus=actx.createGain(); this.bus.gain.value=this.VOL; this.bus.connect(this.duck);
+  },
+  /* Одна итерация петли: чуть раньше loopStart и чуть дальше loopEnd, края
+     плавно гасятся — соседние итерации перекрываются ровно на стыке. */
+  _iter(tr, when){
+    const [ls,le]=this.META[tr.name].loop, X=0.06, len=le-ls;
+    const src=actx.createBufferSource(); src.buffer=this.buf[tr.name];
+    const g=actx.createGain();
+    g.gain.setValueAtTime(0.0001,when);
+    g.gain.linearRampToValueAtTime(1,when+X);
+    g.gain.setValueAtTime(1,when+len);
+    g.gain.linearRampToValueAtTime(0.0001,when+len+X);
+    src.connect(g); g.connect(tr.gain);
+    src.start(when, Math.max(0,ls-X/2), len+X);
+    tr.srcs.push(src); if(tr.srcs.length>3) tr.srcs.shift();
+    tr.next=when+len;
+  },
+  _startLoop(name, fadeIn){
+    this.ensureBus();
+    const tr={name, gain:actx.createGain(), srcs:[], next:0, timer:0};
+    tr.gain.connect(this.bus);
+    const t=actx.currentTime+0.02;
+    tr.gain.gain.setValueAtTime(0.0001,t);
+    tr.gain.gain.linearRampToValueAtTime(1,t+Math.max(0.02,fadeIn));
+    this._iter(tr,t);
+    // подкладываем следующую итерацию заранее, пока текущая ещё играет
+    tr.timer=setInterval(()=>{ if(actx.currentTime > tr.next-2.0) this._iter(tr,tr.next); },400);
+    return tr;
+  },
+  _stop(tr, fade){
+    if(!tr) return;
+    clearInterval(tr.timer);
+    const t=actx.currentTime;
+    try{ tr.gain.gain.cancelScheduledValues(t); tr.gain.gain.setValueAtTime(tr.gain.gain.value,t);
+         tr.gain.gain.linearRampToValueAtTime(0.0001,t+fade); }catch(e){}
+    setTimeout(()=>{ tr.srcs.forEach(s=>{ try{s.stop();}catch(e){} }); try{tr.gain.disconnect();}catch(e){} }, fade*1000+120);
+  },
+  _one(name, fadeIn){                                  // рог — одиночный, но тоже часть переходов
+    this.ensureBus();
+    const tr={name, gain:actx.createGain(), srcs:[], timer:0};
+    tr.gain.connect(this.bus);
+    const t=actx.currentTime+0.02, src=actx.createBufferSource();
+    src.buffer=this.buf[name]; src.connect(tr.gain);
+    tr.gain.gain.setValueAtTime(0.0001,t); tr.gain.gain.linearRampToValueAtTime(1,t+fadeIn);
+    src.start(t); tr.srcs.push(src);
+    return tr;
+  },
+  /* Переход к нужному состоянию. Пауза в бою — это не смена трека. */
+  set(state){
+    if(!this.ready || state===this.want) return;
+    const prev=this.cur, from=this.want;
+    this.want=state;
+    if(state==='none'){ this._stop(prev,1.4); this.cur=null; return; }
+    // рог сменяется волной почти встык — удар волны не должен ждать
+    const fadeOld = from==='horn' ? 0.25 : 0.9;
+    const fadeNew = state==='heavy' && from==='horn' ? 0.08 : state==='horn' ? 0.05 : 0.6;
+    this._stop(prev,fadeOld);
+    this.cur = state==='horn' ? this._one('horn',fadeNew) : this._startLoop(state,fadeNew);
+    if(this.sting){ this._stop(this.sting,0.6); this.sting=null; }
+  },
+  /* Итог боя: петля уходит, звучит короткий финал. */
+  finale(win){
+    if(!this.ready) return;
+    const name = win ? 'victory' : 'defeat';
+    if(!this.buf[name]) { this.set('none'); return; }
+    this._stop(this.cur,0.5); this.cur=null; this.want='none'; this.holdUntil=0;
+    if(this.sting) this._stop(this.sting,0.2);
+    this.sting=this._one(name,0.02);
+  },
+  /* Громкость по обстоятельствам: реклама и свёрнутая вкладка — тишина,
+     пауза игрока — приглушить, чтобы было слышно, что игра стоит. */
+  setDuck(v){
+    if(!this.duck) return;
+    const t=actx.currentTime;
+    if(Math.abs(this.duck.gain.value-v)<0.01) return;
+    this.duck.gain.cancelScheduledValues(t);
+    this.duck.gain.setValueAtTime(this.duck.gain.value,t);
+    this.duck.gain.linearRampToValueAtTime(v,t+0.25);
+  },
+  stopAll(){ this._stop(this.cur,0.3); this.cur=null; this.want='none'; if(this.sting){ this._stop(this.sting,0.3); this.sting=null; } }
+};
+/* Что должно звучать прямо сейчас. Считаем по реальным часам: после последнего
+   убитого врага музыка держится ещё 2.5 с и только потом уходит в ветер. */
+function musicWanted(now){
+  const g=game;
+  if(!g || !g.running || g.over) return 'none';
+  if(g.alarm && g.alarm.on) return 'horn';
+  let alive=0; for(const e of g.enemies) if(!e.dead) alive++;
+  if(g.waveState==='spawning' || alive>0){
+    Music.holdUntil=now+2500;
+    return g.heavyNow ? 'heavy' : 'battle';
+  }
+  if(now<Music.holdUntil && Music.want!=='horn') return Music.want;
+  return 'none';
+}
+
 const SFX={
   /* Боевой барабан: удар кожи по низкой синусоиде. power 0..1 — чем ближе волна,
      тем громче и суше. */
@@ -1390,7 +1536,7 @@ function startWave(bonus){
   const heavyW = w.boss || (game.massBase>0 && w.mass>game.massBase*1.35);
   if(w.boss){ SFX.boss(); floatText(480,BY+60,'THE JARL COMES','#e06060'); } else SFX.wave();
   // враги идут с кличем: на тяжёлой волне громче и дважды
-  setTimeout(()=>{ if(game && game.running) SFX.warcry(heavyW); }, 450);
+  if(!Music.ready) setTimeout(()=>{ if(game && game.running) SFX.warcry(heavyW); }, 450);   // в треке Heavy свои кличи
   game.battleBeat=0.6; game.heavyNow=heavyW;
 }
 function update(dt){
@@ -1408,15 +1554,17 @@ function update(dt){
     let alive=0; for(const e of g.enemies) if(!e.dead) alive++;
     const fighting = g.waveState==='spawning' || alive>0;
     if(fighting && g.waveState!=='sand'){
-      const press = clamp(alive/12, 0, 1);
-      const heavy = !!g.heavyNow;
-      g.battleBeat = (g.battleBeat||0) - dt;
-      if(g.battleBeat<=0){
-        g.battleStep = (g.battleStep||0)+1;
-        const strong = g.battleStep%2===1;
-        const pow = (0.32 + 0.5*press + (heavy?0.3:0)) * (strong?1:0.62);
-        SFX.wardrum(Math.min(1,pow));
-        g.battleBeat = Math.max(0.28, (0.95 - 0.5*press - (heavy?0.15:0)) * (strong?0.55:0.45));
+      if(!Music.ready){                              // синтезированный бой — только если треки не загрузились
+        const press = clamp(alive/12, 0, 1);
+        const heavy = !!g.heavyNow;
+        g.battleBeat = (g.battleBeat||0) - dt;
+        if(g.battleBeat<=0){
+          g.battleStep = (g.battleStep||0)+1;
+          const strong = g.battleStep%2===1;
+          const pow = (0.32 + 0.5*press + (heavy?0.3:0)) * (strong?1:0.62);
+          SFX.wardrum(Math.min(1,pow));
+          g.battleBeat = Math.max(0.28, (0.95 - 0.5*press - (heavy?0.15:0)) * (strong?0.55:0.45));
+        }
       }
     } else { g.battleStep=0; g.heavyNow=false; }
   }
@@ -1428,11 +1576,11 @@ function update(dt){
     const heavy = !!nw && (nw.boss || (g.massBase>0 && nw.mass > g.massBase*1.35));
     if(!g.alarm) g.alarm={on:false, beat:0, lit:0};
     if(heavy && g.waveTimer<=9 && g.waveTimer>0){
-      if(!g.alarm.on){ g.alarm.on=true; g.alarm.beat=0; g.shake=0.45; SFX.horn(); }
+      if(!g.alarm.on){ g.alarm.on=true; g.alarm.beat=0; g.shake=0.45; if(!Music.ready) SFX.horn(); }
       const prox = 1 - clamp(g.waveTimer/9, 0, 1);
       g.alarm.lit = prox;
       g.alarm.beat -= dt;
-      if(g.alarm.beat<=0){ SFX.wardrum(0.18+0.34*prox); g.alarm.beat = 1.05 - 0.6*prox; }   // разгон, кульминация — в бою
+      if(g.alarm.beat<=0){ if(!Music.ready) SFX.wardrum(0.18+0.34*prox); g.alarm.beat = 1.05 - 0.6*prox; }   // есть треки — барабаны играет рог
     } else if(!heavy && g.alarm.on){ g.alarm.on=false; g.alarm.lit=0; }
     if(g.waveTimer<=0) startWave(false);
   }else if(g.waveState==='spawning'){
@@ -2895,7 +3043,7 @@ async function onButton(id){
       unlockAudio(); startWind();
       // на iPhone беззвучный режим глушит WebAudio целиком — подскажем, а то это не угадать
       if(actx && actx.state!=='running') floatText(CW/2, BY+40, 'Tap the screen once to wake the sound', '#e5a04a');
-    } else stopWind();
+    } else { stopWind(); Music.stopAll(); }
     return; }
   if(id==='vibe'){
     if(!VIBE_OK){ floatText(CW/2, BY+40, 'This device has no vibration', '#8ea6b5'); SFX.no(); return; }
@@ -2997,7 +3145,7 @@ let perksReturn='scMenu';
 /* Кузницу открываем из трёх мест: из меню, с экрана подготовки и сразу после боя.
    Раньше она жила только в меню, и половина игроков её не находила. */
 function openForge(from){ perksReturn=from||'scMenu'; renderPerks(); screen('scPerks'); }
-$('#bPerks').onclick=()=>openForge('scMenu');
+$('#bPerks').onclick=()=>openForge('scLevels');
 $('#bBoard').onclick=()=>Board.open('scMenu');
 $('#boardBack').onclick=()=>{
   if(boardReturn==='scResult' && game) screen('scResult');
@@ -3153,10 +3301,11 @@ function canAffordSomething(){
 }
 function refreshMoney(){
   document.querySelectorAll('.silvv,#silv1').forEach(el=>el.textContent=P().silver);
+  const dot = canAffordSomething() ? '<span class="dot"></span>' : '';
   const fb=document.getElementById('bPerks');
-  if(fb) fb.innerHTML='<img src="assets/icons/icon_silver.png" alt="">Forge'+(canAffordSomething()?'<span class="dot"></span>':'');
+  if(fb) fb.innerHTML='<img src="assets/icons/icon_silver.png" alt="">Forge'+dot;
   const res=document.getElementById('forgeBtn');
-  if(res) res.textContent='Forge · '+P().silver+' silver';
+  if(res) res.innerHTML='<img src="assets/icons/icon_silver.png" alt="">Forge · '+P().silver+dot;
   if(document.getElementById('scPrep') && document.getElementById('scPrep').classList.contains('on')) renderPrep();
 }
 // --- подготовка к бою: расходники на один раунд ---
@@ -3230,6 +3379,7 @@ function showEndless(){
   $('#resTitle').textContent='Raid over';
   $('#resStars').innerHTML='';
   const wasBest = w > Board.best();
+  try{ Music.finale(wasBest); }catch(e){}          // новый рекорд — победный финал, иначе мрачный
   $('#resText').textContent='You held '+w+' waves on '+g.L.n+'. Silver earned: '+silver+
     '. Endless raids never touch your village lives.'+
     (wasBest ? ' New personal best.' : ' Your best is '+Board.best()+' waves.');
@@ -3244,6 +3394,7 @@ function showEndless(){
 let levelsDone=0;
 function showResult(win){
   const g=game, i=g.idx;
+  if(!g.endless){ try{ Music.finale(win); }catch(e){} }
   const stars = win ? (g.lives>=g.maxLives*0.9?3 : g.lives>=g.maxLives*0.5?2 : 1) : 0;
   $('#resTitle').textContent = win ? 'Fjord Held' : 'The Gates Have Fallen';
   $('#resStars').innerHTML = win ? '★★★'.slice(0,stars)+'<span style="color:#2c4452">'+'☆☆☆'.slice(0,3-stars)+'</span>' : '';
@@ -3272,8 +3423,10 @@ function showResult(win){
 
   /* Кузница стоит в потоке между уровнями: игрок видит её сразу после боя, когда
      серебро только что начислено, а не ищет по меню. */
-  const forge=mk('Forge · '+P().silver+' silver','', ()=>openForge('scResult'));
+  const forge=mk('','forge', ()=>openForge('scResult'));
   forge.id='forgeBtn';
+  forge.innerHTML='<img src="assets/icons/icon_silver.png" alt="">Forge · '+P().silver+
+                  (canAffordSomething()?'<span class="dot"></span>':'');
   if(win){
     mk('Double silver (ad)','ad', async e=>{
       const btnEl=e.target; btnEl.disabled=true;
@@ -3323,6 +3476,12 @@ function loop(now){
   if(adPaused && !Ads.showing) adPaused=false;
   if(platformPaused && !Ads.showing && typeof document!=='undefined'
      && document.visibilityState!=='hidden') platformPause(false);
+  if(Music.ready && save.sound && !platformMuted){
+    try{                                             // любая ошибка звука — не повод замораживать игру
+      Music.set(musicWanted(now));
+      Music.setDuck(platformPaused||adPaused ? 0 : (game && (game.paused||game.rotAsk)) ? 0.35 : 1);
+    }catch(e){ console.warn('music', e); }
+  }
   if(game && game.running && !game.paused && !game.rotAsk && !platformPaused && !adPaused){
     const steps=game.speed;
     for(let i=0;i<steps;i++) update(dt);
@@ -3332,6 +3491,19 @@ function loop(now){
 }
 
 (async function boot(){
+  /* Bridge поднимаем раньше всего: пока он не инициализирован, его хранилище
+     недоступно. Раньше сохранение читалось до инициализации — на Playgama
+     прогресс писался в Bridge, а при следующем запуске читался из пустого
+     локального хранилища, и игрок терял его при каждой перезагрузке.
+     Таймаут — чтобы зависший SDK не повесил загрузку игры. */
+  try{
+    if(window.bridge && bridge.initialize){
+      let done=false;
+      await Promise.race([ bridge.initialize().then(()=>{ done=true; }),
+                           new Promise(r=>setTimeout(r,6000)) ]);
+      Ads.ready=done;
+    }
+  }catch(e){}
   await loadSave();
   const touch=(navigator.maxTouchPoints||0)>0 || 'ontouchstart' in window;
   setLayout(touch, window.innerHeight > window.innerWidth*1.04);
@@ -3385,9 +3557,10 @@ function loop(now){
   }
   if(boot){ boot.classList.add('gone'); setTimeout(()=>boot.remove(),600); }
   // Bridge может добавить отступы под «чёлку» уже после первой раскладки — пересчитываем.
-  try{ if(window.bridge && bridge.initialize){ await bridge.initialize(); Ads.ready=true; fit(); } }catch(e){}
+  fit();                                           // Bridge мог добавить отступы под «чёлку» — пересчитываем раскладку
   bindAudioUnlock();
   bindPlatformEvents();
+  Music.load();                                   // 2 МБ музыки грузим в фоне, уже после заставки
   try{ if(window.bridge && bridge.platform && bridge.platform.sendMessage) bridge.platform.sendMessage('game_ready'); }catch(e){}
   // Playables: сообщаем платформе, что кадр отрисован и игра готова принимать ввод
   if(window.ytgame && ytgame.game){

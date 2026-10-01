@@ -158,6 +158,10 @@
   #rot.late .rotskip{opacity:1;pointer-events:auto}
   #rot #rotph{transform-origin:60px 60px;animation:rotsway 2.2s ease-in-out infinite}
   @keyframes rotsway{0%,100%{transform:rotate(0deg)}50%{transform:rotate(-78deg)}}
+  #adToast{position:fixed;left:50%;top:18%;transform:translateX(-50%);z-index:40;pointer-events:none;
+     background:rgba(10,22,30,.94);border:1px solid #3d5f72;border-radius:10px;padding:12px 18px;
+     font:600 15px/1.3 var(--f);color:#e9f0f4;text-align:center;max-width:86vw;display:none}
+  #adToast.on{display:block}
   #pausePanel{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:25;display:none;
      width:min(92vw,460px);box-sizing:border-box;padding:18px 16px 16px;border-radius:14px;
      background:rgba(10,22,30,.94);border:1px solid #2f4a5a;box-shadow:0 10px 40px rgba(0,0,0,.5);
@@ -297,7 +301,7 @@
       <button class="btn sec" id="bHelp">How to play</button>
     </div>
     <div class="bar"><div class="silver"><img src="assets/icons/icon_silver.png" alt=""><b id="silv1">0</b></div></div>
-    <div class="build">build 01.10 · 2</div>
+    <div class="build">build 01.10 · 5</div>
   </div>
 
   <!-- ВЫБОР УРОВНЯ -->
@@ -377,6 +381,7 @@
   </div>
 
   <!-- РЕКЛАМА (заглушка) -->
+  <div id="adToast"></div>
   <div class="screen" id="adOv">
     <div id="adBox">
       <h2 id="adTitle">Advertisement</h2>
@@ -428,14 +433,56 @@ const Store = {
 function newProfile(){ return { silver:0, lives:20, mast:{archer:1}, stars:{}, hints:{} }; }
 let save = { diff:0, sound:true, vibe:true, portraitOk:false, prof:{0:newProfile(),1:newProfile(),2:newProfile()} };
 const P = () => save.prof[save.diff||0] || (save.prof[save.diff||0]=newProfile());
+/* Раньше здесь стояла миграция со старого формата, где мастерская лежала в корне
+   сохранения. Она срабатывала и на новом формате: d.mast там нет, и купленные ранги
+   при каждой загрузке сбрасывались до «только лучники». Теперь старый формат
+   переносим, только если он действительно старый (нет prof), а новый не трогаем. */
+function fixProfile(pr){
+  if(!pr || typeof pr!=='object') pr=newProfile();
+  if(typeof pr.silver!=='number') pr.silver=0;
+  if(typeof pr.lives!=='number') pr.lives=20;
+  if(!pr.mast || typeof pr.mast!=='object') pr.mast={archer:1};
+  if(!pr.mast.archer) pr.mast.archer=1;
+  if(!pr.stars || typeof pr.stars!=='object') pr.stars={};
+  if(!pr.hints || typeof pr.hints!=='object') pr.hints={};
+  return pr;
+}
+/* Сохранение на платформе асинхронное: если перезагрузить страницу сразу после
+   покупки, запись в Bridge может не долететь. Поэтому каждая запись ещё и синхронно
+   дублируется в localStorage с отметкой времени, а при загрузке берём более свежую. */
+const LOCAL_KEY='fjord_save_v2_local';
+function readLocal(){ try{ const v=localStorage.getItem(LOCAL_KEY); return v? JSON.parse(v) : null; }catch(e){ return null; } }
 async function loadSave(){
   const raw = await Store.get('fjord_save_v2');
-  if(raw){ try{ const d = JSON.parse(raw); save = Object.assign(save,d);
-    P().lives = (d.lives==null? 20 : d.lives);
-    P().mast = d.mast||{archer:1}; if(!P().mast.archer) P().mast.archer=1; P().hints = d.hints||{}; }catch(e){} }
+  let d=null; try{ d=raw? JSON.parse(raw) : null; }catch(e){ d=null; }
+  const loc=readLocal();
+  if(loc && (!d || (loc.ts||0) > (d.ts||0))) d=loc;
+  if(!d) return;
+  try{
+    if(d.prof && typeof d.prof==='object'){
+      Object.assign(save,d);
+    } else {                                           // старый формат: всё в корне
+      const old={ silver:d.silver, lives:d.lives, mast:d.mast, stars:d.stars, hints:d.hints };
+      for(const k of ['diff','sound','vibe','portraitOk','musVol','sfxVol','raids','nick']) if(k in d) save[k]=d[k];
+      save.prof[save.diff||0]=old;
+    }
+    for(const k of [0,1,2]) save.prof[k]=fixProfile(save.prof[k]);
+  }catch(e){ console.warn('save parse',e); }
 }
 let saveTimer=null;
-function persist(){ clearTimeout(saveTimer); saveTimer=setTimeout(()=>Store.set('fjord_save_v2',JSON.stringify(save)),250); }
+function persist(){ clearTimeout(saveTimer); saveTimer=setTimeout(flushSave,250); }
+/* Покупку и перезагрузку разделяют доли секунды. Отложенная запись в этот момент
+   теряется, поэтому при уходе со страницы пишем сразу. */
+function flushSave(){ clearTimeout(saveTimer); saveTimer=null;
+  save.ts=Date.now();
+  const str=JSON.stringify(save);
+  try{ localStorage.setItem(LOCAL_KEY,str); }catch(e){}
+  try{ return Store.set('fjord_save_v2',str); }catch(e){} }
+if(typeof window!=='undefined' && window.addEventListener){
+  window.addEventListener('pagehide',()=>{ if(saveTimer) flushSave(); });
+  if(typeof document!=='undefined' && document.addEventListener)
+    document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='hidden' && saveTimer) flushSave(); });
+}
 
 /* Платформа (YouTube или Bridge) может в любой момент потребовать паузу и отключение звука.
    Это обязательное требование сертификации: игра обязана слушаться мгновенно. */
@@ -538,19 +585,27 @@ const Ads = {
     const ev = kind==='rewarded' ? 'rewarded_state_changed' : 'interstitial_state_changed';
     const ad = bridge.advertisement;
     return new Promise(res=>{
-      let done=false, got=false, late=0;
+      /* Если ролика нет (игра на модерации, нет заполнения в регионе, частотный лимит),
+         Bridge может не прислать вообще ничего. Раньше мы ждали 3 минуты на паузе —
+         для игрока это зависание. Теперь ролик обязан открыться за 10 секунд. */
+      let done=false, got=false, late=0, opened=false;
+      Ads.toast('Loading ad…', 0);
       const fin=v=>{ if(done) return; done=true;
-        clearTimeout(t); clearTimeout(late);
+        clearTimeout(t); clearTimeout(late); clearTimeout(start);
+        if(!opened && !v) Ads.toast('No ad available right now. Try again later.', 2800);
+        else Ads.toast('', 0);
         try{ ad.off(ev, h); }catch(e){}
         Ads.showing=false;
         unlockAudio();            // ролик мог усыпить наш контекст
         res(v); };
       const h=st=>{
+        if(st==='opened'){ opened=true; clearTimeout(start); Ads.toast('',0); }
         if(st==='rewarded'){ got=true; fin(true); }
         else if(st==='closed'){ late=setTimeout(()=>fin(got),350); }   // награда может прийти следом
         else if(st==='failed'){ fin(false); }
       };
       const t=setTimeout(()=>fin(got), kind==='rewarded'?180000:45000);
+      const start=setTimeout(()=>{ if(!opened) fin(false); }, 10000);
       try{
         ad.on(ev,h);
         if(kind==='rewarded') ad.showRewarded(); else ad.showInterstitial();
@@ -572,6 +627,12 @@ const Ads = {
     return this._demo(title || 'Rewarded video', 5);
   },
 
+  toast(msg, ms){
+    const el=typeof document!=='undefined' && document.getElementById('adToast'); if(!el) return;
+    clearTimeout(this._tt);
+    el.textContent=msg||''; el.classList.toggle('on', !!msg);
+    if(msg && ms) this._tt=setTimeout(()=>el.classList.remove('on'), ms);
+  },
   _demo(title, secs){
     this.showing=true;
     return new Promise(res=>{
@@ -3589,7 +3650,7 @@ function buyBtn(label, cost, max, maxLabel, onBuy){
   const price='<span class="pr">'+cost+coin+'</span>';
   b.innerHTML = max ? maxLabel : (poor ? ('Need '+price) : (label+' '+price));
   b.disabled = max || poor;
-  b.onclick=()=>{ if(!max && P().silver>=cost){ P().silver-=cost; onBuy(); persist(); renderPerks(); renderLevels(); SFX.up(); buzz(20); } else SFX.no(); };
+  b.onclick=()=>{ if(!max && P().silver>=cost){ P().silver-=cost; onBuy(); flushSave(); renderPerks(); renderLevels(); SFX.up(); buzz(20); } else SFX.no(); };
   return b;
 }
 const RANK_TXT=['Rank I — lets you build it','Rank II — upgrade to level II','Rank III — upgrade to level III'];
@@ -3819,8 +3880,8 @@ function showResult(win){
     mk('Double silver (ad)','ad', async e=>{
       const btnEl=e.target; btnEl.disabled=true;
       const ok=await Ads.rewarded('double-silver','Ad for double silver');
-      if(ok){ P().silver+=silver; persist(); screen('scResult'); $('#resText').textContent='Silver doubled: +'+(silver*2)+'.'; }
-      btnEl.remove();
+      if(ok){ P().silver+=silver; persist(); screen('scResult'); $('#resText').textContent='Silver doubled: +'+(silver*2)+'.'; btnEl.remove(); }
+      else btnEl.disabled=false;              // ролика не было — пусть попробует ещё раз
     });
     if(i+1<LEVELS.length){
       const nx=mk('Next fjord','', async ()=>{

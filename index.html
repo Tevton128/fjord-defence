@@ -297,7 +297,7 @@
       <button class="btn sec" id="bHelp">How to play</button>
     </div>
     <div class="bar"><div class="silver"><img src="assets/icons/icon_silver.png" alt=""><b id="silv1">0</b></div></div>
-    <div class="build">build 30.09 · 8</div>
+    <div class="build">build 01.10 · 2</div>
   </div>
 
   <!-- ВЫБОР УРОВНЯ -->
@@ -912,6 +912,7 @@ const SFX={
   },
   bow(){ if(sfxBudget-- <0) return; noise(0.09,2600,700,1.6,0.05); tone(300,140,0.07,'triangle',0.03); },
   spear(){ if(sfxBudget-- <0) return; noise(0.14,1400,320,1.2,0.07); tone(160,70,0.12,'sawtooth',0.04); },
+  chop(){ if(sfxBudget-- <0) return; tone(520,300,0.07,'triangle',0.06); noise(0.06,2400,900,0.9,0.05); },
   thud(){ if(sfxBudget-- <0) return; tone(120,45,0.22,'sine',0.11); noise(0.13,600,140,0.8,0.05); },
   boom(){ if(sfxBudget-- <0) return; noise(0.42,900,90,0.7,0.12,'lowpass'); tone(80,35,0.34,'sine',0.09); },
   zap(){ if(sfxBudget-- <0) return; noise(0.12,5200,2200,3,0.05,'highpass');
@@ -949,14 +950,14 @@ const TOWERS = {
   archer:{ build:3, name:'Archers', short:'Archers', air:true, unlock:1, color:'#caa84f',
     tip:'Fast arrows, hits air. Weak against armour.',
     L:[ {cost:80,  range:112, dmg:14, cd:0.55, ab:'One arrow per shot.'},
-        {cost:70,  range:126, dmg:24, cd:0.48, ab:'Longer range, harder hits.'},
-        {cost:155, range:142, dmg:36, cd:0.40, twin:true, ab:'Volley of two arrows.'} ] },
+        {cost:85,  range:124, dmg:21, cd:0.50, ab:'Longer range, harder hits.'},
+        {cost:220, range:136, dmg:30, cd:0.45, twin:true, ab:'Volley of two arrows.'} ] },
   frost:{ build:4, name:'Frost Rune', short:'Frost Rune', air:true, unlock:2, color:'#6fc0e0',
-    tip:'Low damage, heavy slow. Place early on the path.',
-    L:[ {cost:105,  range:118, dmg:6,  cd:1.0, slow:.35, slowT:1.5, ab:'Slows by 35%.'},
-        {cost:115,  range:130, dmg:13, cd:0.9, slow:.45, slowT:1.9, ab:'Slows by 45%.'},
-        {cost:245, range:145, dmg:22, cd:0.8, slow:.55, slowT:2.4, aoe:40, freeze:.9,
-         ab:'Cold splashes and sometimes freezes the target.'} ] },
+    tip:'Low damage, heavy slow. More targets per shot with every level.',
+    L:[ {cost:105,  range:118, dmg:6,  cd:1.0, slow:.35, slowT:1.5, tgt:1, ab:'Slows one enemy by 35%.'},
+        {cost:115,  range:130, dmg:13, cd:0.9, slow:.45, slowT:1.9, tgt:2, ab:'Slows 2 enemies at once by 45%.'},
+        {cost:245, range:145, dmg:22, cd:0.8, slow:.55, slowT:2.4, tgt:3, aoe:40, freeze:.9,
+         ab:'Slows 3 enemies at once, cold splashes and sometimes freezes.'} ] },
   catapult:{ build:5, name:'Catapult', short:'Catapult', air:false, unlock:3, color:'#9a6b3f', splash:true,
     tip:'Splash boulder, pierces armour. Cannot hit ravens.',
     L:[ {cost:145, range:150, dmg:32, cd:1.9, splash:42, pierce:4, ab:'Area blast.'},
@@ -979,11 +980,11 @@ const TOWERS = {
         {cost:210, range:126, cd:4.4, push:130, dmg:24, maxT:6, ab:'Throws up to 6 enemies back 130.'},
         {cost:415, range:142, cd:3.8, push:190, dmg:40, freeze:.7, maxT:8,
          ab:'Throws up to 8 back 190 and freezes them.'} ] },
-  totem:{ build:6, name:'Thor\'s Totem', short:'Totem', air:true, unlock:7, color:'#b58ce0',
-    tip:'Lightning jumps between targets and ignores armour. Expensive.',
-    L:[ {cost:235, range:140, dmg:42, cd:1.7, chain:3, ab:'Chains to 3 targets.'},
-        {cost:285, range:152, dmg:64, cd:1.55,chain:4, ab:'Chains to 4 targets.'},
-        {cost:520, range:168, dmg:96, cd:1.4, chain:6, ab:'Chains to 6 targets.'} ] }
+  totem:{ build:6, name:'Thor\'s Totem', short:'Totem', air:true, unlock:7, color:'#b58ce0', limit:3, mastMul:1.35,
+    tip:'Lightning jumps between targets and ignores armour. Up to 3 per fjord.',
+    L:[ {cost:280, range:140, dmg:42, cd:1.7, chain:3, ab:'Chains to 3 targets.'},
+        {cost:330, range:152, dmg:64, cd:1.55,chain:4, ab:'Chains to 4 targets.'},
+        {cost:600, range:168, dmg:96, cd:1.4, chain:6, ab:'Chains to 6 targets.'} ] }
 };
 const TKEYS = Object.keys(TOWERS);
 
@@ -1030,7 +1031,7 @@ function perkPrice(k,n){                                     // каждая с�
 function loadoutCost(l){ let t=0; for(const k in l) for(let i=0;i<l[k];i++) t+=perkPrice(k,i); return t; }
 // ранг I — право строить, II — улучшать до второго уровня, III — до третьего.
 // цена привязана к силе башни
-const MAST_COST=k=>{ const b=TOWERS[k].L[0].cost; return [Math.round(b*1.0/10)*10, Math.round(b*1.7/10)*10, Math.round(b*3.0/10)*10]; };
+const MAST_COST=k=>{ const b=TOWERS[k].L[0].cost*(TOWERS[k].mastMul||1); return [Math.round(b*1.0/10)*10, Math.round(b*1.7/10)*10, Math.round(b*3.0/10)*10]; };
 const mastRank = k => (P().mast && P().mast[k]) || 0;
 
 const goldMul = () => (DIFFS[save.diff||0].gold||1);
@@ -1048,37 +1049,33 @@ const LEVELS = [
   {n:'Ice Gate',theme:'snow',  waves:10, lives:20, gold:310,
    paths:[[[-1,8],[2,8],[2,2],[7,2],[7,8],[12,8],[12,2],[17,2],[17,6],[20,6]]]},
   {n:'Two Rivers',      theme:'grass', waves:10, lives:22, gold:350, boss:1, bossType:'jarl',
-   paths:[[[-1,2],[5,2],[5,5],[20,5]],[[-1,8],[5,8],[5,5],[20,5]]]},
+   paths:[[[-1,1],[6,1],[6,3],[17,3],[17,5],[20,5]],[[-1,8],[11,8],[11,7],[17,7],[17,5],[20,5]]]},
   {n:'Black Forest',    theme:'grass', waves:10, lives:20, gold:370,
    paths:[[[1,-1],[1,8],[6,8],[6,1],[11,1],[11,8],[16,8],[16,3],[20,3]]]},
   {n:'Ash Slope',theme:'ash',  waves:11, lives:20, gold:400,
    paths:[[[-1,4],[3,4],[3,0],[8,0],[8,9],[13,9],[13,4],[20,4]]]},
   {n:'Fenrir\'s Pincers', theme:'ash',   waves:11, lives:22, gold:430, boss:2, bossType:'draugr',
-   paths:[[[-1,1],[8,1],[8,4],[20,4]],[[-1,8],[8,8],[8,4],[20,4]]]},
+   paths:[[[-1,2],[4,2],[4,0],[12,0],[12,3],[17,3],[17,4],[20,4]],[[-1,7],[4,7],[4,9],[12,9],[12,6],[17,6],[17,4],[20,4]]]},
   {n:'Barrows',       theme:'snow',  waves:12, lives:20, gold:460,
    paths:[[[10,-1],[10,2],[2,2],[2,7],[9,7],[9,4],[15,4],[15,8],[20,8]]]},
   {n:'Gates of Valhalla',theme:'ash',  waves:12, lives:25, gold:540, boss:3, bossType:'fenrir',
-   paths:[[[-1,2],[4,2],[4,7],[10,7],[10,2],[15,2],[15,6],[20,6]],[[-1,8],[10,8],[10,2],[15,2],[15,6],[20,6]]]}
+   paths:[[[-1,1],[5,1],[5,4],[10,4],[10,1],[16,1],[16,4],[20,4]],[[-1,8],[7,8],[7,6],[13,6],[13,8],[16,8],[16,4],[20,4]]]}
 ,
   // 11: спираль внутрь и выход вверх — башни в центре простреливают три витка
   {n:'Runestone Field', theme:'snow', waves:13, lives:20, gold:340,
    paths:[[[-1,0],[18,0],[18,8],[1,8],[1,3],[14,3],[14,5],[6,5],[6,-1]]]},
-  // 12: клещи — одна тропа слева, вторая сверху, сходятся на середине
+  // 12: длинная тропа слева и короткая сверху, сходятся только у ворот
   {n:'Whale Bay',       theme:'grass',waves:12, lives:22, gold:450, boss:2, bossType:'draugr',
-   paths:[[[-1,1],[7,1],[7,6],[13,6],[13,2],[20,2]],
-          [[3,-1],[3,6],[7,6],[13,6],[13,2],[20,2]]]},
+   paths:[[[-1,2],[6,2],[6,7],[16,7],[16,5],[20,5]],[[11,-1],[11,3],[16,3],[16,5],[20,5]]]},
   // 13: змейка в пять колен, длинный путь и мало места под башни
   {n:'Ember Rift',      theme:'ash',  waves:13, lives:22, gold:420,
    paths:[[[-1,9],[2,9],[2,1],[6,1],[6,8],[10,8],[10,1],[14,1],[14,8],[18,8],[18,2],[20,2]]]},
-  // 14: кольцо вокруг острова — внутренняя площадка простреливает обе стороны
+  // 14: змейка снизу и прямая сверху, сходятся у ворот
   {n:'Frozen Falls',    theme:'snow', waves:13, lives:22, gold:470,
-   paths:[[[-1,4],[4,4],[4,1],[15,1],[15,8],[4,8],[4,5],[16,5],[16,3],[20,3]],
-          [[8,-1],[8,1],[15,1],[15,8],[4,8],[4,5],[16,5],[16,3],[20,3]]]},
-  // 15: три входа сходятся в один коридор перед воротами
+   paths:[[[-1,5],[3,5],[3,8],[10,8],[10,6],[15,6],[15,4],[20,4]],[[4,-1],[4,2],[15,2],[15,4],[20,4]]]},
+  // 15: три входа идут раздельно и сливаются только в двух клетках от ворот
   {n:'Ragnarok Gate',   theme:'ash',  waves:14, lives:26, gold:570, boss:3, bossType:'fenrir',
-   paths:[[[-1,2],[6,2],[6,5],[10,5],[10,8],[17,8],[17,3],[20,3]],
-          [[10,-1],[10,5],[10,8],[17,8],[17,3],[20,3]],
-          [[-1,9],[6,9],[6,5],[10,5],[10,8],[17,8],[17,3],[20,3]]]}
+   paths:[[[-1,1],[7,1],[7,3],[16,3],[16,5],[20,5]],[[11,-1],[11,1],[18,1],[18,5],[20,5]],[[-1,8],[7,8],[7,7],[16,7],[16,5],[20,5]]]}
 ];
 const THEMES = {
   grass:{a:'#3c6647',b:'#41704c',path:'#8a6a45',pathLit:'#a3855e',edge:'#5a4228',deco:'#5f9468',rock:'#6b7683'},
@@ -1388,7 +1385,15 @@ class Tower{
       SFX.thud();
       game.shots.push(new Shot('rock',this.x,this.y,null,dmg,{tx:px,ty:py,splash:s.splash,pierce:s.pierce,stun:s.stun}));
     }
-    else if(this.key==='frost') game.shots.push(new Shot('ice',this.x,this.y,t,dmg,{slow:s.slow,slowT:s.slowT,aoe:s.aoe,freeze:s.freeze}));
+    else if(this.key==='frost'){
+      /* С уровнем руна бьёт сразу по нескольким: 1, 2, 3 цели. Берём ведущих по тропе,
+         чтобы лёд ложился на тех, кто ближе к воротам. */
+      const R=s.range, list=[];
+      for(const e of game.enemies) if(!e.dead && this.canHit(e) && dist2(e,this)<=R*R) list.push(e);
+      list.sort((a,b)=>b.dist-a.dist);
+      const n=Math.max(1,Math.min(s.tgt||1,list.length));
+      for(let i=0;i<n;i++) game.shots.push(new Shot('ice',this.x,this.y,list[i],dmg,{slow:s.slow,slowT:s.slowT,aoe:s.aoe,freeze:s.freeze}));
+    }
     else if(this.key==='ballista'){
       game.shots.push(new Shot('spear',this.x,this.y,null,dmg,
         {ang:this.ang, range:s.range, pierce:s.pierce||3, pierceAll:!!s.pierceAll}));
@@ -1520,6 +1525,7 @@ const HINTS={
   disabled:'That tower was sabotaged and is dark for a moment. It cannot fire.',
   wrecked:'A Wrecker smashed that tower. It stays dark far longer than a shaman\'s sabotage — kill Wreckers before they reach your line.',
   rune:'The rune of return is capped: three per fjord, and two runes cannot stand within four tiles of each other. Red cells are blocked by that rule.',
+  rock:'The best spots are blocked by rocks and trees. Buy a pickaxe for 300 gold to clear one. It takes 12 seconds, then you can build there.',
   building:'Towers take a few seconds to raise — a catapult needs five. Build before a wave lands, not while it runs.',
   freeze:'Fire melts frost and frost puts out fire. Do not stack a frost rune next to a fire altar.'
 };
@@ -1558,6 +1564,7 @@ function startLevel(idx, sandbox, endless){
       while(c!==c2||r!==r2){ c+=dc; r+=dr; game.blocked.add(c+','+r); }
     }
   }
+  game.pathCells=new Set(game.blocked);
   // деревья и валуны: занимают клетку, строить на них нельзя
   game.decor=[];
   const dr=mkRng((idx+1)*4231); let tries=0;
@@ -1573,7 +1580,9 @@ function startLevel(idx, sandbox, endless){
     game.decor.push({c,r,kind, v:1+Math.floor(dr()*(kind==='tree'?3:2)), s:0.85+dr()*0.35});
     game.blocked.add(c+','+r);
   }
+  if(!sandbox) placeObstacles(idx);
   game.decor.sort((a,b)=>a.r-b.r);
+  game.selRock=null;
   game.alarm={on:false, beat:0, lit:0}; game.massBase=0;
   game.bgImg=null; game.roadImg=null; loadLevelBg(idx);
   preloadLevelBg(Math.min(idx+1, LEVELS.length-1));
@@ -1589,6 +1598,55 @@ function startLevel(idx, sandbox, endless){
   game.rotAsk = VERT && TOUCH;               // вертикально не играем вовсе
   if(save.sound) startWind();
   screen(null);
+}
+/* Препятствия на лучших клетках. Самые выгодные места под башню (рядом с изгибами,
+   где тропа простреливается с двух сторон) закрыты камнем или деревом. Их можно
+   расчистить киркой за золото, и это занимает время. Так у сильной позиции есть цена. */
+const CLEAR_COST=300, CLEAR_T=12;
+function cellScore(c,r){
+  const R=2.6; let n=0;
+  for(const k of game.pathCells){
+    const i=k.indexOf(','), pc=+k.slice(0,i), pr=+k.slice(i+1);
+    if(pc<0||pr<0||pc>=COLS||pr>=ROWS) continue;
+    if(Math.hypot(pc-c,pr-r)<=R) n++;
+  }
+  return n;
+}
+function placeObstacles(idx){
+  const cand=[];
+  for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++){
+    if(game.blocked.has(c+','+r)) continue;
+    cand.push({c,r,sc:cellScore(c,r)+hash(c,r)*0.01});   // хэш только разводит равные
+  }
+  cand.sort((a,b)=>b.sc-a.sc);
+  const want = idx<2 ? 2 : 3, picked=[];
+  for(const p of cand){
+    if(picked.length>=want) break;
+    if(picked.some(q=>Math.max(Math.abs(q.c-p.c),Math.abs(q.r-p.r))<3)) continue;   // не кучей в одном углу
+    picked.push(p);
+  }
+  const th=game.L.theme;
+  picked.forEach((p,i)=>{
+    const kind = th==='grass' ? (i%2?'rock':'tree') : (i%2?'tree':'rock');
+    const v = kind==='tree' ? 1+(i%3) : (th==='snow' ? (i%2?3:1) : 1+(i%3));
+    game.decor.push({c:p.c, r:p.r, kind, v, s:1, clear:true, cut:0});
+    game.blocked.add(p.c+','+p.r);
+  });
+}
+function updateObstacles(dt){
+  for(const d of game.decor){
+    if(!d.clear || d.cut<=0) continue;
+    d.cut-=dt; d.chip=(d.chip||0)-dt;
+    if(d.chip<=0){ d.chip=0.85; SFX.chop && SFX.chop();
+      for(let i=0;i<3;i++) particle(tx(d.c),ty(d.r)-4, d.kind==='tree'?'#8a6a45':'#9aa3a8'); }
+    if(d.cut<=0){
+      d.gone=true; game.blocked.delete(d.c+','+d.r);
+      for(let i=0;i<12;i++) particle(tx(d.c),ty(d.r), d.kind==='tree'?'#7a5a3a':'#a9b2b8');
+      SFX.up(); buzz(30); floatText(tx(d.c),ty(d.r)-14,'cleared','#cfe9d2');
+      if(game.selRock===d) game.selRock=null;
+    }
+  }
+  if(game.decor.some(d=>d.gone)) game.decor=game.decor.filter(d=>!d.gone);
 }
 function towerCost(key){ return Math.round(TOWERS[key].L[0].cost*(1-perkVal('cost')/100)); }
 /* Руна возврата слишком сильна, если её ставить пачкой: ограничиваем и число на уровень,
@@ -1694,6 +1752,7 @@ function update(dt){
   }
 
   for(const t of g.towers){ t.update(dt); if(t.fireAnim>0&&t.key!=='flame') t.fireAnim-=dt; }
+  updateObstacles(dt);
   for(const e of g.enemies) e.update(dt);
   for(const s of g.shots) s.update(dt);
   for(const p of g.parts){ p.life-=dt; p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=180*dt; }
@@ -1748,7 +1807,7 @@ function draw(){
     ctx.beginPath(); ctx.rect(0,PORT_BOARD_Y,CW,PORT_BOARD_H); ctx.clip();
     ctx.translate(BV.x, BV.y-BY*BV.s); ctx.scale(BV.s,BV.s);
   }
-  drawBoard(); drawPath(); drawRange(); drawDecor(); drawBeacons(); drawTowers(); drawEnemies(); drawShots(); drawFx();
+  drawBoard(); drawPath(); drawRange(); drawDecor(); drawBeacons(); drawTowers(); drawEnemies(); drawShots(); drawObstacleTop(); drawEntrances(); drawFx();
   ctx.restore();
   ctx.restore();
   drawHud();
@@ -2022,10 +2081,66 @@ function drawGates(){
   }
 }
 
+/* На картах с несколькими входами перед волной видно, сколько врагов пойдёт с каждой
+   стороны. Игрок решает, какой вход укреплять сильнее. */
+function drawEntrances(){
+  const g=game;
+  if(!g || g.paths.length<2 || g.waveState!=='idle' || g.sandbox) return;
+  const wv=g.waves[g.wave]; if(!wv) return;
+  const cnt=g.paths.map(()=>0);
+  for(const gr of wv.groups) cnt[gr.path||0]+=gr.count;
+  const mx=Math.max(...cnt);
+  g.paths.forEach((p,i)=>{
+    let [c,r]=p[0]; const [c2,r2]=p[1]; const dc=Math.sign(c2-c), dr=Math.sign(r2-r);
+    while(c<0||r<0||c>=COLS||r>=ROWS){ c+=dc; r+=dr; }
+    const x=tx(c)+dc*4, y=ty(r)+dr*4;
+    const n=cnt[i], hot=n===mx && n>0, pulse=hot?0.75+Math.sin(g.time*5)*0.25:1;
+    const label=n? n+' ⚔' : '—', w=n>9?50:42;
+    ctx.save(); ctx.globalAlpha=pulse;
+    ctx.fillStyle=hot?'rgba(150,40,30,.92)':'rgba(10,20,27,.85)'; rr(x-w/2,y-13,w,26,8); ctx.fill();
+    ctx.strokeStyle=hot?'#f0a070':'#5d7686'; ctx.lineWidth=1.6; rr(x-w/2,y-13,w,26,8); ctx.stroke();
+    ctx.restore();
+    txt(label,x,y+1,14,hot?'#ffe0c8':'#cfe0ea','center',true);
+  });
+}
+function drawPickaxe(x,y,s,col){
+  ctx.save(); ctx.translate(x,y); ctx.scale(s,s); ctx.rotate(-0.6);
+  ctx.lineCap='round';
+  ctx.strokeStyle='#6b4a2c'; ctx.lineWidth=2.6; ctx.beginPath(); ctx.moveTo(0,7); ctx.lineTo(0,-6); ctx.stroke();
+  ctx.strokeStyle=col||'#dfe6ea'; ctx.lineWidth=2.6;
+  ctx.beginPath(); ctx.moveTo(-7,-3); ctx.quadraticCurveTo(0,-9,7,-3); ctx.stroke();
+  ctx.restore();
+}
+/* Подсветка расчищаемой клетки: пунктирная рамка под объектом. Сам значок и полосу
+   рисуем поверх, в drawObstacleTop, чтобы их не перекрывало дерево. */
+function drawObstacleMark(d){
+  const x=d.c*TS, y=BY+d.r*TS;
+  ctx.save(); ctx.setLineDash([5,4]); ctx.lineWidth=1.6;
+  ctx.strokeStyle= game.selRock===d ? 'rgba(240,200,110,.95)' : 'rgba(240,215,150,.6)';
+  rr(x+3,y+3,TS-6,TS-6,6); ctx.stroke(); ctx.restore();
+}
+function drawObstacleTop(){
+  for(const d of game.decor){
+    if(!d.clear) continue;
+    const x=tx(d.c), y=ty(d.r);
+    if(d.cut>0){
+      const k=1-d.cut/CLEAR_T, w=TS-10;
+      ctx.fillStyle='rgba(8,16,22,.8)'; rr(x-w/2,y+TS/2-11,w,7,3); ctx.fill();
+      ctx.fillStyle='#e7b74e'; rr(x-w/2,y+TS/2-11,w*k,7,3); ctx.fill();
+      txt(Math.ceil(d.cut)+'s',x,y-TS/2+2,12,'#f3e2b0','center',true);
+    } else {
+      const bx=x+TS/2-9, by=y-TS/2+9;
+      ctx.fillStyle='rgba(10,20,27,.82)'; ctx.beginPath(); ctx.arc(bx,by,9,0,7); ctx.fill();
+      ctx.strokeStyle='#e7b74e'; ctx.lineWidth=1.4; ctx.stroke();
+      drawPickaxe(bx,by+1,0.85,'#e9f0f4');
+    }
+  }
+}
 function drawDecor(){
   const th=game.theme;
   for(const d of game.decor){
-    const x=tx(d.c), y=ty(d.r)+10, sc=d.s;
+    const x=tx(d.c)+(d.cut>0? Math.sin(performance.now()/40)*1.6 : 0), y=ty(d.r)+10, sc=d.s;
+    if(d.clear) drawObstacleMark(d);
     ctx.save(); ctx.translate(x,y); ctx.scale(sc,sc);
     shadow(2,2,16,6);
     if(sprite('deco_'+game.L.theme+'_'+d.kind+'_'+d.v, 0, 10, d.kind==='tree'?64:38, TS*1.3)){ ctx.restore(); continue; }
@@ -2610,8 +2725,72 @@ function drawFx(){
     ctx.strokeText(t.txt,t.x,t.y); txt(t.txt,t.x,t.y,15,t.col,'center',true); ctx.globalAlpha=1; }
 }
 
+/* Характеристики выбранной башни: сейчас и после улучшения. Зелёным — то, что
+   станет лучше; серым — если следующий уровень ещё не открыт в мастерской. */
+function towerStats(t){
+  const L=TOWERS[t.key].L, a=L[t.lvl], b=L[t.lvl+1]||null, m=t.dmgMul;
+  const dps=x=> x.dps? x.dps*m : (x.dmg&&x.cd? x.dmg*m/x.cd*(x.twin?2:1) : 0);
+  const out=[];
+  const add=(l,va,vb,f)=>{ if(va===undefined||va===null) return; out.push({l, a:f(va), b:(vb===undefined||vb===null||f(vb)===f(va))?null:f(vb)}); };
+  const r0=v=>String(Math.round(v));
+  if(dps(a)) add(t.key==='flame'?'Burn':'Damage', dps(a), b&&dps(b), v=>Math.round(v)+'/s');
+  else if(a.dmg) add('Damage', a.dmg*m, b&&b.dmg*m, r0);
+  add('Range', a.range, b&&b.range, r0);
+  if(a.slow!==undefined) add('Slow', a.slow, b&&b.slow, v=>Math.round(v*100)+'%');
+  if(a.tgt) add('Targets', a.tgt, b&&b.tgt, r0);
+  if(a.max) add('Targets', a.max, b&&b.max, r0);
+  if(a.chain) add('Chain', a.chain, b&&b.chain, r0);
+  if(a.pierce && t.key==='ballista') add('Pierce', a.pierce, b&&b.pierce, r0);
+  if(a.splash) add('Splash', a.splash, b&&b.splash, r0);
+  if(a.maxT) add('Targets', a.maxT, b&&b.maxT, r0);
+  if(a.push) add('Push', a.push, b&&b.push, r0);
+  if(a.cd && !a.dps && out.length<4) add('Reload', a.cd, b&&b.cd, v=>v.toFixed(2)+'s');
+  return out.slice(0,4);
+}
+function drawTowerStats(t,px,pyy,pw,ph){
+  const st=towerStats(t), next=t.lvl<2, open=t.canUp();
+  const big=PORTRAIT, fsH=big?18:(STRIP?14.5:15), fsL=big?12.5:11, fsV=big?17:14;
+  txt(t.def.name,px+12,pyy+15,fsH,'#e9f0f4','left',true);
+  txt(next? 'Lv '+(t.lvl+1)+' → '+(t.lvl+2) : 'Lv 3 · max', px+pw-12, pyy+15, big?14:12, next?(open?'#9fd8a8':'#7d94a3'):'#e7b74e','right',true);
+  if(t.bt>0) txt('building '+Math.ceil(t.bt)+'s', px+pw-12, pyy+15+(big?17:14), big?12:10.5, '#e0a07c','right');
+  const top=pyy+(big?32:28), rowsN=Math.ceil(st.length/2), cellH=Math.min(big?44:32,(ph-(top-pyy)-4)/Math.max(1,rowsN));
+  const cw=(pw-24)/2;
+  ctx.save(); ctx.textBaseline='middle';
+  st.forEach((s,i)=>{
+    const cx=px+12+(i%2)*cw, cy=top+Math.floor(i/2)*cellH;
+    txt(s.l,cx,cy+fsL*0.6,fsL,'#7d94a3','left');
+    const vy=cy+fsL+fsV*0.62;
+    ctx.font='bold '+fsV+'px '+F;
+    txt(s.a,cx,vy,fsV,'#e9f0f4','left',true);
+    if(s.b){
+      const wa=(ctx.measureText(s.a)||{}).width||s.a.length*fsV*0.6;
+      const col=open?'#7fe08f':'#7d94a3';
+      txt('→ '+s.b,cx+wa+6,vy,fsV,col,'left',true);
+    }
+  });
+  ctx.restore();
+}
 function towerUnlocked(k){ return game.sandbox || mastRank(k)>=1; }
 /* Панель действий прямо над выбранной башней — чтобы не тянуться в нижний угол. */
+function drawRockPopup(d){
+  const bw=PORTRAIT?300:214, bh=PORTRAIT?46:34;
+  const c=b2c(tx(d.c),ty(d.r));
+  let x=clamp(c.x-bw/2, 8, CW-bw-8);
+  let y=c.y-(PORTRAIT?70:64);
+  const topLim=(PORTRAIT?PORT_BOARD_Y:BY)+6;
+  if(y<topLim) y=c.y+(PORTRAIT?20:26);
+  ctx.fillStyle='rgba(10,20,27,.88)'; rr(x-7,y-7,bw+14,bh+14,9); ctx.fill();
+  ctx.strokeStyle='#3d5f72'; ctx.lineWidth=1.5; rr(x-7,y-7,bw+14,bh+14,9); ctx.stroke();
+  const fs=PORTRAIT?15:13;
+  if(d.cut>0) btn('clear',x,y,bw,bh,'Clearing… '+Math.ceil(d.cut)+'s',{fs,c1:'#4a5566',c2:'#333e4c',on:false});
+  else{
+    btn('clear',x,y,bw,bh,'',{fs,c1:'#f0c766',c2:'#cf9a2f',on:game.gold>=CLEAR_COST});
+    ctx.save(); if(game.gold<CLEAR_COST) ctx.globalAlpha=0.42;
+    drawPickaxe(x+20,y+bh/2+1,PORTRAIT?1.25:1,'#241708');
+    txt('Pickaxe '+CLEAR_COST+' gold · '+CLEAR_T+'s',x+bw/2+10,y+bh/2+1,fs,'#241708','center',true);
+    ctx.restore();
+  }
+}
 function drawTowerPopup(t){
   const bw=PORTRAIT?150:104, bh=PORTRAIT?46:34, gap=6, tot=bw*2+gap;
   const c=b2c(t.x,t.y);
@@ -2622,6 +2801,7 @@ function drawTowerPopup(t){
   ctx.fillStyle='rgba(10,20,27,.88)'; rr(x-7,y-7,tot+14,bh+14,9); ctx.fill();
   ctx.strokeStyle='#3d5f72'; ctx.lineWidth=1.5; rr(x-7,y-7,tot+14,bh+14,9); ctx.stroke();
   if(t.lvl>=2)        btn('up',x,y,bw,bh,'Max level',{fs:PORTRAIT?15:13,on:false});
+  else if(t.bt>0)     btn('up',x,y,bw,bh,'Building '+Math.ceil(t.bt)+'s',{fs:PORTRAIT?15:13,c1:'#4a5566',c2:'#333e4c',on:false});
   else if(!t.canUp()) btn('up',x,y,bw,bh,'Workshop rank '+['I','II','III'][t.lvl+1],{fs:PORTRAIT?14:12,c1:'#4a5566',c2:'#333e4c',on:false});
   else                btn('up',x,y,bw,bh,'Upgrade '+t.upCost(),{fs:PORTRAIT?15:13,c1:'#f0c766',c2:'#cf9a2f',tc:'#241708',on:game.gold>=t.upCost()});
   btn('sell',x+bw+gap,y,bw,bh,(t.cancelable()? (t.upPaid?'Cancel +':'Cancel +') : 'Sell +')+t.sellValue(),{fs:PORTRAIT?15:13,c1:'#6a4750',c2:'#4a2f36'});
@@ -2743,12 +2923,7 @@ function drawHud(){
       ctx.fillStyle='#162833'; rr(px,pyy,pw,ph,8); ctx.fill();
       ctx.strokeStyle='#2f4a5a'; ctx.lineWidth=2; rr(px,pyy,pw,ph,8); ctx.stroke();
     }
-    const lh=STRIP?20:(PORTRAIT?24:20), fs2=STRIP?14:(PORTRAIT?19:(BIG?17:15));
-    txt(t.def.name,px+14,pyy+22,fs2,'#e9f0f4','left',true);
-    txt('level '+(t.lvl+1),px+14,pyy+22+lh,STRIP?12.5:(PORTRAIT?14:12),'#8ea6b5','left');
-    if(!STRIP) txt(s2.ab||'',px+14,pyy+22+lh*2,PORTRAIT?14:(BIG?13:12),'#8ea6b5');
-    txt('range '+s2.range+(s2.dps?('  ·  '+Math.round(s2.dps*t.dmgMul)+' dps'):(s2.dmg?('  ·  '+Math.round(s2.dmg*t.dmgMul)+' dmg'):'')),
-        px+14,pyy+22+lh*(STRIP?2:3),STRIP?12.5:(PORTRAIT?14:12),'#6f8a9a');
+    drawTowerStats(t,px,pyy,pw,ph);
   } else if(g.sandbox){
     txt('Sandbox: spawn enemies',px+12,pyy+18,13,'#cfe0ea','left',true);
     const list=['raider','scout','shield','raven','shaman','berserk','jarl','draugr','fenrir'];
@@ -2847,6 +3022,7 @@ function drawHud(){
     ctx.restore();
   }
   if(g.selTower) drawTowerPopup(g.selTower);
+  else if(g.selRock) drawRockPopup(g.selRock);
   if(g.sel && !g.selTower && !STRIP){
     const tip = towerUnlocked(g.sel) ? TOWERS[g.sel].tip : 'Locked. Buy rank I for this weapon in the Workshop.';
     ctx.fillStyle='rgba(14,28,37,.92)'; rr(6,PY-40,540,32,6); ctx.fill();
@@ -3034,7 +3210,10 @@ function handleTap(p){
   const c=Math.floor(bp.x/TS), r=Math.floor((bp.y-BY)/TS);
   if(c<0||r<0||c>=COLS||r>=ROWS) return;
   const t=g.towers.find(t=>t.c===c&&t.r===r);
-  if(t){ g.selTower=t; g.sel=null; buzz(10); return; }
+  if(t){ g.selTower=t; g.sel=null; g.selRock=null; buzz(10); return; }
+  const ob=g.decor.find(d=>d.clear && d.c===c && d.r===r);
+  if(ob){ g.selRock = g.selRock===ob ? null : ob; g.selTower=null; buzz(10); hint('rock'); return; }
+  g.selRock=null;
   g.selTower=null;
   if(g.sel){
     if(!towerUnlocked(g.sel)){ SFX.no(); return; }
@@ -3112,7 +3291,7 @@ cv.addEventListener('contextmenu',e=>e.preventDefault());
 window.addEventListener('keydown',e=>{
   if(!game||!game.running) return;
   if(e.code==='Space'){ e.preventDefault(); onButton('pause'); }
-  if(e.code==='Escape'){ game.sel=null; game.selTower=null; }
+  if(e.code==='Escape'){ game.sel=null; game.selTower=null; game.selRock=null; }
   const n=parseInt(e.key,10); if(n>=1&&n<=TKEYS.length) game.sel=TKEYS[n-1], game.selTower=null;
 });
 
@@ -3145,8 +3324,12 @@ async function onButton(id){
   if(id==='exit'){ stopWind(); game=null; screen('scLevels'); renderLevels(); return; }
   if(id==='early'){ startWave(true); return; }
   // апгрейд и продажа — тоже действия на поле, на паузе они недоступны
-  if((id==='up'||id==='sell') && (g.paused||platformPaused||adPaused)){ SFX.no(); return; }
+  if((id==='up'||id==='sell'||id==='clear') && (g.paused||platformPaused||adPaused)){ SFX.no(); return; }
+  if(id==='clear'){ const d=g.selRock; if(!d || d.cut>0) return;
+    if(g.gold<CLEAR_COST){ SFX.no(); floatText(tx(d.c),ty(d.r)-10,'not enough gold','#d6584f'); return; }
+    g.gold-=CLEAR_COST; d.cut=CLEAR_T; d.chip=0; SFX.build(); buzz(20); g.selRock=null; return; }
   if(id==='up'){ const t=g.selTower, c=t.upCost();
+    if(t.bt>0){ SFX.no(); buzz([18,40,18]); floatText(t.x,t.y-30,'still building','#e0a0a0'); return; }
     if(g.gold>=c && t.canUp()){ g.gold-=c; t.spent+=c; t.lvl++; SFX.build();
       t.btMax=(TOWERS[t.key].build||3)*0.6; t.bt=t.btMax; t.upPaid=c;
       for(let i=0;i<8;i++) particle(t.x,t.y,'#e7b74e'); } return; }
@@ -3173,7 +3356,7 @@ async function onButton(id){
   if(id.startsWith('t_')){ const k=id.slice(2);
     if(!towerUnlocked(k)){ SFX.no(); g.sel=k; g.selTower=null;
       floatText(480,BY+40,TOWERS[k].name+' — buy rank I in the Workshop','#8ea6b5'); return; }
-    g.sel = g.sel===k? null : k; g.selTower=null; if(TOUCH){ g.hoverC=-1; g.hoverR=-1; } return; }
+    g.sel = g.sel===k? null : k; g.selTower=null; g.selRock=null; if(TOUCH){ g.hoverC=-1; g.hoverR=-1; } return; }
 }
 
 /* ---------- 10. ЭКРАНЫ -------------------------------------------------- */
@@ -3429,6 +3612,7 @@ function gainHtml(k, r){
   if(d0 && d1) rows.push('Damage <b>'+fmt(d0)+'</b> → <b>'+fmt(d1)+'/s</b> <span class="up">+'+Math.round((d1/d0-1)*100)+'%</span>');
   if(a.cd && b.cd && fmt(1/a.cd)!==fmt(1/b.cd)) rows.push('Fire rate <b>'+fmt(1/a.cd)+'</b> → <b>'+fmt(1/b.cd)+'/s</b>');   // одинаковые после округления не показываем
   if(a.range!==b.range) rows.push('Range <b>'+a.range+'</b> → <b>'+b.range+'</b>');
+  if(a.tgt && b.tgt!==a.tgt) rows.push('Targets <b>'+a.tgt+'</b> → <b>'+b.tgt+'</b>');
   if(a.slow!==undefined && b.slow!==a.slow) rows.push('Slow <b>'+Math.round(a.slow*100)+'%</b> → <b>'+Math.round(b.slow*100)+'%</b>');
   return '<div class="gain">'+rows.join('<br>')+(b.ab? '<span class="new">'+b.ab+'</span>' : '')+'</div>';
 }

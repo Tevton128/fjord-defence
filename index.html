@@ -301,7 +301,7 @@
       <button class="btn sec" id="bHelp">How to play</button>
     </div>
     <div class="bar"><div class="silver"><img src="assets/icons/icon_silver.png" alt=""><b id="silv1">0</b></div></div>
-    <div class="build">build 02.10 · 2</div>
+    <div class="build">build 02.10 · 4</div>
   </div>
 
   <!-- ВЫБОР УРОВНЯ -->
@@ -1590,7 +1590,7 @@ const HINTS={
   disabled:'That tower was sabotaged and is dark for a moment. It cannot fire.',
   wrecked:'A Wrecker smashed that tower. It stays dark far longer than a shaman\'s sabotage — kill Wreckers before they reach your line.',
   rune:'The rune of return is capped: three per fjord, and two runes cannot stand within four tiles of each other. Red cells are blocked by that rule.',
-  rain:'Fire rain: 50 gold. Pick a spot on the road; arrows land 2 seconds later and burn everything in the circle. Best for finishing off wounded raiders near the gates.',
+  rain:'Fire rain: 65 gold, once a minute. Pick a spot on the road; arrows land 3.5 seconds later and burn everything in the circle. Best for finishing off wounded raiders near the gates.',
   rock:'The best spots are blocked by rocks and trees. Buy a pickaxe for 300 gold to clear one. It takes 12 seconds, then you can build there.',
   building:'Towers take a few seconds to raise — a catapult needs five. Build before a wave lands, not while it runs.',
   freeze:'Fire melts frost and frost puts out fire. Do not stack a frost rune next to a fire altar.'
@@ -1674,7 +1674,7 @@ const CLEAR_COST=300, CLEAR_T=12;
    у ворот, а не заменить башни: урон растёт вместе со здоровьем врагов волны, но
    целого крепкого врага не убивает. Короткая перезарядка не даёт засыпать дорогу
    дождём, когда золота много. */
-const RAIN_COST=50, RAIN_DELAY=2, RAIN_R=70, RAIN_CD=6, RAIN_DMG=55, RAIN_BURN=10;
+const RAIN_COST=65, RAIN_DELAY=3.5, RAIN_R=70, RAIN_CD=60, RAIN_DMG=33, RAIN_BURN=6;
 function rainHpMul(){
   const g=game, w=g.waves[Math.min(g.wave,g.waves.length-1)];
   return (w && w.groups[0] && w.groups[0].hpMul) || 1;
@@ -1694,10 +1694,10 @@ const FXR={ img:null, ok:false, F:{"scorch": [0, 0, 380, 384], "flame_t": [382, 
   load(){ if(typeof Image==='undefined') return; const im=new Image();
     im.onload=()=>{ this.ok=true; }; im.src='assets/fx/fx_rain.webp'; this.img=im; },
   /* name — кадр, (x,y) — точка опоры, h — высота на поле, (ax,ay) — опора в долях кадра */
-  draw(name,x,y,h,ax,ay,rot,alpha,sx){
+  draw(name,x,y,h,ax,ay,rot,alpha,sx,flip){
     const f=this.F[name]; if(!this.ok||!f) return false;
     const sc=h/f[3], w=f[2]*sc*(sx||1);
-    ctx.save(); ctx.translate(x,y); if(rot) ctx.rotate(rot);
+    ctx.save(); ctx.translate(x,y); if(rot) ctx.rotate(rot); if(flip) ctx.scale(-1,1);
     if(alpha!==undefined) ctx.globalAlpha*=clamp(alpha,0,1);
     ctx.drawImage(this.img,f[0],f[1],f[2],f[3],-w*ax,-h*ay,w,h);
     ctx.restore(); return true;
@@ -1715,10 +1715,12 @@ function makeVolley(st){
                     landed:false, tilt:(Math.random()-.5)*0.5, sz:0.85+Math.random()*0.3});
   }
   const kinds=['flame_w','flame_t','flame_t2'];
-  for(let i=0;i<6;i++){
-    const a=i*2.39996+1.1, r=RAIN_R*0.74*Math.sqrt((i+0.6)/6);
-    st.flames.push({x:st.x+Math.cos(a)*r, y:st.y+Math.sin(a)*r*0.85, k:kinds[i%3],
-                    h:(i%3===0?22:30)+Math.random()*9, ph:Math.random()*9, end:RAIN_GROUND*(0.55+Math.random()*0.45)});
+  const NF=16;
+  for(let i=0;i<NF;i++){
+    const a=i*2.39996+1.1, r=RAIN_R*0.8*Math.sqrt((i+0.5)/NF);
+    const k=kinds[1+(i%2)];                         // узкие языки — у широкого другой силуэт
+    st.flames.push({x:st.x+Math.cos(a)*r+(Math.random()-.5)*6, y:st.y+Math.sin(a)*r*0.85+(Math.random()-.5)*6, k,
+                    h:16+Math.random()*3, ph:Math.random()*9, end:RAIN_GROUND*(0.6+Math.random()*0.4)});
   }
 }
 function updateRain(dt){
@@ -1788,7 +1790,7 @@ function drawRain(){
     const ga = !st.hit ? 1 : clamp((RAIN_GROUND+1.2-st.age)/1.2,0,1);
     for(const ar of st.arrows){
       if(!ar.landed) continue;
-      if(!FXR.draw('stuck',ar.x,ar.y,30*ar.sz,0.30,0.93,ar.tilt,ga)){
+      if(!FXR.draw('stuck',ar.x,ar.y,30*ar.sz,0.30,0.93,ar.tilt,ga,1,true)){
         ctx.save(); ctx.globalAlpha=ga; ctx.strokeStyle='#6b4a2c'; ctx.lineWidth=2;
         ctx.beginPath(); ctx.moveTo(ar.x,ar.y); ctx.lineTo(ar.x+6,ar.y-16); ctx.stroke(); ctx.restore();
       }
@@ -1820,9 +1822,9 @@ function drawRain(){
     for(const f of st.flames){
       const life=st.age, grow=clamp(life/0.3,0,1), die=clamp((f.end-life)/0.9,0,1), a=Math.min(grow,die);
       if(a<=0) continue;
-      const glow=ctx.createRadialGradient(f.x,f.y-4,2,f.x,f.y-4,f.h*0.9);
+      const glow=ctx.createRadialGradient(f.x,f.y-4,2,f.x,f.y-4,f.h*1.1);
       glow.addColorStop(0,'rgba(255,150,60,'+(0.22*a)+')'); glow.addColorStop(1,'rgba(255,80,20,0)');
-      ctx.fillStyle=glow; ctx.beginPath(); ctx.arc(f.x,f.y-4,f.h*0.9,0,7); ctx.fill();
+      ctx.fillStyle=glow; ctx.beginPath(); ctx.arc(f.x,f.y-4,f.h*1.1,0,7); ctx.fill();
     }
     ctx.restore();
     for(const f of st.flames){

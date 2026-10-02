@@ -301,7 +301,7 @@
       <button class="btn sec" id="bHelp">How to play</button>
     </div>
     <div class="bar"><div class="silver"><img src="assets/icons/icon_silver.png" alt=""><b id="silv1">0</b></div></div>
-    <div class="build">build 01.10 · 5</div>
+    <div class="build">build 02.10 · 2</div>
   </div>
 
   <!-- ВЫБОР УРОВНЯ -->
@@ -973,6 +973,10 @@ const SFX={
   },
   bow(){ if(sfxBudget-- <0) return; noise(0.09,2600,700,1.6,0.05); tone(300,140,0.07,'triangle',0.03); },
   spear(){ if(sfxBudget-- <0) return; noise(0.14,1400,320,1.2,0.07); tone(160,70,0.12,'sawtooth',0.04); },
+  rainCall(){ if(sfxBudget-- <0) return; tone(180,420,0.35,'sawtooth',0.035); noise(0.5,900,2600,1.2,0.04,'bandpass'); },
+  rainHit(){ if(sfxBudget-- <0) return;
+    for(let i=0;i<7;i++) noise(0.05,3200,1200,1,0.05,'bandpass',i*0.035);
+    noise(0.6,700,180,0.7,0.09,'lowpass',0.12); tone(90,40,0.3,'sine',0.08,0.1); },
   chop(){ if(sfxBudget-- <0) return; tone(520,300,0.07,'triangle',0.06); noise(0.06,2400,900,0.9,0.05); },
   thud(){ if(sfxBudget-- <0) return; tone(120,45,0.22,'sine',0.11); noise(0.13,600,140,0.8,0.05); },
   boom(){ if(sfxBudget-- <0) return; noise(0.42,900,90,0.7,0.12,'lowpass'); tone(80,35,0.34,'sine',0.09); },
@@ -1586,6 +1590,7 @@ const HINTS={
   disabled:'That tower was sabotaged and is dark for a moment. It cannot fire.',
   wrecked:'A Wrecker smashed that tower. It stays dark far longer than a shaman\'s sabotage — kill Wreckers before they reach your line.',
   rune:'The rune of return is capped: three per fjord, and two runes cannot stand within four tiles of each other. Red cells are blocked by that rule.',
+  rain:'Fire rain: 50 gold. Pick a spot on the road; arrows land 2 seconds later and burn everything in the circle. Best for finishing off wounded raiders near the gates.',
   rock:'The best spots are blocked by rocks and trees. Buy a pickaxe for 300 gold to clear one. It takes 12 seconds, then you can build there.',
   building:'Towers take a few seconds to raise — a catapult needs five. Build before a wave lands, not while it runs.',
   freeze:'Fire melts frost and frost puts out fire. Do not stack a frost rune next to a fire altar.'
@@ -1614,7 +1619,8 @@ function startLevel(idx, sandbox, endless){
     waves: buildWaves(idx), wave:0, waveState:'idle', waveTimer:6,
     spawnQ:[], killed:0, running:true, paused:false, speed:1,
     sel:null, selTower:null, hoverC:-1, hoverR:-1,
-    adGold:true, adRevive:true, shake:0, time:0, over:null, sandbox:!!sandbox, endless:!!endless
+    adGold:true, adRevive:true, shake:0, time:0, over:null, sandbox:!!sandbox, endless:!!endless,
+    strikes:[], rainCd:0, rainArmed:false, mx:0, my:0, mOn:false
   };
   for(const p of L.paths){
     for(let i=0;i<p.length-1;i++){
@@ -1664,6 +1670,231 @@ function startLevel(idx, sandbox, endless){
    где тропа простреливается с двух сторон) закрыты камнем или деревом. Их можно
    расчистить киркой за золото, и это занимает время. Так у сильной позиции есть цена. */
 const CLEAR_COST=300, CLEAR_T=12;
+/* Огненный дождь: разовый удар по области за золото. Нужен, чтобы добить подранков
+   у ворот, а не заменить башни: урон растёт вместе со здоровьем врагов волны, но
+   целого крепкого врага не убивает. Короткая перезарядка не даёт засыпать дорогу
+   дождём, когда золота много. */
+const RAIN_COST=50, RAIN_DELAY=2, RAIN_R=70, RAIN_CD=6, RAIN_DMG=55, RAIN_BURN=10;
+function rainHpMul(){
+  const g=game, w=g.waves[Math.min(g.wave,g.waves.length-1)];
+  return (w && w.groups[0] && w.groups[0].hpMul) || 1;
+}
+function castRain(x,y){
+  const g=game;
+  if(g.rainCd>0){ SFX.no(); floatText(x,y-10,'reloading '+Math.ceil(g.rainCd)+'s','#e0a0a0'); return false; }
+  if(g.gold<RAIN_COST){ SFX.no(); buzz([18,40,18]); floatText(x,y-10,'not enough gold','#d6584f'); return false; }
+  g.gold-=RAIN_COST; g.rainCd=RAIN_CD;
+  g.strikes.push({x,y,t:RAIN_DELAY,dmg:RAIN_DMG*rainHpMul(),hit:false,fade:0});
+  SFX.rainCall(); buzz(15);
+  return true;
+}
+/* Графика дождя: отдельный атлас assets/fx/fx_rain.webp. Пока он не загрузился
+   (или его нет), рисуем прежние векторные стрелы — игра от картинки не зависит. */
+const FXR={ img:null, ok:false, F:{"scorch": [0, 0, 380, 384], "flame_t": [382, 0, 101, 256], "flame_t2": [485, 0, 142, 256], "icon": [629, 0, 256, 252], "flame_w": [0, 386, 256, 201], "stuck": [258, 386, 135, 200], "arrow": [395, 386, 300, 65], "ember": [697, 386, 64, 64]},
+  load(){ if(typeof Image==='undefined') return; const im=new Image();
+    im.onload=()=>{ this.ok=true; }; im.src='assets/fx/fx_rain.webp'; this.img=im; },
+  /* name — кадр, (x,y) — точка опоры, h — высота на поле, (ax,ay) — опора в долях кадра */
+  draw(name,x,y,h,ax,ay,rot,alpha,sx){
+    const f=this.F[name]; if(!this.ok||!f) return false;
+    const sc=h/f[3], w=f[2]*sc*(sx||1);
+    ctx.save(); ctx.translate(x,y); if(rot) ctx.rotate(rot);
+    if(alpha!==undefined) ctx.globalAlpha*=clamp(alpha,0,1);
+    ctx.drawImage(this.img,f[0],f[1],f[2],f[3],-w*ax,-h*ay,w,h);
+    ctx.restore(); return true;
+  }
+};
+FXR.load();
+const RAIN_GROUND=4.2;                 // сколько горит земля после залпа
+function makeVolley(st){
+  /* 16 стрел: точки падения равномерно по кругу, время падения вразнобой за ~0.4с
+     до удара, чтобы залп звучал и выглядел как дождь, а не как один хлопок. */
+  st.arrows=[]; st.flames=[]; st.embers=[];
+  for(let i=0;i<16;i++){
+    const a=i*2.39996+Math.random()*0.4, r=RAIN_R*0.92*Math.sqrt((i+0.5)/16);
+    st.arrows.push({x:st.x+Math.cos(a)*r, y:st.y+Math.sin(a)*r*0.9, tl:-0.05+Math.random()*0.4,
+                    landed:false, tilt:(Math.random()-.5)*0.5, sz:0.85+Math.random()*0.3});
+  }
+  const kinds=['flame_w','flame_t','flame_t2'];
+  for(let i=0;i<6;i++){
+    const a=i*2.39996+1.1, r=RAIN_R*0.74*Math.sqrt((i+0.6)/6);
+    st.flames.push({x:st.x+Math.cos(a)*r, y:st.y+Math.sin(a)*r*0.85, k:kinds[i%3],
+                    h:(i%3===0?22:30)+Math.random()*9, ph:Math.random()*9, end:RAIN_GROUND*(0.55+Math.random()*0.45)});
+  }
+}
+function updateRain(dt){
+  const g=game;
+  if(g.rainCd>0) g.rainCd=Math.max(0,g.rainCd-dt);
+  for(const st of g.strikes){
+    if(!st.arrows) makeVolley(st);
+    st.t-=dt;
+    for(const ar of st.arrows) if(!ar.landed && st.t<=ar.tl){ ar.landed=true;
+      if(Math.random()<.5) particle(ar.x,ar.y,'#ffb050'); }
+    if(st.t<=0 && !st.hit){
+      st.hit=true; st.age=0; let n=0;
+      for(const e of g.enemies){
+        if(e.dead) continue;
+        const dx=e.x-st.x, dy=e.y-st.y, R=RAIN_R+e.r*0.5;
+        if(dx*dx+dy*dy > R*R) continue;
+        e.take(st.dmg,true); n++;                    // стрелы сверху: броня не спасает
+        if(!e.dead) e.ignite(RAIN_BURN*rainHpMul()*0.5, 1);
+      }
+      for(let i=0;i<22;i++){ const a=Math.random()*6.28, r=Math.random()*RAIN_R;
+        particle(st.x+Math.cos(a)*r, st.y+Math.sin(a)*r, Math.random()<.5?'#ff9a3c':'#ffd27a'); }
+      SFX.rainHit(); g.shake=Math.max(g.shake,0.18); buzz(n?40:20);
+    }
+    if(st.hit){
+      st.age+=dt;
+      if(st.age<RAIN_GROUND-0.8 && Math.random()<dt*14){       // искры поднимаются над огнём
+        const f=st.flames[Math.floor(Math.random()*st.flames.length)];
+        st.embers.push({x:f.x+(Math.random()-.5)*14, y:f.y-6, vx:(Math.random()-.5)*18, vy:-30-Math.random()*40, life:0.9+Math.random()*0.7, t:0});
+      }
+      for(const em of st.embers){ em.t+=dt; em.x+=em.vx*dt+Math.sin((em.t+em.x)*6)*0.3; em.y+=em.vy*dt; }
+      st.embers=st.embers.filter(em=>em.t<em.life);
+    }
+  }
+  if(g.strikes.length) g.strikes=g.strikes.filter(st=>!st.hit || st.age<RAIN_GROUND+1.6);
+}
+/* Прицел и круг ожидания рисуем кодом: он должен быть чётким при любом масштабе. */
+function rainRing(x,y,alpha,dash,fill){
+  ctx.save();
+  ctx.fillStyle='rgba(220,50,30,'+(fill*alpha)+')'; ctx.beginPath(); ctx.arc(x,y,RAIN_R,0,7); ctx.fill();
+  ctx.setLineDash(dash?[9,7]:[]); ctx.lineDashOffset=-(performance.now()/40)%16;
+  ctx.strokeStyle='rgba(255,90,60,'+alpha+')'; ctx.lineWidth=2.6; ctx.beginPath(); ctx.arc(x,y,RAIN_R,0,7); ctx.stroke();
+  ctx.restore();
+}
+/* Земля: выжженное пятно лежит под врагами и башнями. */
+function drawRainGround(){
+  const g=game; if(!g.strikes.length) return;
+  for(const st of g.strikes){
+    if(!st.hit) continue;
+    const a = st.age<0.25 ? st.age/0.25 : clamp((RAIN_GROUND+1.6-st.age)/1.6,0,1);
+    if(!FXR.draw('scorch',st.x,st.y,RAIN_R*2.15,0.5,0.5,0,a*0.85)){
+      ctx.save(); ctx.globalAlpha=a*0.5; ctx.fillStyle='#1d1612'; ctx.beginPath(); ctx.arc(st.x,st.y,RAIN_R*0.9,0,7); ctx.fill(); ctx.restore();
+    }
+  }
+}
+function drawRain(){
+  const g=game, now=performance.now()/1000;
+  if(g.rainArmed && g.mOn && !g.touch) rainRing(g.mx,g.my,0.75,true,0.16);
+  for(const st of g.strikes){
+    if(!st.arrows) makeVolley(st);
+    if(!st.hit){
+      const k=1-st.t/RAIN_DELAY, pulse=0.6+Math.sin(now*11)*0.25;
+      rainRing(st.x,st.y,0.9,true,0.12+0.18*k);
+      ctx.save(); ctx.strokeStyle='rgba(255,170,90,'+pulse+')'; ctx.lineWidth=4;
+      ctx.beginPath(); ctx.arc(st.x,st.y,RAIN_R-6,-Math.PI/2,-Math.PI/2+k*6.283); ctx.stroke(); ctx.restore();
+    }
+    // воткнутые стрелы: стоят, пока горит земля, и гаснут вместе с ней
+    const ga = !st.hit ? 1 : clamp((RAIN_GROUND+1.2-st.age)/1.2,0,1);
+    for(const ar of st.arrows){
+      if(!ar.landed) continue;
+      if(!FXR.draw('stuck',ar.x,ar.y,30*ar.sz,0.30,0.93,ar.tilt,ga)){
+        ctx.save(); ctx.globalAlpha=ga; ctx.strokeStyle='#6b4a2c'; ctx.lineWidth=2;
+        ctx.beginPath(); ctx.moveTo(ar.x,ar.y); ctx.lineTo(ar.x+6,ar.y-16); ctx.stroke(); ctx.restore();
+      }
+    }
+    // стрелы в полёте: падают сверху слева под крутым углом, огнём вперёд
+    const FL=0.42, ang=Math.atan2(1,0.32);
+    for(const ar of st.arrows){
+      if(ar.landed) continue;
+      const k=(st.t-ar.tl)/FL; if(k>1) continue;
+      const d=170*k, x=ar.x-0.32*d/1.05, y=ar.y-d/1.05;
+      if(!FXR.draw('arrow',x,y,12*ar.sz,1,0.62,ang,clamp((1-k)*4,0,1))){
+        ctx.save(); ctx.strokeStyle='rgba(255,140,60,.9)'; ctx.lineWidth=2.4;
+        ctx.beginPath(); ctx.moveTo(x-8,y-26); ctx.lineTo(x,y); ctx.stroke(); ctx.restore();
+      }
+    }
+    if(!st.hit) continue;
+    // вспышка удара: яркий центр и разлетающееся пламя
+    if(st.age<0.45){
+      const k=st.age/0.45;
+      ctx.save(); ctx.globalCompositeOperation='lighter'; ctx.globalAlpha=(1-k)*0.9;
+      const gr=ctx.createRadialGradient(st.x,st.y,4,st.x,st.y,RAIN_R*(0.7+k*0.6));
+      gr.addColorStop(0,'rgba(255,240,190,1)'); gr.addColorStop(0.35,'rgba(255,150,50,.7)'); gr.addColorStop(1,'rgba(200,40,10,0)');
+      ctx.fillStyle=gr; ctx.beginPath(); ctx.arc(st.x,st.y,RAIN_R*(0.7+k*0.6),0,7); ctx.fill();
+      ctx.restore();
+      FXR.draw('flame_w',st.x,st.y+RAIN_R*0.25,RAIN_R*(0.6+k*0.9),0.5,0.95,0,(1-k)*0.95);
+    }
+    // огонь на земле: языки пламени колышутся и по очереди гаснут
+    ctx.save(); ctx.globalCompositeOperation='lighter';
+    for(const f of st.flames){
+      const life=st.age, grow=clamp(life/0.3,0,1), die=clamp((f.end-life)/0.9,0,1), a=Math.min(grow,die);
+      if(a<=0) continue;
+      const glow=ctx.createRadialGradient(f.x,f.y-4,2,f.x,f.y-4,f.h*0.9);
+      glow.addColorStop(0,'rgba(255,150,60,'+(0.22*a)+')'); glow.addColorStop(1,'rgba(255,80,20,0)');
+      ctx.fillStyle=glow; ctx.beginPath(); ctx.arc(f.x,f.y-4,f.h*0.9,0,7); ctx.fill();
+    }
+    ctx.restore();
+    for(const f of st.flames){
+      const life=st.age, grow=clamp(life/0.3,0,1), die=clamp((f.end-life)/0.9,0,1), a=Math.min(grow,die);
+      if(a<=0) continue;
+      const fl=1+Math.sin(now*13+f.ph)*0.09+Math.sin(now*7.3+f.ph*2)*0.06;
+      const h=f.h*(0.4+0.6*a)*fl, sx=1+Math.sin(now*9+f.ph)*0.07;
+      if(!FXR.draw(f.k,f.x,f.y,h,0.5,0.97,Math.sin(now*3+f.ph)*0.06,a,sx)){
+        ctx.save(); ctx.globalAlpha=a; ctx.fillStyle='#ff8a3c'; ctx.beginPath(); ctx.ellipse(f.x,f.y-h/2,h/4,h/2,0,0,7); ctx.fill(); ctx.restore();
+      }
+    }
+    // искры
+    for(const em of st.embers){
+      const a=1-em.t/em.life;
+      if(!FXR.draw('ember',em.x,em.y,7,0.5,0.5,0,a)){
+        ctx.save(); ctx.globalAlpha=a; ctx.fillStyle='#ffd27a'; ctx.beginPath(); ctx.arc(em.x,em.y,1.6,0,7); ctx.fill(); ctx.restore();
+      }
+    }
+  }
+}
+/* Кнопка дождя — в левом нижнем углу поля, в любой раскладке на одном месте. */
+function rainBtnRect(){
+  const s=TOUCH?62:56;
+  const bottom = PORTRAIT ? PORT_BOARD_Y+PORT_BOARD_H : PY;
+  return {x:10, y:bottom-s-((PORTRAIT||STRIP)?24:58), w:s, h:s};
+}
+function drawRainBtn(){
+  const g=game; if(!g) return;
+  const b=rainBtnRect(), cx=b.x+b.w/2, cy=b.y+b.h/2, r=b.w/2;
+  const ready=g.rainCd<=0, afford=g.gold>=RAIN_COST, on=g.rainArmed;
+  uiBtns.push({id:'rain',x:b.x,y:b.y,w:b.w,h:b.h,on:true});
+  ctx.save();
+  if(on){                                               // выбран — светится
+    ctx.shadowColor='rgba(255,120,40,.9)'; ctx.shadowBlur=16;
+    ctx.fillStyle='rgba(255,120,40,.35)'; ctx.beginPath(); ctx.arc(cx,cy,r+3,0,7); ctx.fill();
+    ctx.shadowBlur=0;
+  }
+  ctx.globalAlpha = ready&&afford ? 1 : 0.5;
+  if(!FXR.draw('icon',cx,cy,b.h,0.5,0.5,0)){
+    ctx.fillStyle='rgba(12,22,30,.88)'; ctx.beginPath(); ctx.arc(cx,cy,r,0,7); ctx.fill();
+    ctx.strokeStyle='#e0703c'; ctx.lineWidth=2; ctx.stroke();
+    txt('🔥',cx,cy,r,'#fff','center');
+  }
+  ctx.globalAlpha=1;
+  if(on){ ctx.strokeStyle='#ffd0a0'; ctx.lineWidth=2.5; ctx.beginPath(); ctx.arc(cx,cy,r+1.5,0,7); ctx.stroke(); }
+  if(!ready){                                           // перезарядка — затемнённый сектор
+    const k=g.rainCd/RAIN_CD;
+    ctx.fillStyle='rgba(5,10,14,.66)'; ctx.beginPath(); ctx.moveTo(cx,cy);
+    ctx.arc(cx,cy,r,-Math.PI/2,-Math.PI/2+k*6.283); ctx.closePath(); ctx.fill();
+    txt(Math.ceil(g.rainCd)+'s',cx,cy,TOUCH?18:16,'#ffffff','center',true);
+  }
+  ctx.restore();
+  if(!TOUCH) keyBadge(b.x+b.w-6,b.y+6,'8');
+  // цена под кнопкой
+  const py=b.y+b.h+1;
+  ctx.fillStyle='rgba(10,20,27,.85)'; rr(cx-24,py-9,48,17,8); ctx.fill();
+  txt(RAIN_COST+'',cx+5,py,12.5,afford?'#f3e2b0':'#d6584f','center',true);
+  ctx.save(); ctx.translate(cx-13,py); ctx.scale(.42,.42); drawCoin(0,0); ctx.restore();
+  if(on){
+    const tip = TOUCH ? 'Tap the road to drop fire arrows' : 'Click the road to drop fire arrows';
+    const tw=TOUCH?250:230;
+    ctx.fillStyle='rgba(120,30,24,.92)'; rr(b.x+b.w+8,cy-14,tw,28,8); ctx.fill();
+    txt(tip,b.x+b.w+18,cy,TOUCH?13.5:12.5,'#ffe0c8','left',true);
+  }
+}
+/* Номер клавиши в углу карточки: на компьютере башню можно выбрать цифрой. */
+function keyBadge(x,y,label){
+  ctx.fillStyle='rgba(8,16,22,.85)'; rr(x-9,y-9,18,18,5); ctx.fill();
+  ctx.strokeStyle='#4d6a7c'; ctx.lineWidth=1.2; rr(x-9,y-9,18,18,5); ctx.stroke();
+  txt(label,x,y+1,11.5,'#cfe0ea','center',true);
+}
+
 function cellScore(c,r){
   const R=2.6; let n=0;
   for(const k of game.pathCells){
@@ -1814,6 +2045,7 @@ function update(dt){
 
   for(const t of g.towers){ t.update(dt); if(t.fireAnim>0&&t.key!=='flame') t.fireAnim-=dt; }
   updateObstacles(dt);
+  updateRain(dt);
   for(const e of g.enemies) e.update(dt);
   for(const s of g.shots) s.update(dt);
   for(const p of g.parts){ p.life-=dt; p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=180*dt; }
@@ -1868,7 +2100,7 @@ function draw(){
     ctx.beginPath(); ctx.rect(0,PORT_BOARD_Y,CW,PORT_BOARD_H); ctx.clip();
     ctx.translate(BV.x, BV.y-BY*BV.s); ctx.scale(BV.s,BV.s);
   }
-  drawBoard(); drawPath(); drawRange(); drawDecor(); drawBeacons(); drawTowers(); drawEnemies(); drawShots(); drawObstacleTop(); drawEntrances(); drawFx();
+  drawBoard(); drawPath(); drawRainGround(); drawRange(); drawDecor(); drawBeacons(); drawTowers(); drawEnemies(); drawShots(); drawObstacleTop(); drawEntrances(); drawFx(); drawRain();
   ctx.restore();
   ctx.restore();
   drawHud();
@@ -2962,9 +3194,10 @@ function drawHud(){
       txt((TOWERS[k].build||3)+'s',x+w-9,y+12,CARD_BIG?12:(TOUCH?12:10.5),'#7d94a3','right');
       if(t.limit){
         const n=g.towers.filter(q=>q.key===k).length;
-        txt(n+'/'+t.limit,x+9,y+12,CARD_BIG?12:(TOUCH?12:10.5), n>=t.limit?'#d6584f':'#7d94a3','left',true);
+        txt(n+'/'+t.limit,x+(TOUCH?9:24),y+12,CARD_BIG?12:(TOUCH?12:10.5), n>=t.limit?'#d6584f':'#7d94a3','left',true);
       }
     }
+    if(!TOUCH) keyBadge(x+11,y+11,String(i+1));
     uiBtns.push({id:'t_'+k,x,y,w,h,on:true});
   });
 
@@ -3084,12 +3317,7 @@ function drawHud(){
   }
   if(g.selTower) drawTowerPopup(g.selTower);
   else if(g.selRock) drawRockPopup(g.selRock);
-  if(g.sel && !g.selTower && !STRIP){
-    const tip = towerUnlocked(g.sel) ? TOWERS[g.sel].tip : 'Locked. Buy rank I for this weapon in the Workshop.';
-    ctx.fillStyle='rgba(14,28,37,.92)'; rr(6,PY-40,540,32,6); ctx.fill();
-    ctx.strokeStyle='#2f4a5a'; ctx.lineWidth=1.5; rr(6,PY-40,540,32,6); ctx.stroke();
-    txt(tip,18,PY-24,13,'#cfe0ea');
-  }
+  if(!g.over) drawRainBtn();
 }
 function drawTowerIcon(k,x,y){
   if(spriteW('icon_tower_'+k+'_1',x,y+20,42)) return;
@@ -3268,6 +3496,10 @@ function handleTap(p){
      остановленном времени и снять паузу, когда всё уже построено. */
   if(g.paused || platformPaused || adPaused){ SFX.no(); return; }
   const bp=toBoard(p);
+  if(g.rainArmed){
+    if(castRain(bp.x,bp.y)) g.rainArmed=false;
+    return;
+  }
   const c=Math.floor(bp.x/TS), r=Math.floor((bp.y-BY)/TS);
   if(c<0||r<0||c>=COLS||r>=ROWS) return;
   const t=g.towers.find(t=>t.c===c&&t.r===r);
@@ -3313,8 +3545,9 @@ cv.addEventListener('pointermove',e=>{
   if(!game) return;
   if(e.pointerType!=='touch'){
     const p=toGame(e);
-    if(onBoard(p)){ const bp=toBoard(p); game.hoverC=Math.floor(bp.x/TS); game.hoverR=Math.floor((bp.y-BY)/TS); }
-    else game.hoverC=-1;
+    if(onBoard(p)){ const bp=toBoard(p); game.hoverC=Math.floor(bp.x/TS); game.hoverR=Math.floor((bp.y-BY)/TS);
+      game.mx=bp.x; game.my=bp.y; game.mOn=true; game.touch=false; }
+    else { game.hoverC=-1; game.mOn=false; }
     return;
   }
   if(touches.has(e.pointerId)) touches.set(e.pointerId, toGame(e));
@@ -3352,8 +3585,11 @@ cv.addEventListener('contextmenu',e=>e.preventDefault());
 window.addEventListener('keydown',e=>{
   if(!game||!game.running) return;
   if(e.code==='Space'){ e.preventDefault(); onButton('pause'); }
-  if(e.code==='Escape'){ game.sel=null; game.selTower=null; game.selRock=null; }
-  const n=parseInt(e.key,10); if(n>=1&&n<=TKEYS.length) game.sel=TKEYS[n-1], game.selTower=null;
+  if(e.code==='Escape'){ game.sel=null; game.selTower=null; game.selRock=null; game.rainArmed=false; }
+  if(game.over) return;
+  const m=/^(Digit|Numpad)([1-9])$/.exec(e.code||''); const n=m? +m[2] : 0;
+  if(e.code==='KeyF' || n===TKEYS.length+1){ onButton('rain'); return; }
+  if(n>=1 && n<=TKEYS.length) onButton('t_'+TKEYS[n-1]);
 });
 
 async function onButton(id){
@@ -3386,6 +3622,11 @@ async function onButton(id){
   if(id==='early'){ startWave(true); return; }
   // апгрейд и продажа — тоже действия на поле, на паузе они недоступны
   if((id==='up'||id==='sell'||id==='clear') && (g.paused||platformPaused||adPaused)){ SFX.no(); return; }
+  if(id==='rain'){
+    if(g.paused||platformPaused||adPaused){ SFX.no(); return; }
+    g.rainArmed=!g.rainArmed;
+    if(g.rainArmed){ g.sel=null; g.selTower=null; g.selRock=null; hint('rain'); SFX.coin && SFX.coin(); }
+    return; }
   if(id==='clear'){ const d=g.selRock; if(!d || d.cut>0) return;
     if(g.gold<CLEAR_COST){ SFX.no(); floatText(tx(d.c),ty(d.r)-10,'not enough gold','#d6584f'); return; }
     g.gold-=CLEAR_COST; d.cut=CLEAR_T; d.chip=0; SFX.build(); buzz(20); g.selRock=null; return; }
@@ -3417,7 +3658,7 @@ async function onButton(id){
   if(id.startsWith('t_')){ const k=id.slice(2);
     if(!towerUnlocked(k)){ SFX.no(); g.sel=k; g.selTower=null;
       floatText(480,BY+40,TOWERS[k].name+' — buy rank I in the Workshop','#8ea6b5'); return; }
-    g.sel = g.sel===k? null : k; g.selTower=null; g.selRock=null; if(TOUCH){ g.hoverC=-1; g.hoverR=-1; } return; }
+    g.sel = g.sel===k? null : k; g.selTower=null; g.selRock=null; g.rainArmed=false; if(TOUCH){ g.hoverC=-1; g.hoverR=-1; } return; }
 }
 
 /* ---------- 10. ЭКРАНЫ -------------------------------------------------- */

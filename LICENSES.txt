@@ -28,7 +28,7 @@ THIRD PARTY SERVICES
   no network requests at all.
 
 ---
-Playgama Bridge (playgama-bridge.js) v2.2.0
+Playgama Bridge (playgama-bridge.js) v2.3.1
 Copyright (c) Playgama. Licensed under the GNU Lesser General Public License v3.0.
 Full licence text: LICENSE-playgama-bridge.txt
 Source: https://github.com/playgama/bridge

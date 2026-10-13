@@ -301,7 +301,7 @@
       <button class="btn sec" id="bHelp">How to play</button>
     </div>
     <div class="bar"><div class="silver"><img src="assets/icons/icon_silver.png" alt=""><b id="silv1">0</b></div></div>
-    <div class="build">build 02.10 · 4</div>
+    <div class="build">build 13.10 · 1</div>
   </div>
 
   <!-- ВЫБОР УРОВНЯ -->
@@ -660,8 +660,13 @@ function applyVolumes(){
   if(sfxBus && actx){ try{ sfxBus.gain.setTargetAtTime(volSfx(),actx.currentTime,0.05); }catch(e){} }
   if(Music.bus && actx){ try{ Music.bus.gain.setTargetAtTime(volMus(),actx.currentTime,0.05); }catch(e){} }
 }
+/* До первого касания браузер не даёт запустить звук и на каждую попытку пишет
+   предупреждение в консоль. Проверка площадки считает такие строки, поэтому
+   звуковой движок создаём только после первого жеста игрока. */
+let audioGesture=false;
 function audio(){
   if(actx) return actx;
+  if(!audioGesture) return null;
   try{
     actx=new (window.AudioContext||window.webkitAudioContext)();
     master=actx.createGain(); master.gain.value=1.7;   // громче: на телефонном динамике 0.9 почти не слышно
@@ -710,14 +715,18 @@ function unlockAudio(){
 }
 function bindAudioUnlock(){
   if(typeof document==='undefined') return;
-  const h=()=>unlockAudio();
+  let watched=false;
+  const h=()=>{
+    audioGesture=true; unlockAudio();
+    const c=actx;
+    if(c && !watched && c.addEventListener){ watched=true;
+      c.addEventListener('statechange',()=>{
+        audioUnlocked = c.state==='running';
+        if(c.state!=='running' && save.sound) { try{ c.resume(); }catch(e){} }
+      }); }
+  };
   ['pointerdown','pointerup','touchend','keydown','click']
     .forEach(e=>document.addEventListener(e,h,true));
-  const c=audio();
-  if(c && c.addEventListener) c.addEventListener('statechange',()=>{
-    audioUnlocked = c.state==='running';
-    if(c.state!=='running' && save.sound) { try{ c.resume(); }catch(e){} }
-  });
 }
 /* Дешёвая проверка из игрового цикла: раз в секунду убеждаемся, что контекст жив.
    Без неё молчание после рекламы лечится только перезагрузкой страницы. */
@@ -791,7 +800,12 @@ const Music={
   holdUntil:0,
   async load(){
     if(this.loading || typeof fetch==='undefined') return;
-    const c=audio(); if(!c) return;
+    /* Раскодировать можно и без живого звука: беззвучный OfflineAudioContext не
+       требует жеста. Готовые буферы потом играет основной контекст. */
+    let c=actx;
+    if(!c){ try{ const O=window.OfflineAudioContext||window.webkitOfflineAudioContext;
+      if(O) c=new O(2,1,44100); }catch(e){} }
+    if(!c) return;
     this.loading=true;
     const names=Object.keys(this.META);
     await Promise.all(names.map(async n=>{
@@ -3620,7 +3634,7 @@ async function onButton(id){
     floatText(CW/2, BY+40, save.vibe? 'Vibration on':'Vibration off', '#cfe0ea');
     return;
   }
-  if(id==='exit'){ stopWind(); game=null; screen('scLevels'); renderLevels(); return; }
+  if(id==='exit'){ stopWind(); game=null; screen('scLevels'); renderLevels(); adBreak(); return; }
   if(id==='early'){ startWave(true); return; }
   // апгрейд и продажа — тоже действия на поле, на паузе они недоступны
   if((id==='up'||id==='sell'||id==='clear') && (g.paused||platformPaused||adPaused)){ SFX.no(); return; }
@@ -3716,7 +3730,10 @@ const Board={
   },
   async entries(){
     const m=this.mod(); if(!m) return null;
-    try{ const l=await m.getEntries(this.ID); return Array.isArray(l)? l : null; }catch(e){ return null; }
+    try{ const l=await m.getEntries(this.ID);
+      /* Сервис таблиц Playgama (Bridge SaaS) может вернуть список в обёртке. */
+      const arr = Array.isArray(l) ? l : (l && (l.entries||l.items||l.data||l.leaderboard));
+      return Array.isArray(arr)? arr : null; }catch(e){ return null; }
   },
   fmtT(sec){ sec=Math.max(0,sec|0); const m=Math.floor(sec/60), s=sec%60; return m+':'+String(s).padStart(2,'0'); },
   fmtD(ms){ try{ const d=new Date(ms); return d.toLocaleDateString(undefined,{day:'numeric',month:'short'}); }catch(e){ return ''; } },
@@ -4033,12 +4050,14 @@ function marchOut(endless){
 function enterLevel(idx, endless){
   preloadLevelBg(idx);
   const ov=document.getElementById('lvload');
-  if(bgReady(idx) || typeof Image==='undefined'){ startLevel(idx,false,endless); return; }
+  /* Атласы догружаются в фоне после заставки, поэтому уровень ждёт и их тоже. */
+  const ok=()=>bgReady(idx) && ART.ready();
+  if(ok() || typeof Image==='undefined'){ startLevel(idx,false,endless); return; }
   screen(null);                                  // прячем меню и убираем прошлый уровень
   if(ov) ov.classList.add('on');
   const t0=Date.now();
   const iv=setInterval(()=>{
-    if(!bgReady(idx) && Date.now()-t0<12000) return;
+    if(!ok() && Date.now()-t0<25000) return;
     clearInterval(iv);
     if(ov) ov.classList.remove('on');
     startLevel(idx,false,endless);
@@ -4079,10 +4098,21 @@ function showEndless(){
   const mk=(label,cls,fn)=>{ const b=document.createElement('button'); b.className='btn '+cls; b.textContent=label; b.onclick=fn; box.appendChild(b); return b; };
   mk('Leaderboard','board',()=>{ Board.rename(rec.id, inp.value); Board.open('scResult','mine'); });
   mk('Raid again','sec',()=>{ Board.rename(rec.id, inp.value); enterLevel(g.idx,true); });
-  mk('Back to map','sec',()=>{ Board.rename(rec.id, inp.value); game=null; renderLevels(); screen('scLevels'); });
+  mk('Back to map','sec',async ()=>{ Board.rename(rec.id, inp.value); game=null; renderLevels(); screen('scLevels'); await adBreak(); });
   screen('scResult');
 }
 let levelsDone=0;
+/* Межуровневая реклама — в естественных паузах: уход с экрана итогов (дальше, заново,
+   на карту) и выход из боя кнопкой «домой». Не чаще раза в 90 секунд, первая —
+   при первой же паузе. Раньше она шла только на каждом втором «Next fjord», и
+   проверка площадки не могла её вызвать, не пройдя два уровня. */
+let lastBreakAd=-1e9;
+async function adBreak(){
+  const now=Date.now();
+  if(now-lastBreakAd<90000 || !Ads.available('interstitial')) return;
+  lastBreakAd=now;
+  try{ await Ads.interstitial(); }catch(e){}
+}
 function showResult(win){
   const g=game, i=g.idx;
   $('#resStars').style.display='';
@@ -4129,7 +4159,7 @@ function showResult(win){
     if(i+1<LEVELS.length){
       const nx=mk('Next fjord','', async ()=>{
         levelsDone++;
-        if(levelsDone%2===0) await Ads.interstitial();
+        await adBreak();
         if(unlocked(i+1)) openPrep(i+1);
         else { renderLevels(); screen('scLevels'); }     // не хватает звёзд — отправляем на карту
       });
@@ -4138,7 +4168,7 @@ function showResult(win){
         nx.textContent='Need '+(starsNeed(i+1)-starsBefore(i+1))+' more ★';
       }
     }
-    mk('Back to map','sec',()=>{ game=null; renderLevels(); screen('scLevels'); });
+    mk('Back to map','sec',async ()=>{ game=null; renderLevels(); screen('scLevels'); await adBreak(); });
   } else {
     if(g.adRevive) mk('+3 lives (ad)','ad', async e=>{
       e.target.disabled=true;
@@ -4150,8 +4180,8 @@ function showResult(win){
         screen(null);
       } else e.target.disabled=false;
     });
-    mk('Retry','',()=>openPrep(i));
-    mk('Back to map','sec',()=>{ game=null; renderLevels(); screen('scLevels'); });
+    mk('Retry','',async ()=>{ await adBreak(); openPrep(i); });
+    mk('Back to map','sec',async ()=>{ game=null; renderLevels(); screen('scLevels'); await adBreak(); });
   }
   screen('scResult');
 }
@@ -4216,18 +4246,25 @@ function loop(now){
   splash.onload=splash.onerror=()=>{ splashDone=true; };
   splash.src='assets/splash.webp';
   preloadLevelBg(0);                                  // первый фьорд готов заранее
-  const t0=Date.now();
+  const t0=Date.now(); let gameReadySent=false;
   const bootOk = await new Promise(res=>{
     const iv=setInterval(()=>{
       const part=(ART.done + (splashDone?1:0) + (bgReady(0)?1:0)) / (ART.total+2);
       if(fill) fill.style.width=Math.round(Math.max(0.06,part)*100)+'%';
       if(tip && Date.now()-t0>4000 && !ART.ready()) tip.textContent='Loading artwork… '+ART.n+'/'+ART.total;
       if(ART.ready() && splashDone && bgReady(0)){ clearInterval(iv); res(true); }
-      else if(Date.now()-t0>30000){ clearInterval(iv); res(false); }
+      /* Меню — это HTML со своей картинкой, атласы ему не нужны. Ждём их не дольше
+         8 секунд: дальше открываем меню и сообщаем площадке о готовности, а графика
+         догружается в фоне. Раньше заставка ждала 30 с и потом нажатия игрока —
+         автоматическая проверка Playgama так и не получала game_ready. */
+      else if(splashDone && Date.now()-t0>8000){ clearInterval(iv); res(true); }
+      else if(Date.now()-t0>15000){ clearInterval(iv); res(true); }
     },90);
   });
   const artMissing = ART.fail>=ART.total;
-  if(!bootOk || artMissing){
+  if(artMissing){
+    // игра работает и с простой графикой — площадке сообщаем о готовности сразу
+    try{ if(window.bridge && bridge.platform && bridge.platform.sendMessage) bridge.platform.sendMessage('game_ready'); gameReadySent=true; }catch(e){}
     // Не запускаем молча: объясняем, что случилось, и ждём осознанного решения.
     if(fill) fill.style.width='100%';
     if(tip){
@@ -4255,7 +4292,7 @@ function loop(now){
   bindAudioUnlock();
   bindPlatformEvents();
   Music.load();                                   // 2 МБ музыки грузим в фоне, уже после заставки
-  try{ if(window.bridge && bridge.platform && bridge.platform.sendMessage) bridge.platform.sendMessage('game_ready'); }catch(e){}
+  try{ if(!gameReadySent && window.bridge && bridge.platform && bridge.platform.sendMessage) bridge.platform.sendMessage('game_ready'); }catch(e){}
   // Playables: сообщаем платформе, что кадр отрисован и игра готова принимать ввод
   if(window.ytgame && ytgame.game){
     try{

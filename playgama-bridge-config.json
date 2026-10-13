@@ -2,5 +2,11 @@
   "platforms": {},
   "game": {
     "adaptToSafeArea": true
-  }
+  },
+  "saas": {
+    "publicToken": "cmul6nzuv003oo60h2phtuals"
+  },
+  "leaderboards": [
+    { "id": "endless" }
+  ]
 }

@@ -301,7 +301,7 @@
       <button class="btn sec" id="bHelp">How to play</button>
     </div>
     <div class="bar"><div class="silver"><img src="assets/icons/icon_silver.png" alt=""><b id="silv1">0</b></div></div>
-    <div class="build">build 13.10 · 1</div>
+    <div class="build">build 16.10 · 2</div>
   </div>
 
   <!-- ВЫБОР УРОВНЯ -->
@@ -491,16 +491,53 @@ let platformPaused=false, platformMuted=false, adPaused=false;
    или сворачивания игра оставалась замороженной навсегда. Теперь game.paused — это
    исключительно пауза, которую нажал игрок, а остановки от платформы и рекламы живут
    в своих флагах и снимаются сами. */
-function platformPause(v){
-  platformPaused=!!v;
+/* Внешних пауз две, и снимаются они по-разному:
+   platHidden  — вкладка скрыта; снимается, как только документ снова виден;
+   platPauseReq — площадка прямо попросила паузу (pause_state_changed); снимает её
+                  только сама площадка. Раньше сторож в цикле снимал любую внешнюю
+                  паузу при видимой вкладке — и просьба площадки игнорировалась. */
+let platHidden=false, platPauseReq=false;
+/* Прямые причины паузы и тишины внутри Bridge. Пока фрейм без фокуса, общий флаг Bridge
+   уже «пауза» — и новая команда площадки не меняет его, событие не приходит. Поэтому
+   причины ещё и опрашиваем из игрового цикла. null — Bridge не даёт заглянуть внутрь. */
+const BRIDGE_REASONS=['platform','interstitial','rewarded','rate'];
+let bridgePollOn=false, bridgePollAt=0;
+function bridgeReason(name){
+  try{ const pb=window.bridge && bridge.platform && bridge.platform._platformBridge, ag=pb && pb[name];
+    if(!ag || typeof ag.getState!=='function') return null;
+    return BRIDGE_REASONS.some(k=>ag.getState(k)===true); }catch(e){ return null; }
+}
+function pollBridgeStates(now){
+  if(!bridgePollOn || now-bridgePollAt<200) return;
+  bridgePollAt=now;
+  const p=bridgeReason('_pauseStateAggregator'), m=bridgeReason('_audioStateAggregator');
+  if(p!==null && p!==platPauseReq) platformPauseRequest(p);
+  if(m!==null && m!==platformMuted) platformMute(m);
+}
+function applyExtPause(){
+  platformPaused = platHidden || platPauseReq;
   if(platformPaused) stopWind();
   else if(save.sound && !platformMuted && game) startWind();
+  syncAudioState();
 }
+function platformPause(v){ platHidden=!!v; applyExtPause(); }
+function platformPauseRequest(v){ platPauseReq=!!v; applyExtPause(); }
 function platformMute(v){
   platformMuted=!!v;
   if(platformMuted) stopWind();
   else if(save.sound && game) startWind();
-  if(master && actx){ try{ master.gain.value = platformMuted?0:1.7; }catch(e){} }
+  syncAudioState();
+}
+/* Звук гасим целиком, остановкой контекста. Раньше музыку приглушал игровой цикл,
+   а при свёрнутой вкладке браузер этот цикл не крутит — музыка играла дальше. */
+function audioBlocked(){ return platformMuted || platformPaused || (typeof document!=='undefined' && document.hidden); }
+function syncAudioState(){
+  if(!actx) return;
+  try{ if(master) master.gain.value = platformMuted?0:1.7; }catch(e){}
+  try{
+    if(audioBlocked()){ if(actx.state==='running') actx.suspend(); }
+    else if(save.sound && audioGesture && actx.state!=='running') actx.resume();
+  }catch(e){}
 }
 /* Событие возобновления от платформы может не прийти вовсе — например, если реклама
    закрылась нештатно. Поэтому любое возвращение на экран снимает внешние паузы само. */
@@ -525,14 +562,28 @@ function bindPlatformEvents(){
       if(typeof ytgame.system.isAudioEnabled==='function') platformMute(!ytgame.system.isAudioEnabled());
     }
   }catch(e){}
+  /* В Bridge 2.3 у bridge.game больше нет метода on — раньше весь блок стоял под этим
+     условием и после обновления SDK игра молча перестала слушать площадку. События
+     всех модулей идут через общую шину, подписываемся через bridge.platform.on. */
   try{
-    if(window.bridge && bridge.game && bridge.game.on){
-      bridge.game.on('visibility_state_changed', st=>{ if(st==='hidden') platformPause(true); else wakeUp(); });
-      // площадка может держать звук выключенным — уважаем её состояние
-      try{
-        if(typeof bridge.platform.isAudioEnabled==='boolean') platformMute(!bridge.platform.isAudioEnabled);
-        if(bridge.platform.on) bridge.platform.on('audio_state_changed', on=>platformMute(!on));
-      }catch(e){}
+    if(window.bridge && bridge.platform && bridge.platform.on && Ads.ready){
+      const on=(ev,fn)=>{ try{ bridge.platform.on(ev,fn); }catch(e){} };
+      /* Bridge складывает паузу и звук из нескольких причин, в том числе «видимость»,
+         а видимостью считает и потерю фокуса фреймом (window blur). Клик по панели
+         площадки снаружи игры давал «паузу + тишину», которые снимались только кликом
+         обратно в игру. Слушаем прямые причины — площадка, реклама, окно оценки;
+         настоящее сворачивание вкладки игра ловит сама по document.hidden. */
+      const syncPause=(v)=>{ const r=bridgeReason('_pauseStateAggregator'); platformPauseRequest(r===null ? !!v : r); };
+      const syncMute=(en)=>{ const r=bridgeReason('_audioStateAggregator'); platformMute(r===null ? !en : r); };
+      bridgePollOn=true;
+      on('visibility_state_changed', st=>{
+        if(st==='hidden'){ if(typeof document!=='undefined' && document.hidden) platformPause(true); }
+        else wakeUp(); });
+      on('audio_state_changed', en=>syncMute(en));
+      on('pause_state_changed', p=>syncPause(p));
+      // площадка может уже держать звук выключенным или игру на паузе — уважаем её состояние
+      try{ syncMute(typeof bridge.platform.isAudioEnabled==='boolean' ? bridge.platform.isAudioEnabled : true); }catch(e){}
+      try{ syncPause(typeof bridge.platform.isPaused==='boolean' ? bridge.platform.isPaused : false); }catch(e){}
     }
   }catch(e){}
 }
@@ -669,7 +720,7 @@ function audio(){
   if(!audioGesture) return null;
   try{
     actx=new (window.AudioContext||window.webkitAudioContext)();
-    master=actx.createGain(); master.gain.value=1.7;   // громче: на телефонном динамике 0.9 почти не слышно
+    master=actx.createGain(); master.gain.value=platformMuted?0:1.7;   // громче: на телефонном динамике 0.9 почти не слышно
     /* Лимитер на выходе: позволяет поднять громкость, не боясь, что залп катапульт
        поверх музыки уйдёт в клиппинг и захрипит. */
     let out=master;
@@ -710,6 +761,7 @@ function unlockAudio(){
   if(!save.sound) return;
   setPlaybackSession();
   const c=audio(); if(!c) return;
+  if(audioBlocked()){ syncAudioState(); return; }   // площадка просила тишину или паузу
   if(c.state!=='running'){ try{ c.resume(); }catch(e){} }
   audioUnlocked = c.state==='running';
 }
@@ -722,7 +774,7 @@ function bindAudioUnlock(){
     if(c && !watched && c.addEventListener){ watched=true;
       c.addEventListener('statechange',()=>{
         audioUnlocked = c.state==='running';
-        if(c.state!=='running' && save.sound) { try{ c.resume(); }catch(e){} }
+        if(c.state!=='running' && save.sound && !audioBlocked()) { try{ c.resume(); }catch(e){} }
       }); }
   };
   ['pointerdown','pointerup','touchend','keydown','click']
@@ -731,7 +783,7 @@ function bindAudioUnlock(){
 /* Дешёвая проверка из игрового цикла: раз в секунду убеждаемся, что контекст жив.
    Без неё молчание после рекламы лечится только перезагрузкой страницы. */
 function keepAudioAlive(now){
-  if(!save.sound || platformMuted || !actx) return;
+  if(!save.sound || !actx || audioBlocked()) return;
   if(now-lastWake < 1000) return;
   lastWake=now;
   if(actx.state!=='running'){ try{ actx.resume(); }catch(e){} }
@@ -3541,7 +3593,7 @@ function handleTap(p){
 cv.addEventListener('pointerdown',e=>{
   e.preventDefault(); if(!game) return;
   if(e.pointerType==='touch' && !TOUCH) setLayout(true, window.innerHeight > window.innerWidth*1.04);
-  if(save.sound){ audio(); if(actx && actx.state==='suspended') actx.resume(); startWind(); }
+  if(save.sound){ audioGesture=true; unlockAudio(); if(!audioBlocked()) startWind(); }   // во время паузы площадки звук не будим
   const p=toGame(e);
   if(e.pointerType==='touch'){
     game.touch=true;
@@ -3765,7 +3817,7 @@ const Board={
     $('#boardBody').innerHTML='<table class="bt"><thead><tr><th>#</th><th>Name</th><th>Fjord</th><th>Difficulty</th>'+
       '<th class="n">Waves</th><th class="n">Time</th><th class="n">Per wave</th><th class="n">Date</th></tr></thead><tbody>'+rows+'</tbody></table>';
   },
-  async renderWorld(){
+  async renderWorld(quiet){
     const body=$('#boardBody');
     const k=this.kind();
     if(k==='native_popup'){
@@ -3778,7 +3830,7 @@ const Board={
       body.innerHTML='<p class="bempty">The world table works where the game is published — on YouTube Playables and Playgama. '+
         'This copy runs outside a game platform, so only your own raids are kept.</p>'; return;
     }
-    body.innerHTML='<p class="bempty">Loading the world table…</p>';
+    if(!quiet) body.innerHTML='<p class="bempty">Loading the world table…</p>';
     const list=await this.entries();
     if(this.tab!=='world') return;                     // пока грузилось, игрок переключил вкладку
     if(!list || !list.length){ body.innerHTML='<p class="bempty">No world records yet. Be the first to set one.</p>'; return; }
@@ -3791,7 +3843,22 @@ const Board={
       '<p class="bempty" style="font-size:12.5px">Names come from player accounts on this platform.</p>';
   },
   show(tab){
+    /* Вкладку «World» показываем, только когда площадка действительно даёт таблицу.
+       Проверка Playgama отметила: таблица есть, а не работает — это было окно-заглушка. */
+    const worldOk = this.kind()!=='not_available';
+    const wb=document.querySelector('.btab[data-tab=world]');
+    if(wb) wb.style.display = worldOk ? '' : 'none';
+    const tabs=document.querySelector('.btabs'); if(tabs) tabs.style.display = worldOk ? '' : 'none';
+    if(!worldOk && tab==='world') tab='mine';
     this.tab=tab;
+    clearInterval(this._live); this._live=null;
+    if(tab==='world'){                                // игроков добавляют и убирают на лету — обновляем список
+      this._live=setInterval(()=>{
+        const sc=document.getElementById('scBoard');
+        if(this.tab!=='world' || !sc || !sc.classList.contains('on')){ clearInterval(this._live); this._live=null; return; }
+        this.renderWorld(true);
+      },4000);
+    }
     document.querySelectorAll('.btab').forEach(b=>b.classList.toggle('on',b.dataset.tab===tab));
     this.renderSum();
     if(tab==='world') this.renderWorld(); else this.renderMine();
@@ -4194,11 +4261,12 @@ function loop(now){
   /* Страховка от вечной заморозки: внешние паузы живут ровно столько, сколько длится
      их причина. Нет рекламы — снимаем adPaused; документ на экране — снимаем паузу
      платформы, даже если событие возобновления так и не пришло. */
+  try{ pollBridgeStates(now); }catch(e){}
   keepAudioAlive(now);
   try{ syncPausePanel(); }catch(e){}
   if(adPaused && !Ads.showing) adPaused=false;
   if(platformPaused && !Ads.showing && typeof document!=='undefined'
-     && document.visibilityState!=='hidden') platformPause(false);
+     && document.visibilityState!=='hidden' && platHidden) platformPause(false);
   if(Music.ready && save.sound && !platformMuted){
     try{                                             // любая ошибка звука — не повод замораживать игру
       Music.set(musicWanted(now));

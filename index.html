@@ -86,6 +86,13 @@
   .cnt{display:flex;justify-content:space-between;align-items:baseline;margin:2px 0 8px}
   .cnt .num{font-size:22px;font-weight:bold;color:var(--rune)}
   .cnt .pr{font-size:12px;color:#8ea6b5}
+  .respec{display:flex;gap:14px;align-items:center;justify-content:space-between;flex-wrap:wrap;
+     border:1px solid #2f4a5a;background:#122430;border-radius:10px;padding:12px 16px;text-align:left}
+  .respec .rtext{flex:1 1 300px;min-width:0}
+  .respec .rtext b{display:block;font-size:16px;color:#e9f0f4;margin-bottom:3px}
+  .respec .rtext span{display:block;font-size:12.5px;color:#8ea6b5;line-height:1.45}
+  .respec .btn{flex:0 0 auto;font-size:14px}
+  @media (max-width:640px){ .respec .btn{flex:1 1 100%;width:100%;margin:0} }
   .danger{border:2px solid #5d2f2f;background:linear-gradient(180deg,#2a1a1c,#1d1416);border-radius:10px;padding:14px 16px;text-align:left}
   .danger .top{display:flex;gap:12px;align-items:flex-start}
   .danger .top img{width:54px;height:54px;flex:0 0 54px}
@@ -107,12 +114,25 @@
   /* цена и монета держатся вместе и не переносятся */
   .perk .btn{display:flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap;
              margin-top:auto;padding:10px 8px}
-  .perk .btn .pr{display:inline-flex;align-items:center;gap:4px;font-weight:800}
+  .btn .pr{display:inline-flex;align-items:center;gap:4px;font-weight:800;vertical-align:middle;line-height:1}
   .gain{font-size:12px;color:#93a8b6;line-height:1.5;margin:0 0 10px;text-align:left}
   .gain b{color:#e9f0f4;font-weight:700}
   .gain .up{color:#7fe0a0;font-weight:700}
   .gain .new{display:block;color:#e7b74e;margin-top:3px}
   /* Кузница — красная, с монетой серебра: её видно сразу, и понятно, что здесь тратятся деньги. */
+  /* Итоги боя: главное действие на всю ширину, остальное парами под ним */
+  #resBtns.resgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;width:100%;max-width:520px;margin:6px auto 0}
+  #resBtns.resgrid .btn{margin:0;min-width:0;width:100%;padding:12px 14px;font-size:16px}
+  #resBtns.resgrid .wide{grid-column:1/-1;min-height:62px;font-size:19px}
+  #resBtns.resgrid .note{grid-column:1/-1;font-size:12.5px;color:#8ea6b5;line-height:1.45;text-align:center;margin:-4px 6px 0}
+  @media (max-width:520px){ #resBtns.resgrid{gap:10px;padding:0 4px} #resBtns.resgrid .btn{font-size:15px;padding:10px 8px;min-height:52px} #resBtns.resgrid .wide{font-size:18px;min-height:58px} }
+  @media (max-width:320px){ #resBtns.resgrid{grid-template-columns:1fr} }
+  #resBtns.resgrid .btn{white-space:nowrap;gap:6px}
+  @media (max-width:520px){ #resBtns.resgrid .btn.forge img{width:20px;height:20px} }
+  .btn.forge .cnt{display:inline-block;font-size:13px;font-weight:800;line-height:1;padding:4px 7px;border-radius:9px;
+     background:rgba(0,0,0,.28);color:#fff1ee}
+  .btn.forge .cnt.can{background:#2f8a48;color:#eafff0;box-shadow:0 0 0 2px rgba(127,224,160,.35)}
+  .btn.replay{background:linear-gradient(180deg,#6b5a8f,#4a3d66);color:#f1ecfa;box-shadow:0 4px 0 #2b2340,0 8px 18px rgba(0,0,0,.35)}
   .btn.forge{background:linear-gradient(180deg,#d0554b,#9a2f29);color:#fff1ee;
           box-shadow:0 4px 0 #5a1a16,0 8px 18px rgba(0,0,0,.35);
           display:inline-flex;align-items:center;justify-content:center;gap:7px}
@@ -301,7 +321,7 @@
       <button class="btn sec" id="bHelp">How to play</button>
     </div>
     <div class="bar"><div class="silver"><img src="assets/icons/icon_silver.png" alt=""><b id="silv1">0</b></div></div>
-    <div class="build">build 16.10 · 2</div>
+    <div class="build">build 21.10 · 3</div>
   </div>
 
   <!-- ВЫБОР УРОВНЯ -->
@@ -310,7 +330,7 @@
     <h2>Choose a fjord</h2>
     <div class="row" id="diffRow" style="margin:2px 0 -4px"></div>
     <p class="sub" id="livesLine" style="margin:8px 0 0"></p>
-    <div class="row"><button class="btn forge" id="bPerks" style="min-width:200px"><img src="assets/icons/icon_silver.png" alt="">Forge</button>
+    <div class="row"><button class="btn forge" id="bPerks" style="min-width:200px"><img src="assets/icons/icon_silver.png" alt="">Upgrades</button>
       <button class="btn sec" id="bSandbox" style="min-width:200px">Sandbox</button></div>
     <p class="sub" id="diffHint" style="margin:8px 0 0"></p>
     <div class="levels" id="lvGrid"></div>
@@ -343,9 +363,10 @@
   </div>
   <div class="screen scroll" id="scPerks">
     <div class="hdr"><button class="btn sec" id="forgeBack">&larr; Back</button><div class="silver"><img src="assets/icons/icon_silver.png" alt=""><b class="silvv">0</b></div></div>
-    <h2>Forge</h2>
+    <h2>Upgrades</h2>
     <p class="sub" style="margin:6px 0 0">Spend silver to train your weapons. Rank I lets you build a tower, ranks II and III unlock its upgrades in battle.</p>
     <div class="perks" id="mastGrid"></div>
+    <div id="respecBox" style="width:100%;max-width:700px;margin:14px 0 0"></div>
     <h2 style="font-size:22px;margin:18px 0 0">Village</h2>
     <div class="perk" style="width:100%;max-width:700px;margin-top:12px" id="livesCard"></div>
     <div id="resetBox" style="width:100%;max-width:700px;margin:18px 0 6px"></div>
@@ -363,7 +384,7 @@
       <li><b>Shamans heal</b> nearby allies and can briefly disable a tower. Kill them first.</li>
       <li>The frost rune barely hurts but slows. <b>Rune of Return</b> does not kill: it throws enemies back down the path, costing a whole wave half its progress.</li>
       <li><b>Ballista</b> spears everyone in its firing line: place it looking along a long straight stretch.</li>
-      <li>You start with archers only. Every other weapon has to be bought in the Workshop for silver: rank I lets you build it, rank II and III unlock its in-battle upgrades. Silver comes from cleared fjords, so replay an easy one if you are short.</li>
+      <li>You start with archers only. Every other weapon has to be bought in <b>Upgrades</b> (on the fjord map) for silver: rank I lets you build it, rank II and III unlock its in-battle upgrades. Silver comes from cleared fjords, so replay an easy one if you are short.</li>
       <li><b>Shieldmen lock into a shield wall:</b> standing three or more together they gain extra armour, and each one splits into two raiders when it dies. Break the group up with splash damage.</li>
       <li><b>Berserkers charge.</b> Every few seconds they burst forward at more than double speed &mdash; a slow tower alone will not stop them.</li>
       <li><b>Shamans sabotage.</b> Besides healing, they knock out the nearest tower for a couple of seconds. A dark tower with green sparks is disabled.</li>
@@ -1647,7 +1668,7 @@ class Shot{
 
 function particle(x,y,col){ game.parts.push({x,y,vx:(Math.random()-.5)*90,vy:(Math.random()-.5)*90-30,life:.45,max:.45,col,r:2+Math.random()*2}); }
 const HINTS={
-  build:'Pick a tower below, then tap free ground next to the path. Greyed weapons are not bought yet — the Workshop in the main menu unlocks them for silver.',
+  build:'Pick a tower below, then tap free ground next to the path. Greyed weapons are not bought yet — open Upgrades on the fjord map to unlock them for silver.',
   shield:'Shieldmen wear armour and lock into a shield wall when they march together. Each one splits in two when it dies — splash damage first.',
   raven:'Ravens fly. Catapults and fire altars cannot reach them; archers, runes, ballistae and the totem can.',
   shaman:'Shamans heal every wounded ally around them and knock out a tower for a few seconds. Kill them first.',
@@ -3163,7 +3184,7 @@ function drawTowerPopup(t){
   ctx.strokeStyle='#3d5f72'; ctx.lineWidth=1.5; rr(x-7,y-7,tot+14,bh+14,9); ctx.stroke();
   if(t.lvl>=2)        btn('up',x,y,bw,bh,'Max level',{fs:PORTRAIT?15:13,on:false});
   else if(t.bt>0)     btn('up',x,y,bw,bh,'Building '+Math.ceil(t.bt)+'s',{fs:PORTRAIT?15:13,c1:'#4a5566',c2:'#333e4c',on:false});
-  else if(!t.canUp()) btn('up',x,y,bw,bh,'Workshop rank '+['I','II','III'][t.lvl+1],{fs:PORTRAIT?14:12,c1:'#4a5566',c2:'#333e4c',on:false});
+  else if(!t.canUp()) btn('up',x,y,bw,bh,'Needs rank '+['I','II','III'][t.lvl+1],{fs:PORTRAIT?14:12,c1:'#4a5566',c2:'#333e4c',on:false});
   else                btn('up',x,y,bw,bh,'Upgrade '+t.upCost(),{fs:PORTRAIT?15:13,c1:'#f0c766',c2:'#cf9a2f',tc:'#241708',on:game.gold>=t.upCost()});
   btn('sell',x+bw+gap,y,bw,bh,(t.cancelable()? (t.upPaid?'Cancel +':'Cancel +') : 'Sell +')+t.sellValue(),{fs:PORTRAIT?15:13,c1:'#6a4750',c2:'#4a2f36'});
 }
@@ -3255,7 +3276,7 @@ function drawHud(){
     if(lock){
       ctx.fillStyle='rgba(10,20,27,.55)'; rr(x+2,y+2,w-4,h-4,6); ctx.fill();
       drawLock(x+w/2, y+h-34, CARD_BIG?1.15:(TOUCH?1.15:1));
-      txt('Workshop',x+w/2,y+h-11,CARD_BIG?13:(TOUCH?12:10.5),'#9db4c4','center',true);
+      txt('Upgrades',x+w/2,y+h-11,CARD_BIG?13:(TOUCH?12:10.5),'#9db4c4','center',true);
     } else {
       ctx.save(); ctx.translate(x+w/2-20,y+h-17); const cs=CARD_BIG?.75:(TOUCH?.72:.62); ctx.scale(cs,cs); drawCoin(0,0); ctx.restore();
       txt(cost,x+w/2+6,y+h-16,CARD_BIG?15:(TOUCH?15:13),afford?'#e9f0f4':'#d6584f','center',true);
@@ -3360,7 +3381,7 @@ function drawHud(){
     if(!pausePanelOn) txt('Paused',CW/2,by0+bh0/2,44,'#e9f0f4','center',true);
   }
   if(g.sel && !g.selTower && !STRIP){
-    const tip = towerUnlocked(g.sel) ? TOWERS[g.sel].tip : 'Locked. Buy rank I for this weapon in the Workshop.';
+    const tip = towerUnlocked(g.sel) ? TOWERS[g.sel].tip : 'Locked. Buy rank I for this weapon in Upgrades.';
     const ty0 = PANY-34;
     ctx.fillStyle='rgba(14,28,37,.92)'; rr(6,ty0,CW-12,30,6); ctx.fill();
     ctx.strokeStyle='#2f4a5a'; ctx.lineWidth=1.5; rr(6,ty0,CW-12,30,6); ctx.stroke();
@@ -3725,7 +3746,7 @@ async function onButton(id){
   }
   if(id.startsWith('t_')){ const k=id.slice(2);
     if(!towerUnlocked(k)){ SFX.no(); g.sel=k; g.selTower=null;
-      floatText(480,BY+40,TOWERS[k].name+' — buy rank I in the Workshop','#8ea6b5'); return; }
+      floatText(480,BY+40,TOWERS[k].name+' — buy rank I in Upgrades','#8ea6b5'); return; }
     g.sel = g.sel===k? null : k; g.selTower=null; g.selRock=null; g.rainArmed=false; if(TOUCH){ g.hoverC=-1; g.hoverR=-1; } return; }
 }
 
@@ -3950,7 +3971,7 @@ function renderLevels(){
   const ll=$('#livesLine');
   if(ll) ll.textContent='Profile: '+DIFFS[save.diff||0].n+'  ·  silver '+P().silver+
     '  ·  village lives '+Math.min(P().lives,livesMax())+' / '+livesMax()+
-    '. Every difficulty keeps its own silver, workshop and progress.';
+    '. Every difficulty keeps its own silver, upgrades and progress.';
   document.querySelectorAll('.silvv,#silv1').forEach(el=>el.textContent=P().silver);
   const grid=$('#lvGrid'); grid.innerHTML='';
   LEVELS.forEach((L,i)=>{
@@ -4032,11 +4053,46 @@ function renderLives(){
   b.onclick=()=>{ if(P().silver>=cost && !full){ P().silver-=cost; P().lives=Math.min(max,cur+5); persist(); renderPerks(); SFX.up(); } };
   el.appendChild(b);
 }
+/* Переобучение: всё серебро за ранги оружия возвращается целиком, звёзды, уровни и
+   жизни деревни не трогаем. Не подошла сборка для фьорда — пробуешь другую без потерь.
+   Ранг I лучников выдаётся бесплатно с самого начала, поэтому он остаётся и не возвращается. */
+function respecRefund(){
+  let sum=0; const m=P().mast||{};
+  for(const k of TKEYS){
+    const r=m[k]||0, c=MAST_COST(k);
+    for(let i=0;i<r;i++){ if(k==='archer' && i===0) continue; sum+=c[i]; }
+  }
+  return sum;
+}
+function renderRespec(){
+  const box=$('#respecBox'); if(!box) return;
+  const n=respecRefund();
+  box.innerHTML='<div class="respec"><div class="rtext"><b>Retrain your weapons</b>'+
+    '<span>Every rank you bought is returned as silver, in full. Stars, cleared fjords and village lives stay. '+
+    'Archers keep rank I.</span></div></div>';
+  const b=document.createElement('button');
+  const coin='<img class="coin" src="assets/icons/icon_silver.png" alt="">';
+  const label='Refund all ranks <span class="pr">+'+n+coin+'</span>';
+  b.className='btn'+(n?'':' sec'); b.style.minHeight='46px'; b.innerHTML = n ? label : 'Nothing to refund';
+  b.disabled=!n;
+  b.onclick=()=>{
+    if(!n) return;
+    if(b.dataset.armed){
+      const back=respecRefund();
+      P().mast={archer:1}; P().silver+=back; flushSave();
+      renderPerks(); renderLevels(); SFX.coin && SFX.coin(); buzz(30);
+    } else {
+      b.dataset.armed='1'; b.innerHTML='Tap again to refund +'+n+coin;
+      setTimeout(()=>{ if(b.dataset.armed){ b.dataset.armed=''; b.innerHTML=label; } },4000);
+    }
+  };
+  box.querySelector('.respec').appendChild(b);
+}
 function renderReset(){
   const box=$('#resetBox'); if(!box) return;
   const d=DIFFS[save.diff||0];
   box.innerHTML='<div class="danger"><div class="top">'+ICON('icon_reset')+'<div class="dtext"><b>Raze the '+d.n+' profile</b>'+
-    '<span>Silver, workshop ranks, stars and lives for this difficulty are wiped and the gates go back to 20. '+
+    '<span>Silver, weapon upgrades, stars and lives for this difficulty are wiped and the gates go back to 20. '+
     'The other two difficulties are untouched.</span></div></div></div>';
   const b=document.createElement('button');
   b.className='btn danger-btn'; b.textContent='Start this difficulty over';
@@ -4047,7 +4103,7 @@ function renderReset(){
   box.querySelector('.danger').appendChild(b);
 }
 function renderPerks(){
-  renderMastery(); renderLives(); renderReset();
+  renderMastery(); renderRespec(); renderLives(); renderReset();
   refreshMoney();
 }
 /* Одна точка на все экраны: после любой траты серебро и доступность кнопок
@@ -4060,9 +4116,9 @@ function refreshMoney(){
   document.querySelectorAll('.silvv,#silv1').forEach(el=>el.textContent=P().silver);
   const dot = canAffordSomething() ? '<span class="dot"></span>' : '';
   const fb=document.getElementById('bPerks');
-  if(fb) fb.innerHTML='<img src="assets/icons/icon_silver.png" alt="">Forge'+dot;
+  if(fb) fb.innerHTML='<img src="assets/icons/icon_silver.png" alt="">Upgrades'+dot;
   const res=document.getElementById('forgeBtn');
-  if(res) res.innerHTML='<img src="assets/icons/icon_silver.png" alt="">Forge · '+P().silver+dot;
+  if(res) res.innerHTML=upgLabel();
   if(document.getElementById('scPrep') && document.getElementById('scPrep').classList.contains('on')) renderPrep();
 }
 // --- подготовка к бою: расходники на один раунд ---
@@ -4105,9 +4161,21 @@ function renderPrep(){
                                     : ('You can march out with nothing — you keep all '+P().silver+' silver.');
   document.querySelectorAll('.silvv').forEach(el=>el.textContent=P().silver);
 }
+/* Снимок профиля до боя: «Replay fjord» на экране победы возвращает всё как было —
+   жизни, серебро (включая припасы) и звёзды этого фьорда. Отменяется результат целиком,
+   иначе повтором можно было бы копить серебро. */
+let runSnap=null;
+/* Кнопка улучшений на экране итогов: серебро в плашке, плашка светится, когда есть что купить.
+   Так подпись помещается в половину ширины даже на узком телефоне. */
+function upgLabel(){
+  return '<img src="assets/icons/icon_silver.png" alt="">Upgrades<span class="cnt'+(canAffordSomething()?' can':'')+'">'+P().silver+'</span>';
+}
 function marchOut(endless){
   const total=loadoutCost(loadout);
   if(total>P().silver){ SFX.no(); return; }
+  runSnap = endless ? null : { idx:prepLevel, diff:save.diff||0, silver:P().silver, lives:P().lives,
+                                star:(P().stars[prepLevel]||0), hadStar: prepLevel in P().stars,
+                                mast: JSON.parse(JSON.stringify(P().mast||{archer:1})) };
   P().silver-=total; persist();
   enterLevel(prepLevel, endless);
 }
@@ -4161,7 +4229,7 @@ function showEndless(){
   const saveNick=()=>{ const n=Board.rename(rec.id, inp.value); inp.value=n; const b=$('#nickOk'); b.textContent='Saved'; setTimeout(()=>{ if(b) b.textContent='Save name'; },1200); };
   $('#nickOk').onclick=saveNick;
   inp.onkeydown=e=>{ if(e.key==='Enter'){ saveNick(); inp.blur(); } };
-  const box=$('#resBtns'); box.innerHTML='';
+  const box=$('#resBtns'); box.innerHTML=''; box.className='row';
   const mk=(label,cls,fn)=>{ const b=document.createElement('button'); b.className='btn '+cls; b.textContent=label; b.onclick=fn; box.appendChild(b); return b; };
   mk('Leaderboard','board',()=>{ Board.rename(rec.id, inp.value); Board.open('scResult','mine'); });
   mk('Raid again','sec',()=>{ Board.rename(rec.id, inp.value); enterLevel(g.idx,true); });
@@ -4207,36 +4275,62 @@ function showResult(win){
     $('#resText').textContent='The raiders broke through on wave '+(g.wave+1)+' of '+g.waves.length+
       '. The village keeps the '+g.livesIn+' lives it had before the battle, but the fjord paid no silver. ';
   }
-  const box=$('#resBtns'); box.innerHTML='';
+  const box=$('#resBtns'); box.innerHTML=''; box.className='resgrid';
   const mk=(label,cls,fn)=>{ const b=document.createElement('button'); b.className='btn '+cls; b.textContent=label; b.onclick=fn; box.appendChild(b); return b; };
+  const upgrades=()=>{
+    const f=mk('','forge', ()=>openForge('scResult'));
+    f.id='forgeBtn';
+    f.innerHTML=upgLabel();
+    return f;
+  };
+  const toMap=()=>mk('Back to map','sec',async ()=>{ game=null; renderLevels(); screen('scLevels'); await adBreak(); });
 
-  /* Кузница стоит в потоке между уровнями: игрок видит её сразу после боя, когда
-     серебро только что начислено, а не ищет по меню. */
-  const forge=mk('','forge', ()=>openForge('scResult'));
-  forge.id='forgeBtn';
-  forge.innerHTML='<img src="assets/icons/icon_silver.png" alt="">Forge · '+P().silver+
-                  (canAffordSomething()?'<span class="dot"></span>':'');
   if(win){
-    mk('Double silver (ad)','ad', async e=>{
-      const btnEl=e.target; btnEl.disabled=true;
-      const ok=await Ads.rewarded('double-silver','Ad for double silver');
-      if(ok){ P().silver+=silver; persist(); screen('scResult'); $('#resText').textContent='Silver doubled: +'+(silver*2)+'.'; btnEl.remove(); }
-      else btnEl.disabled=false;              // ролика не было — пусть попробует ещё раз
-    });
+    // 1. главное действие — дальше
     if(i+1<LEVELS.length){
-      const nx=mk('Next fjord','', async ()=>{
+      const nx=mk('Next fjord','wide', async ()=>{
         levelsDone++;
         await adBreak();
         if(unlocked(i+1)) openPrep(i+1);
         else { renderLevels(); screen('scLevels'); }     // не хватает звёзд — отправляем на карту
       });
       if(!unlocked(i+1)){                                 // честно говорим, почему дальше нельзя
-        nx.className='btn sec';
+        nx.className='btn sec wide';
         nx.textContent='Need '+(starsNeed(i+1)-starsBefore(i+1))+' more ★';
       }
     }
-    mk('Back to map','sec',async ()=>{ game=null; renderLevels(); screen('scLevels'); await adBreak(); });
+    // 2. переиграть с откатом результата и улучшения
+    const snap=runSnap && runSnap.idx===i && runSnap.diff===(save.diff||0) ? runSnap : null;
+    if(snap){
+      const rp=mk('Replay fjord','replay', ()=>{
+        if(!rp.dataset.armed){
+          rp.dataset.armed='1'; rp.textContent='Tap again to replay';
+          setTimeout(()=>{ if(rp.dataset.armed){ rp.dataset.armed=''; rp.textContent='Replay fjord'; } },4000);
+          return;
+        }
+        P().silver=snap.silver; P().lives=snap.lives; P().mast=JSON.parse(JSON.stringify(snap.mast));   // и покупки после боя тоже
+        if(snap.hadStar) P().stars[i]=snap.star; else delete P().stars[i];
+        runSnap=null; flushSave(); SFX.coin && SFX.coin();
+        game=null; renderLevels(); openPrep(i);
+      });
+    }
+    upgrades();
+    if(!snap) toMap();
+    // 3. реклама и выход на карту
+    mk('×2 silver (ad)','ad', async e=>{
+      const btnEl=e.target; btnEl.disabled=true;
+      const ok=await Ads.rewarded('double-silver','Ad for double silver');
+      if(ok){ P().silver+=silver; persist(); screen('scResult'); $('#resText').textContent='Silver doubled: +'+(silver*2)+'.'; btnEl.remove(); }
+      else btnEl.disabled=false;              // ролика не было — пусть попробует ещё раз
+    });
+    if(snap) toMap();
+    if(snap){
+      const n=document.createElement('div'); n.className='note';
+      n.textContent='Lost too many lives? Replay fjord undoes this result: lives, silver, upgrades and stars go back to how they were before the battle.';
+      box.appendChild(n);
+    }
   } else {
+    mk('Retry','wide',async ()=>{ await adBreak(); openPrep(i); });
     if(g.adRevive) mk('+3 lives (ad)','ad', async e=>{
       e.target.disabled=true;
       const ok=await Ads.rewarded('revive-3-lives','Ad for +3 lives');
@@ -4247,9 +4341,12 @@ function showResult(win){
         screen(null);
       } else e.target.disabled=false;
     });
-    mk('Retry','',async ()=>{ await adBreak(); openPrep(i); });
-    mk('Back to map','sec',async ()=>{ game=null; renderLevels(); screen('scLevels'); await adBreak(); });
+    upgrades();
+    toMap();
   }
+  // кнопка, оставшаяся одна в строке, растягивается на всю ширину
+  const small=[...box.querySelectorAll('.btn:not(.wide)')];
+  if(small.length%2) small[small.length-1].classList.add('wide');
   screen('scResult');
 }
 

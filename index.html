@@ -400,7 +400,7 @@
       <button class="btn sec" id="bHelp">How to play</button>
     </div>
     <div class="bar"><div class="silver"><img src="assets/icons/icon_silver.png" alt=""><b id="silv1">0</b></div></div>
-    <div class="build">build 22.10 · 5</div>
+    <div class="build">build 22.10 · 6</div>
   </div>
 
   <!-- ВЫБОР УРОВНЯ -->
@@ -1780,7 +1780,7 @@ const HINTS={
   disabled:'That tower was sabotaged and is dark for a moment. It cannot fire.',
   wrecked:'A Wrecker smashed that tower. It stays dark far longer than a shaman\'s sabotage — kill Wreckers before they reach your line.',
   rune:'The rune of return is capped: three per fjord, and two runes cannot stand within four tiles of each other. Red cells are blocked by that rule.',
-  rain:'Fire rain: 65 gold, once a minute. Pick a spot on the road: 3.5 seconds later the arrows land, burn everything in the circle and leave burning ground that sets passing raiders on fire. Best for finishing off wounded raiders near the gates.',
+  rain:'Fire rain: 65 gold, every 55 seconds. Pick a spot on the road: 3.5 seconds later the arrows land, burn everything in the circle and leave burning ground that sets passing raiders on fire. Best for finishing off wounded raiders near the gates.',
   rock:'The best spots are blocked by rocks and trees. Buy a pickaxe for 300 gold to clear one. It takes 12 seconds, then you can build there.',
   building:'Towers take a few seconds to raise — a catapult needs five. Build before a wave lands, not while it runs.',
   freeze:'Fire melts frost and frost puts out fire. Do not stack a frost rune next to a fire altar.'
@@ -1867,7 +1867,7 @@ const CLEAR_COST=300, CLEAR_T=12;
    у ворот, а не заменить башни: урон растёт вместе со здоровьем врагов волны, но
    целого крепкого врага не убивает. Короткая перезарядка не даёт засыпать дорогу
    дождём, когда золота много. */
-const RAIN_COST=65, RAIN_DELAY=3.5, RAIN_R=70, RAIN_CD=60, RAIN_DMG=33, RAIN_BURN=6;
+const RAIN_COST=65, RAIN_DELAY=3.5, RAIN_R=70, RAIN_CD=55, RAIN_DMG=33, RAIN_BURN=6;
 function rainHpMul(){
   const g=game, w=g.waves[Math.min(g.wave,g.waves.length-1)];
   return (w && w.groups[0] && w.groups[0].hpMul) || 1;
@@ -2077,12 +2077,12 @@ const FXA={ img:null, ok:false, F:{"ram_u": [0, 0, 92, 340], "ram_d": [94, 0, 96
 FXA.load();
 const AB_ORDER=['rain','bolt','horn','wall','ice','ram'];
 const AB={
-  rain:{ name:'Fire Rain',        god:'odin',     godName:'Odin',     lv:0,  key:'Q', cd:60,  cost:65, mode:'circle', icon:'rain' },
-  bolt:{ name:"Thor's Lightning", god:'thor',     godName:'Thor',     lv:3,  key:'W', cd:60,  cost:80, mode:'target', icon:'i_lightning' },
-  horn:{ name:"Heimdall's Horn",  god:'heimdall', godName:'Heimdall', lv:6,  key:'E', cd:90,  cost:70, mode:'circle', icon:'i_horn' },
-  wall:{ name:'Shield Wall',      god:'freyja',   godName:'Freyja',   lv:8,  key:'R', cd:70,  cost:60, mode:'cell',   icon:'i_wall' },
-  ice: { name:"Skadi's Breath",   god:'skadi',    godName:'Skadi',    lv:10, key:'T', cd:100, base:15, per:120, mode:'line', icon:'i_ice' },
-  ram: { name:'Battering Ram',    god:'tyr',      godName:'Tyr',      lv:12, key:'Y', cd:100, base:10, per:150, mode:'line', icon:'i_ram' }
+  rain:{ name:'Fire Rain',        god:'odin',     godName:'Odin',     lv:0,  key:'Q', cd:55,  cost:65, mode:'circle', icon:'rain' },
+  bolt:{ name:"Thor's Lightning", god:'thor',     godName:'Thor',     lv:3,  key:'W', cd:55,  cost:80, mode:'target', icon:'i_lightning' },
+  horn:{ name:"Heimdall's Horn",  god:'heimdall', godName:'Heimdall', lv:6,  key:'E', cd:75,  cost:70, mode:'circle', icon:'i_horn' },
+  wall:{ name:'Shield Wall',      god:'freyja',   godName:'Freyja',   lv:8,  key:'R', cd:65,  cost:60, mode:'cell',   icon:'i_wall' },
+  ice: { name:"Skadi's Breath",   god:'skadi',    godName:'Skadi',    lv:10, key:'T', cd:70, base:15, per:120, mode:'line', icon:'i_ice' },
+  ram: { name:'Battering Ram',    god:'tyr',      godName:'Tyr',      lv:12, key:'Y', cd:70, base:10, per:150, mode:'line', icon:'i_ram' }
 };
 const HORN_R=120, HORN_T=5, WALL_T=6, WALL_MAX=12, RUSH_T=2.5, ICE_T=2.5, ICE_T_TOUGH=1.5, LINE_MAX=0.6;
 /* Дары выбирает игрок: перед первым фьордом и после 3, 6, 8, 10 и 12. Выбор навсегда

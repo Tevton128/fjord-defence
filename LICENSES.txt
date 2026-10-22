@@ -14,13 +14,7 @@ AUDIO
   are synthesised at runtime with the Web Audio API, so no samples are used.
 
 FONTS
-  The build uses the system font stack (Trebuchet MS, Segoe UI, system-ui).
-  Bundled font files in assets/fonts, if present, are:
-    Lato   — SIL Open Font License 1.1 — https://github.com/latofonts/lato-source
-    Inter  — SIL Open Font License 1.1 — https://github.com/rsms/inter
-  The SIL OFL permits use, modification and redistribution, including commercial
-  use, as long as the fonts are not sold on their own and the licence travels with
-  the files.
+  The build uses the system font stack (Trebuchet MS, Segoe UI, system-ui). No font files are bundled.
 
 THIRD PARTY SERVICES
   The YouTube Playables SDK (https://www.youtube.com/game_api/v1) is loaded only

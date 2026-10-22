@@ -400,7 +400,7 @@
       <button class="btn sec" id="bHelp">How to play</button>
     </div>
     <div class="bar"><div class="silver"><img src="assets/icons/icon_silver.png" alt=""><b id="silv1">0</b></div></div>
-    <div class="build">build 22.10 · 6</div>
+    <div class="build">build 22.10 · 7</div>
   </div>
 
   <!-- ВЫБОР УРОВНЯ -->
@@ -2845,6 +2845,40 @@ function spriteScaled(name,x,yFeet,refName,refH){
                 x-cx, yFeet-bh, bw, bh);
   return true;
 }
+/* Подсветка врагов (огонь, мороз, вспышка попадания, свечение) раньше считалась
+   фильтрами и размытием тени каждый кадр для каждого врага. На телефоне это главный
+   тормоз в массовом бою, а Safari до 18-й версии фильтры вообще не умеет. Теперь
+   вариант кадра готовится один раз и дальше только копируется. */
+const SPR_V=new Map();
+function spriteVariantCanvas(name,v){
+  const key=name+'|'+v; if(SPR_V.has(key)) return SPR_V.get(key);
+  let out=null;
+  try{
+    const d=ART.f(name); if(!d) return null;
+    const bw=d[7]||d[3], bh=d[8]||d[4], pad=v[0]==='g'?18:0;
+    const cn=document.createElement('canvas'); cn.width=bw+pad*2; cn.height=bh+pad*2;
+    const c=cn.getContext('2d');
+    if(v[0]==='g'){ c.shadowColor=v.slice(2); c.shadowBlur=16; }
+    c.drawImage(ART.img[d[0]], d[1]+d[5], d[2]+d[6], bw, bh, pad, pad, bw, bh);
+    if(v==='hit' || v==='ice'){
+      const im=c.getImageData(0,0,cn.width,cn.height), a=im.data;
+      for(let i=0;i<a.length;i+=4){ if(!a[i+3]) continue;
+        const r=a[i],g=a[i+1],b=a[i+2], l=0.3*r+0.59*g+0.11*b;
+        if(v==='hit'){ a[i]=Math.min(255,l*0.5+r*0.5+110); a[i+1]=Math.min(255,l*0.5+g*0.5+110); a[i+2]=Math.min(255,l*0.5+b*0.5+110); }
+        else { a[i]=Math.min(255,l*0.55+40); a[i+1]=Math.min(255,l*0.85+70); a[i+2]=Math.min(255,l*1.05+110); }
+      }
+      c.putImageData(im,0,0);
+    }
+    out={cn,pad,bw,bh,d};
+  }catch(e){ out=null; }                           // file:// и чужие картинки: просто без подсветки
+  SPR_V.set(key,out); return out;
+}
+function spriteV(name,x,yFeet,targetH,v){
+  const c=spriteVariantCanvas(name,v); if(!c) return sprite(name,x,yFeet,targetH);
+  const d=c.d, k=targetH/c.bh, cx=(d[9]!=null? d[9] : c.bw/2)*k;
+  ctx.drawImage(c.cn, x-cx-c.pad*k, yFeet-targetH-c.pad*k, c.cn.width*k, c.cn.height*k);
+  return true;
+}
 function spriteW(name,x,yFeet,targetW){
   const d=ART.f(name); if(!d) return false;
   const bw=d[7]||d[3], bh=d[8]||d[4];
@@ -3482,7 +3516,27 @@ function drawReload(t){                      // видимая перезаря�
     ctx.strokeStyle='rgba(127,209,138,.8)'; ctx.lineWidth=1.4; rr(-w/2,28,w,5,2.5); ctx.stroke();
   }
 }
-function drawRank(lvl){                       // знак уровня башни
+/* Значок уровня рисуется один раз в маленький холст и дальше только копируется:
+   на слабых телефонах 14 башен × несколько штрихов заметно стоили кадра. */
+const RANK_C=[];
+function drawRank(lvl){
+  let c=RANK_C[lvl];
+  if(c===undefined){
+    c=null;
+    try{ const n=lvl+1, w=9+n*9, S=2, cn=document.createElement('canvas');
+      cn.width=(w+4)*S; cn.height=15*S; const x=cn.getContext('2d'); x.scale(S,S); x.translate(w/2+2,-13);
+      const rr2=(X,Y,W,H,R)=>{ x.beginPath(); x.moveTo(X+R,Y); x.arcTo(X+W,Y,X+W,Y+H,R); x.arcTo(X+W,Y+H,X,Y+H,R); x.arcTo(X,Y+H,X,Y,R); x.arcTo(X,Y,X+W,Y,R); x.closePath(); };
+      x.fillStyle='rgba(12,22,29,.82)'; rr2(-w/2,15,w,11,5); x.fill();
+      x.strokeStyle='rgba(231,183,78,.5)'; x.lineWidth=1; rr2(-w/2,15,w,11,5); x.stroke();
+      x.strokeStyle='#e7b74e'; x.lineWidth=2; x.lineCap='round'; x.lineJoin='round';
+      for(let i=0;i<n;i++){ const cx=-w/2+7+i*9; x.beginPath(); x.moveTo(cx-3,23); x.lineTo(cx,17.5); x.lineTo(cx+3,23); x.stroke(); }
+      c={cn,w}; }catch(e){}
+    RANK_C[lvl]=c;
+  }
+  if(c){ ctx.drawImage(c.cn, -c.w/2-2, 13, c.w+4, 15); return; }
+  drawRankRaw(lvl);
+}
+function drawRankRaw(lvl){                    // знак уровня башни
   const n=lvl+1, w=9+n*9;
   ctx.fillStyle='rgba(12,22,29,.82)'; rr(-w/2,15,w,11,5); ctx.fill();
   ctx.strokeStyle='rgba(231,183,78,.5)'; ctx.lineWidth=1; rr(-w/2,15,w,11,5); ctx.stroke();
@@ -3587,14 +3641,10 @@ function drawEnemies(){
       if(flip) ctx.scale(-1,1);                          // западные ракурсы — зеркало восточных
       ctx.rotate(Math.sin(e.phase*0.5)*0.028);           // мягкое покачивание корпуса
       if(e.stunT>0 && !(e.iceT>0)) ctx.translate(Math.sin(game.time*40)*1.5,0);
-      if(e.iceT>0){ try{ ctx.filter='saturate(.35) brightness(1.25) hue-rotate(160deg)'; }catch(err){} }
       if(e.charge>0 && Math.random()<0.35) particle(e.x-Math.cos(e.dir)*10, e.y+e.r*0.6, '#b99a6b');
       if(e.tp>0) ctx.globalAlpha=0.55+0.45*Math.sin(game.time*30);
-      if(e.hit>0){ try{ ctx.filter='brightness(1.9) saturate(.6)'; }catch(err){} }
-      if(e.slowT>0){ ctx.shadowColor='#79cbe8'; ctx.shadowBlur=14; }
-      else if(e.burnT>0){ ctx.shadowColor='#e0733a'; ctx.shadowBlur=16; }
-      else if(e.d.glow){ ctx.shadowColor=e.d.glow; ctx.shadowBlur=11; }   // новые типы делят модель с обычными, различаем свечением
-      sprite(spr, 0, e.r*0.95, H);
+      const v = e.iceT>0 ? 'ice' : e.hit>0 ? 'hit' : e.slowT>0 ? 'g:#79cbe8' : e.burnT>0 ? 'g:#e0733a' : e.d.glow ? 'g:'+e.d.glow : null;
+      if(v) spriteV(spr, 0, e.r*0.95, H, v); else sprite(spr, 0, e.r*0.95, H);
       ctx.restore();
       if(e.iceT>0){                                  // дыхание Скади: враг вмёрз в лёд
         const a=clamp(e.iceT/0.35,0,1), grow=clamp(((e.iceMax||ICE_T)-e.iceT)/0.18,0,1);
@@ -3682,12 +3732,13 @@ function drawFx(){
   for(const f of game.fx){
     const k=f.life/f.max;
     if(f.kind==='bolt'){
-      ctx.save(); ctx.strokeStyle='rgba(200,170,255,'+k+')'; ctx.lineWidth=3.5; ctx.shadowColor='#b58ce0'; ctx.shadowBlur=14;
-      ctx.beginPath();
+      ctx.save(); ctx.beginPath();
       for(let i=0;i<f.pts.length-1;i++){ const a=f.pts[i], b=f.pts[i+1];
         ctx.moveTo(a.x,a.y);
         ctx.lineTo((a.x+b.x)/2+(Math.random()-.5)*14,(a.y+b.y)/2+(Math.random()-.5)*14); ctx.lineTo(b.x,b.y); }
-      ctx.stroke(); ctx.restore();
+      ctx.lineCap='round'; ctx.lineJoin='round';
+      ctx.strokeStyle='rgba(181,140,224,'+(k*0.35)+')'; ctx.lineWidth=10; ctx.stroke();   // ореол без дорогого размытия
+      ctx.strokeStyle='rgba(200,170,255,'+k+')'; ctx.lineWidth=3.5; ctx.stroke(); ctx.restore();
     } else if(f.kind==='boom' && ART.has('fx_explosion_0')){
       spriteC('fx_explosion_'+clamp(Math.floor((1-k)*8),0,7), f.x, f.y, f.r*2.6);
     } else if(f.kind==='tp'){

@@ -188,6 +188,26 @@
      flex-direction:column;align-items:center;gap:14px;pointer-events:auto;text-align:center}
   #pausePanel.on{display:flex}
   #secretRune{margin:26px auto 8px;font-size:22px;color:#2a3f4c;cursor:default;user-select:none;-webkit-user-select:none;width:44px;height:44px;line-height:44px;text-align:center}
+  #chooseOv{position:fixed;inset:0;z-index:30;display:none;align-items:center;justify-content:center;
+     background:rgba(4,9,13,.96);pointer-events:auto;padding:10px;box-sizing:border-box;overflow:auto}
+  #chooseOv.on{display:flex}
+  #chooseOv .chbox{width:min(96vw,760px);display:flex;flex-direction:column;align-items:center;gap:8px;animation:gin .35s ease-out;margin:auto}
+  #chooseOv .gtitle{font:700 24px/1.1 var(--f);color:#f3e2b0;text-align:center;text-shadow:0 2px 8px #000}
+  #chooseOv .chsub{font-size:13.5px;color:#a8b8c2;text-align:center}
+  #chooseOv .chgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;width:100%;margin:4px 0}
+  #chooseOv .chcard{display:grid;grid-template-columns:56px 1fr;grid-template-rows:auto auto auto auto;column-gap:10px;align-items:center;
+     text-align:left;padding:10px;border-radius:12px;border:2px solid #2f4a5a;background:#122430;color:#e9f0f4;cursor:pointer;font:inherit}
+  #chooseOv .chcard img{grid-row:1/5;width:56px;height:56px}
+  #chooseOv .chcard b{font-size:16px;color:#f3e2b0}
+  #chooseOv .chcard .an{font-size:13px;font-weight:700;color:#e9f0f4}
+  #chooseOv .chcard .ad{font-size:12px;line-height:1.35;color:#9fb3c0}
+  #chooseOv .chcard .ap{font-size:11.5px;color:#e7b74e;margin-top:2px}
+  #chooseOv .chcard.on{border-color:#e7b74e;background:#2a2512;box-shadow:0 0 0 3px rgba(231,183,78,.25)}
+  #chooseOv .btn{margin:4px 0 0;min-width:260px}
+  #chooseOv .btn:disabled{opacity:.5}
+  @media (max-width:760px){ #chooseOv .chgrid{grid-template-columns:repeat(2,1fr)} }
+  @media (max-height:460px){ #chooseOv .chcard{padding:6px 8px;grid-template-columns:40px 1fr} #chooseOv .chcard img{width:40px;height:40px}
+     #chooseOv .chcard .ad{display:none} #chooseOv .gtitle{font-size:19px} #chooseOv .chgrid{grid-template-columns:repeat(3,1fr);gap:6px} }
   #giftOv{position:fixed;inset:0;z-index:30;display:none;align-items:center;justify-content:center;
      background:rgba(4,9,13,.82);pointer-events:auto;padding:12px;box-sizing:border-box}
   #giftOv.on{display:flex}
@@ -336,6 +356,15 @@
 </div></div>
 
   <!-- ПАУЗА В БОЮ: громкость крутим там, где музыка реально играет -->
+  <!-- ВЫБОР ДАРА -->
+  <div id="chooseOv">
+    <div class="chbox">
+      <div class="gtitle" id="chTitle">Choose your first god</div>
+      <div class="chsub" id="chSub"></div>
+      <div class="chgrid" id="chGrid"></div>
+      <button class="btn" id="chOk" disabled>Pick a god</button>
+    </div>
+  </div>
   <!-- ДАР БОГОВ: двухкадровый комикс -->
   <div id="giftOv">
     <div class="gbox">
@@ -371,7 +400,7 @@
       <button class="btn sec" id="bHelp">How to play</button>
     </div>
     <div class="bar"><div class="silver"><img src="assets/icons/icon_silver.png" alt=""><b id="silv1">0</b></div></div>
-    <div class="build">build 22.10 · 1</div>
+    <div class="build">build 22.10 · 5</div>
   </div>
 
   <!-- ВЫБОР УРОВНЯ -->
@@ -440,6 +469,7 @@
       <li><b>Shamans sabotage.</b> Besides healing, they knock out the nearest tower for a couple of seconds. A dark tower with green sparks is disabled.</li>
       <li>Trees and boulders occupy a cell: you cannot build on them, but they show where the path is tight.</li>
       <li>The “Call wave early” button pays gold for every second you save.</li>
+      <li><b>Gifts of the gods.</b> Before the first fjord, and after fjords 3, 6, 8, 10 and 12, you choose a god and receive his power: Fire Rain, Thor’s Lightning, Heimdall’s Horn, Shield Wall, Skadi’s Breath or the Battering Ram. The choice is forever; to choose differently, start the difficulty over. They sit on the left of the battlefield, cost gold and need time to recharge. On a keyboard: Q, W, E, R, T, Y.</li>
     </ul>
     <div id="secretRune" title="">ᚱ</div>
     <button class="btn sec" id="bSandbox" style="display:none">Odin's Training Ground</button>
@@ -1166,7 +1196,7 @@ const TOWERS = {
     tip:'Fast arrows, hits air. Weak against armour.',
     L:[ {cost:80,  range:112, dmg:14, cd:0.55, ab:'One arrow per shot.'},
         {cost:85,  range:124, dmg:21, cd:0.50, ab:'Longer range, harder hits.'},
-        {cost:220, range:136, dmg:30, cd:0.45, twin:true, ab:'Volley of two arrows.'} ] },
+        {cost:220, range:136, dmg:20, cd:0.47, twin:true, ab:'Volley of two arrows.'} ] },
   frost:{ build:4, name:'Frost Rune', short:'Frost Rune', air:true, unlock:2, color:'#6fc0e0',
     tip:'Low damage, heavy slow. More targets per shot with every level.',
     L:[ {cost:105,  range:118, dmg:6,  cd:1.0, slow:.35, slowT:1.5, tgt:1, ab:'Slows one enemy by 35%.'},
@@ -1812,7 +1842,7 @@ function startLevel(idx, sandbox, endless){
   game.decor.sort((a,b)=>a.r-b.r);
   game.selRock=null;
   game.startLives=game.lives;
-  if(!sandbox){ const gk=AB_ORDER.find(k=>AB[k].lv===idx && !P().gifts[k]); if(gk) preloadGift(gk); }                    // от этого числа считаем потери именно в этом фьорде
+                    // от этого числа считаем потери именно в этом фьорде
   game.alarm={on:false, beat:0, lit:0}; game.massBase=0;
   game.bgImg=null; game.roadImg=null; loadLevelBg(idx);
   preloadLevelBg(Math.min(idx+1, LEVELS.length-1));
@@ -2032,7 +2062,7 @@ function keyBadge(x,y,label){
 /* ===================== СПОСОБНОСТИ (дары богов) =====================
    Каждую дарит бог после прохождения своего фьорда. В бою стоят золото и
    перезаряжаются. Огненный дождь живёт в старом коде (castRain), остальные — здесь. */
-const FXA={ img:null, ok:false, F:{"ram_u": [0, 0, 92, 340], "ram_d": [94, 0, 96, 340], "wall_v": [192, 0, 84, 300], "ram_r": [278, 0, 340, 205], "ice": [620, 0, 170, 164], "i_lightning": [792, 0, 128, 128], "i_horn": [0, 342, 128, 128], "i_ice": [130, 342, 128, 128], "i_wall": [260, 342, 128, 128], "i_ram": [390, 342, 128, 128], "wall_h": [520, 342, 300, 92], "boost": [822, 342, 68, 72]},
+const FXA={ img:null, ok:false, F:{"ram_u": [0, 0, 92, 340], "ram_d": [94, 0, 96, 340], "wall_v": [192, 0, 84, 300], "ram_r": [278, 0, 340, 205], "ice": [620, 0, 170, 164], "i_lightning": [792, 0, 128, 128], "i_horn": [0, 342, 128, 128], "i_ice": [130, 342, 128, 128], "i_wall": [260, 342, 128, 128], "i_ram": [390, 342, 128, 128], "wall_h": [520, 342, 300, 92], "boost": [822, 342, 68, 72], "wall_back": [0, 472, 300, 104]},
   load(){ if(typeof Image==='undefined') return; const im=new Image();
     im.onload=()=>{ this.ok=true; }; im.src='assets/fx/fx_abil.webp'; this.img=im; },
   draw(name,x,y,w,h,alpha,flip){
@@ -2055,7 +2085,15 @@ const AB={
   ram: { name:'Battering Ram',    god:'tyr',      godName:'Tyr',      lv:12, key:'Y', cd:100, base:10, per:150, mode:'line', icon:'i_ram' }
 };
 const HORN_R=120, HORN_T=5, WALL_T=6, WALL_MAX=12, RUSH_T=2.5, ICE_T=2.5, ICE_T_TOUGH=1.5, LINE_MAX=0.6;
-function abUnlocked(k){ return !!(game && game.sandbox) || (P().stars[AB[k].lv]||0)>0; }
+/* Дары выбирает игрок: перед первым фьордом и после 3, 6, 8, 10 и 12. Выбор навсегда
+   (сбрасывается только вместе со сложностью). Порядок выбора хранится в профиле. */
+const CHOICE_AT=[-1,2,5,7,9,11];
+function picks(){ const pr=P(); if(!Array.isArray(pr.picks)){            // перенос со старой схемы: принятые дары остаются
+    pr.picks=AB_ORDER.filter(k=>pr.gifts && pr.gifts[k]); }
+  return pr.picks; }
+function picksAllowed(){ return CHOICE_AT.filter(m=>m<0 || (P().stars[m]||0)>0).length; }
+function choicePending(){ return picks().length<Math.min(picksAllowed(),AB_ORDER.length); }
+function abUnlocked(k){ return !!(game && game.sandbox) || picks().includes(k); }
 function abList(){ return AB_ORDER.filter(abUnlocked); }
 function abCd(k){ const g=game; return k==='rain' ? g.rainCd : (g.abCd[k]||0); }
 function abMaxCd(k){ return game.sandbox ? 1 : AB[k].cd; }
@@ -2156,19 +2194,20 @@ function castWall(x,y){
   const g=game, c=Math.floor(x/TS), r=Math.floor((y-BY)/TS);
   if(!g.pathCells || !g.pathCells.has(c+','+r) || c<0||r<0||c>=COLS||r>=ROWS) return abFail(x,y,'place it on the road');
   const cx=tx(c), cy=ty(r), at={};
-  let vert=false, any=false;
+  let vert=false, any=false, dir={dx:1,dy:0};
   for(let pi=0;pi<g.paths.length;pi++){
     const G=pathGeo(pi);
     for(let i=1;i<G.pts.length;i++){
       const rr=projSeg(cx,cy,G.pts[i-1],G.pts[i]);
       if(rr.d<4){ at[pi]=G.cum[i-1]+rr.k*rr.len; any=true;
-        if(pi===nearestOnPaths(cx,cy).pi) vert=Math.abs(G.pts[i].y-G.pts[i-1].y)>Math.abs(G.pts[i].x-G.pts[i-1].x);
+        if(pi===nearestOnPaths(cx,cy).pi){ vert=Math.abs(G.pts[i].y-G.pts[i-1].y)>Math.abs(G.pts[i].x-G.pts[i-1].x);
+          dir={dx:Math.sign(G.pts[i].x-G.pts[i-1].x), dy:Math.sign(G.pts[i].y-G.pts[i-1].y)}; }
         break; }
     }
   }
   if(!any) return abFail(x,y,'place it on the road');
   if(!abPay('wall',AB.wall.cost,x,y)) return false;
-  g.walls.push({x:cx,y:cy,at,vert,t:0,held:new Set()});
+  g.walls.push({x:cx,y:cy,at,vert,dir,t:0,held:new Set()});
   SFX.wallUp(); for(let i=0;i<12;i++) particle(cx,cy,'#c9a06a');
   return true;
 }
@@ -2279,24 +2318,74 @@ function drawAbilitiesGround(){
     let pts=r.pts;
     if(sweep<1){ pts=sliceLine(r.pts, r.len*sweep); }
     ctx.save(); ctx.globalAlpha=a;
-    strokePts(pts,TS*0.86,'rgba(150,205,240,.42)');
-    strokePts(pts,TS*0.62,'rgba(205,236,255,.5)');
-    strokePts(pts,TS*0.22,'rgba(255,255,255,.35)');
+    strokePts(pts,TS*1.02,'rgba(240,250,255,.9)');            // иней по краям
+    strokePts(pts,TS*0.9,'rgba(30,90,145,.85)');              // тёмная кромка
+    const pat=iceTex(); if(pat){ strokePts(pts,TS*0.84,pat); }
+    strokePts(pts,TS*0.08,'rgba(255,255,255,.35)');            // отблеск по середине
+    // блики скользят по льду
+    ctx.globalCompositeOperation='lighter';
+    if(!r.glints){ r.glints=[]; for(let i=0;i<Math.max(4,r.len/40|0);i++) r.glints.push({u:Math.random(), o:(Math.random()-.5)*TS*0.5, ph:Math.random()*6}); }
+    for(const gl of r.glints){
+      const q=linePoint({pts:r.pts}, gl.u*r.len*sweep), k=Math.max(0,Math.sin(now*3+gl.ph));
+      if(k<0.2) continue;
+      const x=q.x+(q.dy?gl.o:0), y=q.y+(q.dx?gl.o:0);
+      ctx.fillStyle='rgba(255,255,255,'+(0.55*k)+')';
+      ctx.beginPath(); ctx.moveTo(x,y-6*k); ctx.lineTo(x+1.4,y); ctx.lineTo(x,y+6*k); ctx.lineTo(x-1.4,y); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(x-6*k,y); ctx.lineTo(x,y+1.4); ctx.lineTo(x+6*k,y); ctx.lineTo(x,y-1.4); ctx.closePath(); ctx.fill();
+    }
     ctx.restore();
   }
   for(const w of g.walls){
     const a = w.t<0.2 ? w.t/0.2 : clamp((WALL_T-w.t)/0.4,0,1);
     const rise = 1-Math.pow(1-clamp(w.t/0.22,0,1),3);
-    shadow(w.x,w.y+10,TS*0.75,8);
-    if(w.vert) FXA.draw('wall_h', w.x, w.y-6, TS*1.9, null, a*rise);
-    else if(FXA.ok){                                 // поперёк горизонтальной дороги — столбик щитов лицом к нам
-      const f=FXA.F.wall_h, sw=f[2]/5, n=3, ww=TS*0.78, hh=ww*f[3]/sw, step=TS*0.5;
-      ctx.save(); ctx.globalAlpha*=a*rise;
-      for(let i=0;i<n;i++){ const k=(i*2+1)%5;
-        ctx.drawImage(FXA.img, f[0]+sw*k, f[1], sw, f[3], w.x-ww/2, w.y-TS*0.7+i*step-hh/2+ (i-1)*2, ww, hh); }
-      ctx.restore();
+    /* Щиты всегда лицом к врагу: идут снизу — видим лицевую сторону, идут сверху —
+       обратную с упорами; на горизонтальной дороге ряд стоит боком к нам. */
+    ctx.save(); ctx.globalAlpha*=a*rise; ctx.translate(w.x,w.y);
+    if(w.vert){
+      shadow(0,12,TS*0.95,9);
+      // враги снизу — лицевая сторона; сверху — щиты к ним лицом, а мы видим их изнанку с упорами
+      FXA.draw(w.dir.dy>0?'wall_back':'wall_h', 0, -6, TS*2.0, null);
+    } else {
+      shadow(0,10,14,TS*0.85);
+      if(w.dir.dx<0) ctx.scale(-1,1);
+      FXA.draw('wall_v', 0, -8, null, TS*2.05);
     }
+    ctx.restore();
   }
+}
+/* Текстура льда рисуется один раз: голубые переливы, трещины, пузырьки и иней. */
+let ICE_PAT=null, ICE_IMG=null, ICE_IMG_PAT=null;
+if(typeof Image!=='undefined'){ ICE_IMG=new Image(); ICE_IMG.src='assets/fx/ice_tex.webp'; }
+function iceTex(){
+  // нарисованная текстура льда; пока не загрузилась — запасная, сгенерированная кодом
+  if(ICE_IMG_PAT) return ICE_IMG_PAT;
+  if(ICE_IMG && ICE_IMG.complete && ICE_IMG.naturalWidth){ try{ ICE_IMG_PAT=ctx.createPattern(ICE_IMG,'repeat'); return ICE_IMG_PAT; }catch(e){} }
+  if(ICE_PAT!==null) return ICE_PAT||null;
+  try{
+    const N=192, cn=document.createElement('canvas'); cn.width=cn.height=N; const c=cn.getContext('2d');
+    const R=(a,b)=>a+Math.random()*(b-a);
+    const gr=c.createLinearGradient(0,0,N,N);
+    gr.addColorStop(0,'#5fa3d3'); gr.addColorStop(.35,'#a9dbf6'); gr.addColorStop(.6,'#76b6e0'); gr.addColorStop(1,'#bfe6fb');
+    c.fillStyle=gr; c.fillRect(0,0,N,N);
+    for(let i=0;i<40;i++){ const dark=Math.random()<.45;                    // толща льда: тёмные и светлые пятна
+      c.fillStyle=dark?'rgba(30,90,150,'+R(.08,.18)+')':'rgba(235,250,255,'+R(.1,.25)+')';
+      c.beginPath(); c.ellipse(R(0,N),R(0,N),R(10,40),R(4,14),R(0,3),0,7); c.fill(); }
+    c.save(); c.globalCompositeOperation='lighter';                         // диагональные блики полировки
+    for(let i=0;i<7;i++){ const x=R(-N,N); c.strokeStyle='rgba(255,255,255,'+R(.08,.2)+')'; c.lineWidth=R(3,10);
+      c.beginPath(); c.moveTo(x,N); c.lineTo(x+N,0); c.stroke(); }
+    c.restore();
+    const crack=(x,y,len,ang,w)=>{ const pts=[[x,y]];
+      for(let i=0;i<len;i++){ ang+=(Math.random()-.5)*0.8; x+=Math.cos(ang)*8; y+=Math.sin(ang)*8; pts.push([x,y]);
+        if(Math.random()<0.22 && w>0.8) crack(x,y,len/2|0,ang+(Math.random()<.5?1.1:-1.1),w*0.6); }
+      c.lineJoin='round';
+      c.strokeStyle='rgba(20,70,120,.55)'; c.lineWidth=w+1.6; c.beginPath(); pts.forEach((p,i)=>i?c.lineTo(p[0],p[1]):c.moveTo(p[0],p[1])); c.stroke();
+      c.strokeStyle='rgba(255,255,255,.95)'; c.lineWidth=w; c.stroke(); };
+    for(let i=0;i<6;i++) crack(R(0,N),R(0,N),R(8,16),R(0,6.28),2.2);
+    for(let i=0;i<14;i++){ c.fillStyle='rgba(255,255,255,'+R(.35,.8)+')'; c.beginPath(); c.arc(R(0,N),R(0,N),R(1,2.6),0,7); c.fill(); }  // пузырьки
+    for(let i=0;i<140;i++){ c.fillStyle='rgba(255,255,255,'+R(.2,.6)+')'; c.fillRect(R(0,N),R(0,N),1.4,1.4); }        // иней
+    ICE_PAT=ctx.createPattern(cn,'repeat');
+  }catch(e){ ICE_PAT=false; }
+  return ICE_PAT||null;
 }
 function sliceLine(pts,len){
   const out=[pts[0]]; let acc=0;
@@ -2325,7 +2414,7 @@ function drawAbilitiesTop(){
     const hor=Math.abs(p.dx)>=Math.abs(p.dy);
     const bob=Math.sin(now*22)*1.6;
     const cx=p.x-p.dx*TS*0.95, cy=p.y-p.dy*TS*0.95+bob-8;
-    shadow(cx,p.y+12,TS*1.1,8);
+    if(hor) shadow(cx,p.y+12,TS*1.1,8); else shadow(cx,cy+14,14,TS*1.05);
     if(hor) FXA.draw('ram_r',cx,cy,TS*2.7,null,a,p.dx<0);
     else FXA.draw(p.dy<0?'ram_u':'ram_d',cx,cy,null,TS*2.7,a);
     if(Math.random()<0.5) particle(p.x-p.dx*TS*1.6, p.y-p.dy*TS*1.6+12, '#cbbba0');
@@ -2407,53 +2496,99 @@ function drawLinePreview(line){
   txt(label,e.x,e.y-28,14,afford?'#f3e2b0':'#ff9a8a','center',true);
 }
 
-/* --- кнопки способностей: столбик у левого края поля --- */
-function abRects(){
-  const list=abList(); if(!list.length) return [];
-  const top=(PORTRAIT?PORT_BOARD_Y:BY)+10;
+/* --- кнопки способностей ---
+   Одна кнопка «Gods» в левом нижнем углу поля: занимает одну клетку. Нажатие раскрывает
+   список даров с названием, ценой и перезарядкой; выбор закрывает список. На клавиатуре
+   Q W E R T Y работают без списка. Если дар один, кнопка сразу его применяет. */
+function abAnchor(){
+  const s=TOUCH?60:52;
   const bottom=(PORTRAIT?PORT_BOARD_Y+PORT_BOARD_H:PY)-((PORTRAIT||STRIP)?14:48);
-  const gap=14, n=list.length;
-  const s=Math.max(34, Math.min(TOUCH?62:56, Math.floor((bottom-top-gap*(n-1))/n)));
-  return list.map((k,i)=>({k, x:10, y:bottom-(n-i)*s-(n-1-i)*gap, w:s, h:s}));
+  const top=(PORTRAIT?PORT_BOARD_Y:BY)+8;
+  return {x:10, y:bottom-s, s, top, bottom};
+}
+function abPriceText(k){ const a=AB[k]; return a.mode==='line' ? a.base+'–'+Math.round(a.base+a.per*LINE_MAX) : String(a.cost); }
+function abRows(){
+  const g=game, list=abList(), A=abAnchor(); if(list.length<2 || !g.abOpen) return [];
+  const gap=6, avail=A.y-8-A.top;
+  const rh=Math.max(40, Math.min(TOUCH?58:48, Math.floor((avail-gap*(list.length-1))/list.length)));
+  const rw=TOUCH?262:236;
+  return list.map((k,i)=>({k, x:A.x, y:A.y-8-(list.length-i)*rh-(list.length-1-i)*gap, w:rw, h:rh}));
+}
+function abIcon(k,cx,cy,d,alpha){
+  ctx.save(); ctx.globalAlpha*=alpha;
+  const ok = k==='rain' ? FXR.draw('icon',cx,cy,d,0.5,0.5,0) : FXA.draw(AB[k].icon,cx,cy,d,d);
+  if(!ok){ ctx.fillStyle='rgba(12,22,30,.9)'; ctx.beginPath(); ctx.arc(cx,cy,d/2,0,7); ctx.fill(); txt(AB[k].key,cx,cy,d*0.4,'#e9f0f4','center',true); }
+  ctx.restore();
+}
+function abCdOverlay(k,cx,cy,r,fs){
+  const cd=abCd(k); if(cd<=0) return;
+  ctx.fillStyle='rgba(5,10,14,.66)'; ctx.beginPath(); ctx.moveTo(cx,cy);
+  ctx.arc(cx,cy,r,-Math.PI/2,-Math.PI/2+cd/abMaxCd(k)*6.283); ctx.closePath(); ctx.fill();
+  txt(Math.ceil(cd)+'s',cx,cy,fs,'#ffffff','center',true);
 }
 function drawAbilityBar(){
   const g=game; if(!g) return;
-  const tipFor={ rain:'the road to drop fire arrows', bolt:'an enemy to strike it', horn:'to bless the towers in the circle',
-                 wall:'a road tile to raise the wall' };
-  for(const b of abRects()){
-    const k=b.k, cx=b.x+b.w/2, cy=b.y+b.h/2, r=b.w/2;
-    const cd=abCd(k), ready=cd<=0, afford=g.gold>=abMinCost(k), on=g.armed===k;
-    uiBtns.push({id:'ab_'+k,x:b.x,y:b.y,w:b.w,h:b.h,on:true});
-    ctx.save();
-    if(on){ ctx.shadowColor='rgba(255,170,60,.9)'; ctx.shadowBlur=16;
-      ctx.fillStyle='rgba(255,150,50,.32)'; ctx.beginPath(); ctx.arc(cx,cy,r+3,0,7); ctx.fill(); ctx.shadowBlur=0; }
-    ctx.globalAlpha = ready&&afford ? 1 : 0.5;
-    const drawn = k==='rain' ? FXR.draw('icon',cx,cy,b.h,0.5,0.5,0) : FXA.draw(AB[k].icon,cx,cy,b.w,b.h);
-    if(!drawn){ ctx.fillStyle='rgba(12,22,30,.88)'; ctx.beginPath(); ctx.arc(cx,cy,r,0,7); ctx.fill();
-      txt(AB[k].key,cx,cy,r*0.8,'#e9f0f4','center',true); }
-    ctx.globalAlpha=1;
-    if(on){ ctx.strokeStyle='#ffd0a0'; ctx.lineWidth=2.5; ctx.beginPath(); ctx.arc(cx,cy,r+1.5,0,7); ctx.stroke(); }
-    if(!ready){
-      const kk=cd/abMaxCd(k);
-      ctx.fillStyle='rgba(5,10,14,.66)'; ctx.beginPath(); ctx.moveTo(cx,cy);
-      ctx.arc(cx,cy,r,-Math.PI/2,-Math.PI/2+kk*6.283); ctx.closePath(); ctx.fill();
-      txt(Math.ceil(cd)+'s',cx,cy,TOUCH?17:15,'#ffffff','center',true);
+  const list=abList(); if(!list.length) return;
+  const A=abAnchor(), cx=A.x+A.s/2, cy=A.y+A.s/2, r=A.s/2;
+  // раскрытый список
+  const rows=abRows();
+  if(rows.length){
+    const top=rows[0].y-6, bot=rows[rows.length-1].y+rows[rows.length-1].h+6;
+    ctx.fillStyle='rgba(8,16,22,.9)'; rr(A.x-4,top,rows[0].w+8,bot-top,12); ctx.fill();
+    ctx.strokeStyle='#4a3d22'; ctx.lineWidth=1.5; rr(A.x-4,top,rows[0].w+8,bot-top,12); ctx.stroke();
+    for(const b of rows){
+      const k=b.k, cd=abCd(k), afford=g.gold>=abMinCost(k), ready=cd<=0, d=b.h-8;
+      uiBtns.push({id:'ab_'+k,x:b.x,y:b.y,w:b.w,h:b.h,on:true});
+      ctx.fillStyle = g.armed===k ? 'rgba(255,150,50,.22)' : 'rgba(255,255,255,.04)'; rr(b.x,b.y,b.w,b.h,9); ctx.fill();
+      const ix=b.x+4+d/2, iy=b.y+b.h/2;
+      abIcon(k,ix,iy,d, ready&&afford?1:0.5);
+      abCdOverlay(k,ix,iy,d/2,TOUCH?14:12.5);
+      const tx0=b.x+d+14, fs=TOUCH?15:13.5;
+      txt(AB[k].name, tx0, iy-(TOUCH?9:8), fs, ready?'#e9f0f4':'#8ea6b5','left',true);
+      ctx.save(); ctx.translate(tx0+6,iy+(TOUCH?10:9)); ctx.scale(.36,.36); drawCoin(0,0); ctx.restore();
+      txt(abPriceText(k)+' gold', tx0+16, iy+(TOUCH?10:9), TOUCH?13:12, afford?'#f3e2b0':'#d6584f','left',true);
+      if(!TOUCH) keyBadge(b.x+b.w-14, iy, AB[k].key);
     }
-    ctx.restore();
-    if(!TOUCH) keyBadge(b.x+b.w-5,b.y+5,AB[k].key);
-    const py=b.y+b.h-1, label=abPrice(k);
-    ctx.font='bold 12px '+F; const pw=Math.max(40,(ctx.measureText(label).width||20)+28);
-    ctx.fillStyle='rgba(10,20,27,.9)'; rr(cx-pw/2,py-8,pw,16,8); ctx.fill();
-    txt(label,cx+6,py,12,afford?'#f3e2b0':'#d6584f','center',true);
-    ctx.save(); ctx.translate(cx-pw/2+10,py); ctx.scale(.38,.38); drawCoin(0,0); ctx.restore();
-    if(on){
-      const verb = TOUCH ? 'Tap ' : 'Click ';
-      const tip = AB[k].mode==='line' ? (TOUCH?'Drag along the road from the gates':'Point along the road from the gates, click to cast')
-                                      : verb+tipFor[k];
-      ctx.font='bold '+(TOUCH?13.5:12.5)+'px '+F; const tw=(ctx.measureText(tip).width||200)+22;
-      ctx.fillStyle='rgba(120,30,24,.92)'; rr(b.x+b.w+8,cy-14,tw,28,8); ctx.fill();
-      txt(tip,b.x+b.w+19,cy,TOUCH?13.5:12.5,'#ffe0c8','left',true);
-    }
+  }
+  // главная кнопка
+  const single = list.length===1, shown = g.armed || (single ? list[0] : null);
+  uiBtns.push({id: single ? 'ab_'+list[0] : 'abmenu', x:A.x, y:A.y, w:A.s, h:A.s, on:true});
+  ctx.save();
+  if(g.armed || g.abOpen){ ctx.shadowColor='rgba(255,170,60,.9)'; ctx.shadowBlur=16;
+    ctx.fillStyle='rgba(255,150,50,.3)'; ctx.beginPath(); ctx.arc(cx,cy,r+3,0,7); ctx.fill(); ctx.shadowBlur=0; }
+  ctx.restore();
+  if(shown){
+    abIcon(shown,cx,cy,A.s, (abCd(shown)<=0 && g.gold>=abMinCost(shown))?1:0.5);
+    abCdOverlay(shown,cx,cy,r,TOUCH?17:15);
+    if(!TOUCH && single) keyBadge(A.x+A.s-5,A.y+5,AB[shown].key);
+  } else {
+    // закрытый список: знак богов и число готовых даров
+    ctx.fillStyle='rgba(12,22,30,.92)'; ctx.beginPath(); ctx.arc(cx,cy,r,0,7); ctx.fill();
+    ctx.strokeStyle='#c9a24a'; ctx.lineWidth=2.5; ctx.beginPath(); ctx.arc(cx,cy,r-1.5,0,7); ctx.stroke();
+    const mini=list.slice(0,4), md=A.s*0.42;
+    mini.forEach((k,i)=>{ const ox=(i%2?1:-1)*md*0.52, oy=(i<2?-1:1)*md*0.52*(mini.length>2?1:0);
+      abIcon(k,cx+ox,cy+oy,md, abCd(k)<=0?1:0.45); });
+    const ready=list.filter(k=>abCd(k)<=0 && g.gold>=abMinCost(k)).length;
+    if(ready){ const bx=A.x+A.s-4, by=A.y+4;
+      ctx.fillStyle='#2f8a48'; ctx.beginPath(); ctx.arc(bx,by,10,0,7); ctx.fill();
+      ctx.strokeStyle='#0b1a10'; ctx.lineWidth=1.5; ctx.stroke(); txt(String(ready),bx,by+1,12,'#eafff0','center',true); }
+  }
+  if(g.armed || g.abOpen){ ctx.strokeStyle='#ffd0a0'; ctx.lineWidth=2.5; ctx.beginPath(); ctx.arc(cx,cy,r+1.5,0,7); ctx.stroke(); }
+  // подпись под кнопкой
+  const lab = shown ? abPriceText(shown) : 'Gods';
+  ctx.font='bold 12px '+F; const pw=Math.max(44,(ctx.measureText(lab).width||24)+(shown?28:16));
+  ctx.fillStyle='rgba(10,20,27,.92)'; rr(cx-pw/2,A.y+A.s-6,pw,17,8); ctx.fill();
+  if(shown){ txt(lab,cx+6,A.y+A.s+2.5,12,g.gold>=abMinCost(shown)?'#f3e2b0':'#d6584f','center',true);
+    ctx.save(); ctx.translate(cx-pw/2+10,A.y+A.s+2.5); ctx.scale(.38,.38); drawCoin(0,0); ctx.restore(); }
+  else txt(lab,cx,A.y+A.s+2.5,12,'#f3e2b0','center',true);
+  // подсказка выбранной способности
+  if(g.armed){
+    const k=g.armed, verb=TOUCH?'Tap ':'Click ';
+    const tipFor={ rain:'the road to drop fire arrows', bolt:'an enemy to strike it', horn:'to bless the towers in the circle', wall:'a road tile to raise the wall' };
+    const tip = AB[k].mode==='line' ? (TOUCH?'Drag along the road from the gates':'Point along the road from the gates, click to cast') : verb+tipFor[k];
+    ctx.font='bold '+(TOUCH?13.5:12.5)+'px '+F; const tw=(ctx.measureText(tip).width||200)+22;
+    ctx.fillStyle='rgba(120,30,24,.92)'; rr(A.x+A.s+10,cy-14,tw,28,8); ctx.fill();
+    txt(tip,A.x+A.s+21,cy,TOUCH?13.5:12.5,'#ffe0c8','left',true);
   }
   if(g.flash>0){ ctx.save(); ctx.globalAlpha=clamp(g.flash/0.35,0,1)*0.45; ctx.fillStyle='#fff6c8';
     ctx.fillRect(0,0,CW,H); ctx.restore(); }
@@ -2952,7 +3087,7 @@ function drawEntrances(){
     let [c,r]=p[0]; const [c2,r2]=p[1]; const dc=Math.sign(c2-c), dr=Math.sign(r2-r);
     while(c<0||r<0||c>=COLS||r>=ROWS){ c+=dc; r+=dr; }
     let x=tx(c)+dc*4, y=ty(r)+dr*4;
-    if(x<96 && abList().length && !PORTRAIT) x=96;          // не прятать счётчик под кнопками способностей
+    if(x<96 && abList().length && !PORTRAIT && y>abAnchor().y-30) x=96;   // не прятать счётчик под кнопкой даров
     const n=cnt[i], hot=n===mx && n>0, pulse=hot?0.75+Math.sin(g.time*5)*0.25:1;
     const label=n? n+' ⚔' : '—', w=n>9?50:42;
     ctx.save(); ctx.globalAlpha=pulse;
@@ -4067,6 +4202,7 @@ function handleTap(p){
      остановленном времени и снять паузу, когда всё уже построено. */
   if(g.paused || platformPaused || adPaused){ SFX.no(); return; }
   const bp=toBoard(p);
+  if(g.abOpen){ g.abOpen=false; return; }          // тап мимо списка даров просто закрывает его
   if(g.armed){
     if(AB[g.armed].mode==='line' && !g.touch){ g.lineDrag=true; g.line=lineFor(g.armed,bp.x,bp.y); return; }
     abilityTap(bp); return;
@@ -4170,7 +4306,7 @@ cv.addEventListener('contextmenu',e=>e.preventDefault());
 window.addEventListener('keydown',e=>{
   if(!game||!game.running) return;
   if(e.code==='Space'){ e.preventDefault(); onButton('pause'); }
-  if(e.code==='Escape'){ game.sel=null; game.selTower=null; game.selRock=null; game.armed=null; game.line=null; game.lineDrag=false; }
+  if(e.code==='Escape'){ game.sel=null; game.selTower=null; game.selRock=null; game.armed=null; game.line=null; game.lineDrag=false; game.abOpen=false; }
   if(game.over) return;
   const m=/^(Digit|Numpad)([1-9])$/.exec(e.code||''); const n=m? +m[2] : 0;
   const ak=AB_ORDER.find(k=>e.code==='Key'+AB[k].key);
@@ -4211,7 +4347,11 @@ async function onButton(id){
   if(id==='early'){ startWave(true); return; }
   // апгрейд и продажа — тоже действия на поле, на паузе они недоступны
   if((id==='up'||id==='sell'||id==='clear') && (g.paused||platformPaused||adPaused)){ SFX.no(); return; }
-  if(id.startsWith('ab_')){ armAbility(id.slice(3)); return; }
+  if(id==='abmenu'){
+    if(g.armed){ g.armed=null; g.line=null; g.lineDrag=false; g.abOpen=false; return; }
+    if(g.paused||platformPaused||adPaused){ SFX.no(); return; }
+    g.abOpen=!g.abOpen; if(g.abOpen){ g.sel=null; g.selTower=null; g.selRock=null; } return; }
+  if(id.startsWith('ab_')){ g.abOpen=false; armAbility(id.slice(3)); return; }
   if(id==='clear'){ const d=g.selRock; if(!d || d.cut>0) return;
     if(g.gold<CLEAR_COST){ SFX.no(); floatText(tx(d.c),ty(d.r)-10,'not enough gold','#d6584f'); return; }
     g.gold-=CLEAR_COST; d.cut=CLEAR_T; d.chip=0; SFX.build(); buzz(20); g.selRock=null; return; }
@@ -4407,11 +4547,39 @@ const GIFTS={
 const comicSrc=(k,n)=>'assets/comics/comic_'+AB[k].god+'_0'+n+'.webp';
 const comicCache={};
 function preloadGift(k){ if(typeof Image==='undefined') return; for(const n of [1,2]){ const u=comicSrc(k,n); if(!comicCache[u]){ const im=new Image(); im.src=u; comicCache[u]=im; } } }
-function pendingGifts(){ return AB_ORDER.filter(k=>(P().stars[AB[k].lv]||0)>0 && !P().gifts[k]); }
+function pendingGifts(){ return picks().filter(k=>!P().gifts[k]); }
 let giftOn=false;
+const GOD_LINE={ rain:'Burning arrows on a stretch of road; the ground keeps burning.',
+  bolt:'Strikes one enemy: kills any raider, a third off a boss.',
+  horn:'Towers inside a circle shoot 50% faster for 5 seconds.',
+  wall:'Blocks the road for 6 seconds or 12 raiders.',
+  ice:'Freezes every raider along a stretch of road.',
+  ram:'Throws raiders back along the road, away from the gates.' };
+function showChoice(){
+  if(giftOn || typeof document==='undefined' || !choicePending()) return;
+  const left=AB_ORDER.filter(k=>!picks().includes(k));
+  if(left.length===1){ picks().push(left[0]); flushSave(); preloadGift(left[0]); setTimeout(showGifts,100); return; }
+  giftOn=true; let chosen=null;
+  const ov=$('#chooseOv'), grid=$('#chGrid'), ok=$('#chOk'), n=picks().length;
+  $('#chTitle').textContent = n===0 ? 'Choose your first god' : 'The gods offer another gift';
+  $('#chSub').textContent = 'Gift '+(n+1)+' of 6. Your choice is forever: the others come later, one by one.';
+  grid.innerHTML='';
+  for(const k of left){
+    const a=AB[k], el=document.createElement('button'); el.className='chcard';
+    el.innerHTML='<img src="assets/icons/ab_'+k+'.png" alt=""><b>'+a.godName+'</b><span class="an">'+a.name+'</span>'+
+      '<span class="ad">'+GOD_LINE[k]+'</span><span class="ap">'+abPriceText(k)+' gold · '+a.cd+' s</span>';
+    el.onclick=()=>{ chosen=k; grid.querySelectorAll('.chcard').forEach(c=>c.classList.toggle('on',c===el));
+      ok.disabled=false; ok.textContent='Take the gift of '+a.godName; SFX.coin && SFX.coin(); preloadGift(k); };
+    grid.appendChild(el);
+  }
+  ok.disabled=true; ok.textContent='Pick a god';
+  ok.onclick=()=>{ if(!chosen) return; picks().push(chosen); flushSave(); ov.classList.remove('on'); giftOn=false; setTimeout(showGifts,150); };
+  ov.classList.add('on');
+}
 function showGifts(){
   if(giftOn || typeof document==='undefined') return;
-  const list=pendingGifts(); if(!list.length) return;
+  const list=pendingGifts();
+  if(!list.length){ if(choicePending()) showChoice(); return; }
   const k=list[0]; preloadGift(k); giftOn=true;
   const ov=$('#giftOv'), pic=$('#gPic'); let frame=1;
   $('#gTitle').textContent='A gift from '+AB[k].godName;
@@ -4665,7 +4833,7 @@ function renderReset(){
   const box=$('#resetBox'); if(!box) return;
   const d=DIFFS[save.diff||0];
   box.innerHTML='<div class="danger"><div class="top">'+ICON('icon_reset')+'<div class="dtext"><b>Raze the '+d.n+' profile</b>'+
-    '<span>Silver, weapon upgrades, stars and lives for this difficulty are wiped and the gates go back to 20. '+
+    '<span>Silver, weapon upgrades, gifts of the gods, stars and lives for this difficulty are wiped and the gates go back to 20. '+
     'The other two difficulties are untouched.</span></div></div></div>';
   const b=document.createElement('button');
   b.className='btn danger-btn'; b.textContent='Start this difficulty over';
@@ -4900,7 +5068,7 @@ function showResult(win){
       else btnEl.disabled=false;              // ролика не было — пусть попробует ещё раз
     });
     if(snap) toMap();
-    if(!g.sandbox && pendingGifts().length) setTimeout(showGifts,700);
+    if(!g.sandbox && (pendingGifts().length || choicePending())) setTimeout(showGifts,700);
     if(snap){
       const n=document.createElement('div'); n.className='note';
       n.textContent='Lost too many lives? Replay fjord undoes this result: lives, silver, upgrades and stars go back to how they were before the battle.';

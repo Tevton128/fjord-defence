@@ -188,6 +188,17 @@
      flex-direction:column;align-items:center;gap:14px;pointer-events:auto;text-align:center}
   #pausePanel.on{display:flex}
   #secretRune{margin:26px auto 8px;font-size:22px;color:#2a3f4c;cursor:default;user-select:none;-webkit-user-select:none;width:44px;height:44px;line-height:44px;text-align:center}
+  #dailyOv{position:fixed;inset:0;z-index:31;display:none;align-items:center;justify-content:center;background:rgba(4,9,13,.9);padding:12px}
+  #dailyOv.on{display:flex}
+  #dailyOv .dbox{width:min(94vw,520px);background:#10202b;border:2px solid #5d4a2a;border-radius:16px;padding:20px 16px 18px;text-align:center;animation:gin .35s ease-out}
+  #dailyOv h2{color:#f3e2b0;font-size:26px;margin:0 0 4px}
+  #dailyOv .dsub{color:#9fb3c0;font-size:14px;margin:0 0 14px;line-height:1.4}
+  #dailyOv .days{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin:0 0 14px}
+  #dailyOv .day{border:2px solid #2f4a5a;border-radius:10px;background:#152a37;padding:6px 2px;font-size:11px;color:#7d94a3}
+  #dailyOv .day b{display:block;font-size:15px;color:#e9f0f4;margin-top:3px}
+  #dailyOv .day.got{opacity:.45}
+  #dailyOv .day.now{border-color:#e7b74e;background:#2a2512;box-shadow:0 0 0 3px rgba(231,183,78,.25)}
+  #dailyOv .btn{min-width:200px;margin:5px}
   #chooseOv{position:fixed;inset:0;z-index:30;display:none;align-items:center;justify-content:center;
      background:rgba(4,9,13,.96);pointer-events:auto;padding:10px;box-sizing:border-box;overflow:auto}
   #chooseOv.on{display:flex}
@@ -400,7 +411,7 @@
       <button class="btn sec" id="bHelp">How to play</button>
     </div>
     <div class="bar"><div class="silver"><img src="assets/icons/icon_silver.png" alt=""><b id="silv1">0</b></div></div>
-    <div class="build">build 22.10 · 7</div>
+    <div class="build">build 29.10 · 2</div>
   </div>
 
   <!-- ВЫБОР УРОВНЯ -->
@@ -423,7 +434,7 @@
     <p class="sub" id="prepLine" style="margin:6px 0 0"></p>
     <div class="perks" id="prepGrid"></div>
     <div class="row"><button class="btn" id="bStart">March out</button>
-      <button class="btn sec" id="bEndless" style="display:none">Endless raid</button></div>
+      <button class="btn" id="bEndless" style="display:none;background:linear-gradient(180deg,#c4583f,#86321f);color:#fff3e6;box-shadow:0 4px 0 #4a1a12,0 8px 18px rgba(0,0,0,.35)">Endless raid</button></div>
     <p class="tiny" id="prepCost"></p>
   </div>
 
@@ -485,6 +496,12 @@
 
   <!-- РЕКЛАМА (заглушка) -->
   <div id="adToast"></div>
+  <div id="dailyOv"><div class="dbox">
+    <h2>Tribute from the village</h2>
+    <p class="dsub" id="dailySub">Come back every day: the tribute grows for seven days in a row.</p>
+    <div class="days" id="dailyDays"></div>
+    <div><button class="btn" id="dailyTake">Take</button><button class="btn ad" id="dailyAd">Watch ad: x2</button></div>
+  </div></div>
   <div class="screen" id="adOv">
     <div id="adBox">
       <h2 id="adTitle">Advertisement</h2>
@@ -1182,12 +1199,18 @@ const SFX={
   lose(){ [330,262,196,147].forEach((f,i)=>tone(f,f*0.97,0.45,'sawtooth',0.06,i*0.16)); }
 };
 /* ---------- 3. ДАННЫЕ --------------------------------------------------- */
-const W=960,TS=48,COLS=20,ROWS=10,BY=56,PY=536;
+const TS=48,BY=56;
+/* Поле бывает двух видов: обычное 20×10 и транспонированное 10×20 для вертикального экрана.
+   В вертикали мы не поворачиваем картинку, а зеркалим саму карту по диагонали: дорога,
+   препятствия и фон меняют местами столбцы и строки. Спрайты при этом рисуются как обычно,
+   стоя, и вся логика боя работает без единой поправки. */
+let W=960,COLS=20,ROWS=10,PY=536;
+function setBoardDims(tp){ W=tp?480:960; COLS=tp?10:20; ROWS=tp?20:10; PY=BY+ROWS*TS; }
 let H=640, TOUCH=false, PORTRAIT=false, STRIP=false, VERT=false;   // VERT — экран вертикальный   // STRIP — панель сбоку (телефон лёжа)
 const STRIP_W=262;
-let CW=960;                       // логическая ширина холста (в портрете уже)
+let CW=960, FW=960, FH=640, OX=0;   // FW×FH — весь холст под пропорции экрана, OX — сдвиг макета по горизонтали                       // логическая ширина холста (в портрете уже)
 /* Вид поля в портрете: поле масштабируется под ширину экрана, его можно приближать и двигать. */
-const BV={x:0, y:BY, s:1, zoom:1, panX:0, panY:0};
+const BV={x:0, y:BY, s:1, zoom:1, panX:0, panY:0}, BV_ZOOM=false;   // в вертикали поле целиком, щипок не нужен
    // поле: y 56..536, панель 536..640
 const F="'Trebuchet MS','Segoe UI',system-ui,sans-serif";
 
@@ -1575,7 +1598,7 @@ class Enemy{
     if(this.wp>=p.length && !this.escaped){
       this.escaped=true; this.dead=true;
       game.lives-=this.leak; SFX.leak(); buzz(55); game.shake=0.35;
-      floatText(480,BY+30,'-'+this.leak+' lives','#e06060');
+      floatText(W/2,BY+30,'-'+this.leak+' lives','#e06060');
     }
   }
 }
@@ -1781,7 +1804,7 @@ const HINTS={
   wrecked:'A Wrecker smashed that tower. It stays dark far longer than a shaman\'s sabotage — kill Wreckers before they reach your line.',
   rune:'The rune of return is capped: three per fjord, and two runes cannot stand within four tiles of each other. Red cells are blocked by that rule.',
   rain:'Fire rain: 65 gold, every 55 seconds. Pick a spot on the road: 3.5 seconds later the arrows land, burn everything in the circle and leave burning ground that sets passing raiders on fire. Best for finishing off wounded raiders near the gates.',
-  rock:'The best spots are blocked by rocks and trees. Buy a pickaxe for 300 gold to clear one. It takes 12 seconds, then you can build there.',
+  rock:'Any tree or rock can be cleared with a pickaxe. Marked ones block the best spots and cost up to 300 gold; the rest are cheaper. Then you can build there.',
   building:'Towers take a few seconds to raise — a catapult needs five. Build before a wave lands, not while it runs.',
   freeze:'Fire melts frost and frost puts out fire. Do not stack a frost rune next to a fire altar.'
 };
@@ -1798,6 +1821,7 @@ const clamp=(v,a,b)=>v<a?a:v>b?b:v;
 /* ---------- 7. ЛОГИКА УРОВНЯ -------------------------------------------- */
 function startLevel(idx, sandbox, endless){
   screen(null);                       // закрываем меню сразу, что бы дальше ни случилось
+  setBoardDims(false);                // карту всегда собираем в обычной ориентации, потом зеркалим
   const L=LEVELS[idx];
   game={
     idx, L, theme:THEMES[L.theme], paths:L.paths,
@@ -1809,7 +1833,7 @@ function startLevel(idx, sandbox, endless){
     waves: buildWaves(idx), wave:0, waveState:'idle', waveTimer:6,
     spawnQ:[], killed:0, running:true, paused:false, speed:1,
     sel:null, selTower:null, hoverC:-1, hoverR:-1,
-    adGold:true, adRevive:true, shake:0, time:0, over:null, sandbox:!!sandbox, endless:!!endless,
+    adGold:true, adCd:0, adRevive:true, shake:0, time:0, over:null, sandbox:!!sandbox, endless:!!endless,
     strikes:[], rainCd:0, armed:null, line:null, lineDrag:false, mx:0, my:0, mOn:false,
     abCd:{}, walls:[], rams:[], iceRoads:[], bolts:[], hornFx:[], flash:0, pgeo:null
   };
@@ -1825,6 +1849,8 @@ function startLevel(idx, sandbox, endless){
   game.pathCells=new Set(game.blocked);
   // деревья и валуны: занимают клетку, строить на них нельзя
   game.decor=[];
+  if(!sandbox) placeObstacles(idx);                 // сначала ключевые позиции, потом обычный лес и камни
+  const vmax=game.vmax||1;
   const dr=mkRng((idx+1)*4231); let tries=0;
   const want=9+(idx%4);
   while(game.decor.length<want && tries++<500){
@@ -1832,14 +1858,17 @@ function startLevel(idx, sandbox, endless){
     if(game.blocked.has(c+','+r)) continue;
     let touchesPath=false;
     for(let dx=-1;dx<=1;dx++) for(let dy=-1;dy<=1;dy++)
-      if(game.blocked.has((c+dx)+','+(r+dy))) touchesPath=true;
-    if(touchesPath) continue;                       // рядом с тропой место под башни не занимаем
+      if(game.pathCells.has((c+dx)+','+(r+dy))) touchesPath=true;
+    /* У дороги ставим редко и только на средние клетки: дешёвое дерево не должно
+       закрывать позицию лучше ключевой, иначе ключевой камень теряет смысл. */
+    if(touchesPath && (dr()<0.6 || cellValue(c,r)>0.62*vmax)) continue;
     const kind = dr()<0.62?'tree':'rock';
     game.decor.push({c,r,kind, v:1+Math.floor(dr()*(kind==='tree'?3:2)), s:0.85+dr()*0.35});
     game.blocked.add(c+','+r);
   }
-  if(!sandbox) placeObstacles(idx);
+  for(const d of game.decor) setClearCost(d);
   game.decor.sort((a,b)=>a.r-b.r);
+  if(VERT) transposeGame();
   game.selRock=null;
   game.startLives=game.lives;
                     // от этого числа считаем потери именно в этом фьорде
@@ -1855,14 +1884,49 @@ function startLevel(idx, sandbox, endless){
   }
   game.alarm={on:false, beat:0, lit:0};
   game.hints=[]; hint('build');
-  game.rotAsk = VERT && TOUCH;               // вертикально не играем вовсе
+  setLayout(TOUCH, VERT);
   if(save.sound) startWind();
   screen(null);
+}
+/* Отражаем карту по диагонали: столбец становится строкой. Вызывается при старте фьорда
+   на вертикальном экране и при повороте телефона, пока на поле ничего не построено. */
+function transposeGame(){
+  const g=game; if(!g) return;
+  if(g.gateCells){ for(const k of g.gateCells) g.blocked.delete(k); g.gateCells=null; }
+  g.tp=!g.tp; setBoardDims(g.tp);
+  const sw=k=>{ const [a,b]=k.split(','); return b+','+a; };
+  g.paths=g.paths.map(p=>p.map(([c,r])=>[r,c]));
+  g.blocked=new Set([...g.blocked].map(sw));
+  g.pathCells=new Set([...g.pathCells].map(sw));
+  for(const d of g.decor){ const c=d.c; d.c=d.r; d.r=c; }
+  g.decor.sort((a,b)=>a.r-b.r);
+  if(g.tp){                                          // в вертикали ворота анфас: по бокам частокол
+    g.gateCells=gateCellsFor(g);
+    g.decor=g.decor.filter(d=>!g.gateCells.includes(d.c+','+d.r));
+    for(const k of g.gateCells) g.blocked.add(k);
+  }
+  g.pgeo=null; g.pcList=null; g.roadFx=null; g.bg=null; g.selRock=null; g.selTower=null;
+  g.walls=[]; g.rams=[]; g.iceRoads=[]; g.strikes=[]; g.parts=[]; g.texts=[]; g.fx=[];
+  g.bgImg=null; g.roadImg=null; loadLevelBg(g.idx);
+}
+function freshGame(){
+  const g=game;
+  return !!g && g.running && !g.over && g.towers.length===0 && g.wave===0 && g.waveState==='idle'
+         && g.enemies.length===0 && g.spawnQ.length===0;
+}
+function transposeImg(im){
+  if(!im || typeof document==='undefined') return im;
+  const c=document.createElement('canvas'); c.width=im.naturalHeight||im.height; c.height=im.naturalWidth||im.width;
+  const x=c.getContext('2d'); x.setTransform(0,1,1,0,0,0); x.drawImage(im,0,0); return c;
 }
 /* Препятствия на лучших клетках. Самые выгодные места под башню (рядом с изгибами,
    где тропа простреливается с двух сторон) закрыты камнем или деревом. Их можно
    расчистить киркой за золото, и это занимает время. Так у сильной позиции есть цена. */
 const CLEAR_COST=300, CLEAR_T=12;
+/* Реклама за золото в бою: раз в 90 секунд, награда растёт с номером волны. */
+const AD_CD=90;
+const adGoldAmt=()=> 40+10*Math.min((game?game.wave:0)+1, game?game.waves.length:1);
+const adLabel=()=> game.adCd>0 ? ('Ad in '+Math.floor(game.adCd/60)+':'+String(Math.ceil(game.adCd)%60).padStart(2,'0')) : 'Watch ad';
 /* Огненный дождь: разовый удар по области за золото. Нужен, чтобы добить подранков
    у ворот, а не заменить башни: урон растёт вместе со здоровьем врагов волны, но
    целого крепкого врага не убивает. Короткая перезарядка не даёт засыпать дорогу
@@ -2504,7 +2568,9 @@ function abAnchor(){
   const s=TOUCH?60:52;
   const bottom=(PORTRAIT?PORT_BOARD_Y+PORT_BOARD_H:PY)-((PORTRAIT||STRIP)?14:48);
   const top=(PORTRAIT?PORT_BOARD_Y:BY)+8;
-  return {x:10, y:bottom-s, s, top, bottom};
+  const m = PORTRAIT ? BV.x : OX;                 // есть поле за краем карты — кнопка уходит туда
+  const x = m>=s+10 ? (PORTRAIT ? Math.round((BV.x-s)/2) : -Math.round((OX+s)/2)) : 10;
+  return {x, y:bottom-s, s, top, bottom};
 }
 function abPriceText(k){ const a=AB[k]; return a.mode==='line' ? a.base+'–'+Math.round(a.base+a.per*LINE_MAX) : String(a.cost); }
 function abRows(){
@@ -2591,7 +2657,7 @@ function drawAbilityBar(){
     txt(tip,A.x+A.s+21,cy,TOUCH?13.5:12.5,'#ffe0c8','left',true);
   }
   if(g.flash>0){ ctx.save(); ctx.globalAlpha=clamp(g.flash/0.35,0,1)*0.45; ctx.fillStyle='#fff6c8';
-    ctx.fillRect(0,0,CW,H); ctx.restore(); }
+    ctx.fillRect(-OX,0,FW,FH); ctx.restore(); }
 }
 
 function cellScore(c,r){
@@ -2603,24 +2669,58 @@ function cellScore(c,r){
   }
   return n;
 }
+/* Ценность клетки: сколько клеток дороги башня с неё достаёт. Каждая тропа считается
+   отдельно, поэтому место у слияния двух троп стоит вдвое дороже, и витки, по которым
+   враг проходит несколько раз рядом с клеткой, тоже складываются. */
+function pathCellList(){
+  const g=game; if(g.pcList) return g.pcList;
+  const out=[];
+  for(const p of g.paths){
+    for(let i=0;i<p.length-1;i++){
+      let [c,r]=p[i]; const [c2,r2]=p[i+1], dc=Math.sign(c2-c), drr=Math.sign(r2-r);
+      if(i===0) out.push([c,r]);
+      while(c!==c2||r!==r2){ c+=dc; r+=drr; out.push([c,r]); }
+    }
+  }
+  return (g.pcList=out.filter(([c,r])=>c>=0&&r>=0&&c<COLS&&r<ROWS));
+}
+function cellValue(c,r){
+  let n=0;
+  for(const [pc,pr] of pathCellList()) if((pc-c)*(pc-c)+(pr-r)*(pr-r)<=6.3) n++;   // радиус ~2,5 клетки, как у лучников
+  return n;
+}
+/* Цена сноса зависит от того, что откроется: дальняя клетка — 40 золота и 4 секунды,
+   лучшая позиция на карте — 300 и 12 секунд. */
+function setClearCost(d){
+  const f=clamp(cellValue(d.c,d.r)/(game.vmax||1),0,1);
+  d.clear=true; d.cut=d.cut||0;
+  d.cost=Math.round((40+260*Math.pow(f,1.5))/10)*10;
+  d.ct=Math.round(4+8*f);
+  if(d.key){ d.cost=Math.max(d.cost,250); d.ct=12; }
+}
 function placeObstacles(idx){
-  const cand=[];
+  const cand=[]; let vmax=1;
   for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++){
     if(game.blocked.has(c+','+r)) continue;
-    cand.push({c,r,sc:cellScore(c,r)+hash(c,r)*0.01});   // хэш только разводит равные
+    const v=cellValue(c,r); vmax=Math.max(vmax,v);
+    cand.push({c,r,v,sc:v+hash(c,r)*0.01});   // хэш только разводит равные
   }
+  game.vmax=vmax;
   cand.sort((a,b)=>b.sc-a.sc);
+  /* Ключевые камни стоят только на по-настоящему сильных местах: не хуже 72% лучшего.
+     Если таких мест мало, камней будет меньше, но каждый — очевидно выгодный. */
   const want = idx<2 ? 2 : 3, picked=[];
   for(const p of cand){
     if(picked.length>=want) break;
-    if(picked.some(q=>Math.max(Math.abs(q.c-p.c),Math.abs(q.r-p.r))<3)) continue;   // не кучей в одном углу
+    if(picked.length && p.v<0.72*vmax) break;
+    if(picked.some(q=>Math.max(Math.abs(q.c-p.c),Math.abs(q.r-p.r))<3)) continue;   // разные «горячие» зоны
     picked.push(p);
   }
   const th=game.L.theme;
   picked.forEach((p,i)=>{
     const kind = th==='grass' ? (i%2?'rock':'tree') : (i%2?'tree':'rock');
     const v = kind==='tree' ? 1+(i%3) : (th==='snow' ? (i%2?3:1) : 1+(i%3));
-    game.decor.push({c:p.c, r:p.r, kind, v, s:1, clear:true, cut:0});
+    game.decor.push({c:p.c, r:p.r, kind, v, s:1, clear:true, key:true, cut:0});
     game.blocked.add(p.c+','+p.r);
   });
 }
@@ -2664,7 +2764,7 @@ function buildable(c,r){
 }
 function startWave(bonus){
   const w=game.waves[game.wave];
-  if(bonus && game.waveTimer>0){ const b=Math.round(Math.ceil(game.waveTimer)*(2+game.wave*0.35)*goldMul()); game.gold+=b; floatText(480,BY+40,'+'+b+' gold for rushing','#e7b74e'); }
+  if(bonus && game.waveTimer>0){ const b=Math.round(Math.ceil(game.waveTimer)*(2+game.wave*0.35)*goldMul()); game.gold+=b; floatText(W/2,BY+40,'+'+b+' gold for rushing','#e7b74e'); }
   game.spawnQ=[];
   for(const g of w.groups)
     for(let i=0;i<g.count;i++)
@@ -2673,7 +2773,7 @@ function startWave(bonus){
   game.spawnT=0; game.waveState='spawning';
   if(game.alarm){ game.alarm.on=false; game.alarm.lit=0; }
   const heavyW = w.boss || (game.massBase>0 && w.mass>game.massBase*1.35);
-  if(w.boss){ SFX.boss(); floatText(480,BY+60,'THE JARL COMES','#e06060'); } else SFX.wave();
+  if(w.boss){ SFX.boss(); floatText(W/2,BY+60,'THE JARL COMES','#e06060'); } else SFX.wave();
   // враги идут с кличем: на тяжёлой волне громче и дважды
   if(!Music.ready) setTimeout(()=>{ if(game && game.running) SFX.warcry(heavyW); }, 450);   // в треке Heavy свои кличи
   game.battleBeat=0.6; game.heavyNow=heavyW;
@@ -2732,7 +2832,7 @@ function update(dt){
   }else if(g.waveState==='clearing'){
     if(!g.enemies.length){
       const bonus=Math.round((22+g.wave*4)*goldMul());
-      g.gold+=bonus; floatText(480,BY+40,'Wave cleared +'+bonus,'#9fe0a8');
+      g.gold+=bonus; floatText(W/2,BY+40,'Wave cleared +'+bonus,'#9fe0a8');
       g.wave++;
       if(g.wave>=g.waves.length){
         if(g.endless){ g.waves.push(makeWave(g.idx, g.wave)); }   // рейд не кончается
@@ -2781,29 +2881,83 @@ function btn(id,x,y,w,h,label,opt){
   opt=opt||{}; uiBtns.push({id,x,y,w,h,on:opt.on!==false});
   const dis=opt.on===false;
   ctx.save(); ctx.globalAlpha=dis?0.42:1;
+  if(opt.stone){                                  // тёмный камень с бронзовой окантовкой
+    const c1=opt.c1||'#33424a', c2=opt.c2||'#1b252b';
+    const grd=ctx.createLinearGradient(0,y,0,y+h); grd.addColorStop(0,c1); grd.addColorStop(1,c2);
+    ctx.fillStyle=grd; rr(x,y,w,h,8); ctx.fill();
+    ctx.strokeStyle='#8a6232'; ctx.lineWidth=2; rr(x+1,y+1,w-2,h-2,7); ctx.stroke();
+    ctx.strokeStyle='rgba(240,200,130,.28)'; ctx.lineWidth=1; rr(x+3.5,y+3.5,w-7,h-7,5); ctx.stroke();
+  } else {
   const c1=opt.c1||'#3a5766', c2=opt.c2||'#24404e';
   const grd=ctx.createLinearGradient(0,y,0,y+h); grd.addColorStop(0,c1); grd.addColorStop(1,c2);
   ctx.fillStyle=grd; rr(x,y,w,h,6); ctx.fill();
   ctx.strokeStyle='rgba(255,255,255,.14)'; ctx.lineWidth=1; ctx.stroke();
+  }
   txt(label,x+w/2,y+h/2+1,opt.fs||14,opt.tc||'#e9f0f4','center',true);
   ctx.restore();
 }
 
 function draw(){
   const g=game;
-  ctx.clearRect(0,0,CW,H);
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.clearRect(0,0,FW,FH);
+  if(!g) return;
+  ctx.fillStyle='#0e1c25'; ctx.fillRect(0,0,FW,FH);        // поля за краями макета — цвет панели
+  ctx.save(); ctx.translate(OX,0);
   ctx.save();
-  if(g&&g.shake>0){ const s=g.shake*7; ctx.translate((Math.random()-.5)*s,(Math.random()-.5)*s); }
-  if(!g){ ctx.restore(); return; }
-  ctx.save();
+  if(g.shake>0){ const s=g.shake*7; ctx.translate((Math.random()-.5)*s,(Math.random()-.5)*s); }
   if(PORTRAIT){
     ctx.beginPath(); ctx.rect(0,PORT_BOARD_Y,CW,PORT_BOARD_H); ctx.clip();
     ctx.translate(BV.x, BV.y-BY*BV.s); ctx.scale(BV.s,BV.s);
+    drawSurround(-BV.x, BY-(BV.y-PORT_BOARD_Y), CW, PORT_BOARD_H);
+  } else {
+    if(STRIP){                                    // снизу под полем тоже местность, справа — панель
+      ctx.beginPath(); ctx.rect(-OX,BY,OX+W,FH-BY); ctx.clip();
+      drawSurround(-OX, BY, OX+W, FH-BY);
+    } else {
+      ctx.beginPath(); ctx.rect(-OX,BY,FW,ROWS*TS); ctx.clip();
+      drawSurround(-OX, BY, FW, ROWS*TS);
+    }
   }
-  drawBoard(); drawPath(); drawRainGround(); drawRange(); drawDecor(); drawBeacons(); drawAbilitiesGround(); drawTowers(); drawEnemies(); drawShots(); drawObstacleTop(); drawEntrances(); drawFx(); drawRain(); drawAbilitiesTop();
+  drawBoard(); drawPath(); drawRainGround(); drawRange(); drawDecor(); drawBeacons(); drawAbilitiesGround(); drawTowers(); drawEnemies(); drawShots(); drawFrontGates(); drawObstacleTop(); drawEntrances(); drawFx(); drawRain(); drawAbilitiesTop();
   ctx.restore();
-  ctx.restore();
+  if(!PORTRAIT && OX>0){                                    // линии строки состояния и панели тянем до краёв
+    ctx.fillStyle='#2b4353'; ctx.fillRect(-OX,BY-2,OX,2); ctx.fillRect(CW,BY-2,OX,2);
+    if(!STRIP){ ctx.fillRect(-OX,PY,OX,2); ctx.fillRect(CW,PY,OX,2); }
+  }
   drawHud();
+  ctx.restore();
+}
+/* Местность за краем поля: та же картинка уровня, отражённая зеркально и притемнённая.
+   Дорога у входа так и продолжается за край, и экран заполнен без чёрных полос. */
+function drawSurround(x0,y0,w0,h0){
+  const g=game, bw=W, bh=ROWS*TS, img=g.bgImg||g.bg;
+  if(x0>=0 && y0>=BY && x0+w0<=bw && y0+h0<=BY+bh) return;
+  /* Собираем один раз на уровень и размер экрана, в кадре — одна картинка. */
+  const key=[x0,y0,w0,h0,bw,!!g.bgImg,!!g.bg,!!g.roadImg].join(',');
+  if(!g.sur || g.sur.key!==key){
+    let c=null;
+    try{
+      c=document.createElement('canvas'); c.width=Math.ceil(w0); c.height=Math.ceil(h0);
+      const x=c.getContext('2d'); x.translate(-x0,-y0);
+      try{ x.filter='saturate(55%) brightness(82%)'; }catch(e){}
+      for(let i=-1;i<=1;i++) for(let j=-1;j<=1;j++){
+        if(!i && !j) continue;
+        const cx=bw/2+i*bw, cy=BY+bh/2+j*bh;
+        if(cx+bw/2<x0 || cx-bw/2>x0+w0 || cy+bh/2<y0 || cy-bh/2>y0+h0) continue;
+        x.save(); x.translate(cx,cy); x.scale(i?-1:1, j?-1:1);
+        if(img) x.drawImage(img,-bw/2,-bh/2,bw,bh);
+        else { x.fillStyle=g.theme.a; x.fillRect(-bw/2,-bh/2,bw,bh); }
+        if(g.roadImg) x.drawImage(g.roadImg,-bw/2,-bh/2,bw,bh);
+        x.restore();
+      }
+      x.filter='none';
+      x.fillStyle='rgba(6,14,20,.38)'; x.fillRect(x0,y0,w0,h0);
+      x.clearRect(0,BY,bw,bh);                       // само поле рисует drawBoard
+    }catch(e){ c=null; }
+    g.sur={key,c};
+  }
+  if(g.sur.c) ctx.drawImage(g.sur.c,x0,y0);
 }
 /* Графика: атласы художника из assets/atlases/*.webp. Индекс кадров встроен прямо
    в файл, поэтому игра открывается и по file:// без единого сетевого запроса.
@@ -2931,8 +3085,8 @@ function loadLevelBg(idx){
   const rec=preloadLevelBg(idx);
   const apply=()=>{
     if(!game || game.idx!==idx) return;
-    if(rec.bg){ game.bgImg=rec.bg; }             // дорогу рисует отдельная картинка road_level_NN
-    if(rec.road) { game.roadImg=rec.road; game.roadFx=null; }
+    if(rec.bg){ game.bgImg = game.tp ? (rec.bgT||(rec.bgT=transposeImg(rec.bg))) : rec.bg; }   // дорогу рисует отдельная картинка road_level_NN
+    if(rec.road) { game.roadImg = game.tp ? (rec.roadT||(rec.roadT=transposeImg(rec.road))) : rec.road; game.roadFx=null; }
     if(!rec.bg && rec.bgDone && !game.bg) buildTerrain();
   };
   apply();
@@ -3097,6 +3251,7 @@ function drawGates(){
     const e=p[p.length-1], bp=p[p.length-2];
     const x=clamp(tx(e[0]),18,W-18), y=clamp(ty(e[1]),BY+18,BY+ROWS*TS-18);
     const vert=Math.abs(e[0]-bp[0])>Math.abs(e[1]-bp[1]);
+    if(!vert && GATEF.ok) continue;                 // ворота анфас рисуем поверх врагов, в drawFrontGates
     ctx.save(); ctx.translate(x,y); if(!vert) ctx.rotate(Math.PI/2);
     shadow(0,26,20,6);
     if(sprite('deco_gate',0,30,58)){ ctx.restore(); continue; }
@@ -3108,6 +3263,34 @@ function drawGates(){
   }
 }
 
+/* Ворота на дороге, которая уходит вниз за край: стоят анфас, во всю ширину трёх клеток.
+   Рисуются после врагов, чтобы рейдеры заходили за створки, а не шли по ним. */
+function drawFrontGates(){
+  if(!GATEF.ok) return;
+  const done=new Set();
+  for(const p of game.paths){
+    const e=p[p.length-1], bp=p[p.length-2];
+    if(Math.abs(e[0]-bp[0])>Math.abs(e[1]-bp[1])) continue;
+    const key=e[0]+','+e[1]; if(done.has(key)) continue; done.add(key);
+    const x=tx(e[0]), down=e[1]>=ROWS;
+    const w=TS*2.5, h=w*GATEF.img.height/GATEF.img.width;
+    const yb = down ? BY+ROWS*TS+4 : BY+h-6;        // нижний край ворот у кромки поля
+    ctx.save(); ctx.globalAlpha=0.35; ctx.fillStyle='#08100a';
+    ctx.beginPath(); ctx.ellipse(x,yb-6,w*0.48,9,0,0,7); ctx.fill(); ctx.restore();
+    ctx.drawImage(GATEF.img,x-w/2,yb-h,w,h);
+  }
+}
+/* Клетки по бокам ворот анфас заняты частоколом: строить там нельзя. */
+function gateCellsFor(g){
+  const out=[];
+  for(const p of g.paths){
+    const e=p[p.length-1], bp=p[p.length-2];
+    if(Math.abs(e[0]-bp[0])>Math.abs(e[1]-bp[1])) continue;
+    const r = e[1]>=ROWS ? ROWS-1 : 0;
+    for(const dc of [-1,1]){ const c=e[0]+dc; if(c>=0&&c<COLS && !g.pathCells.has(c+','+r)) out.push(c+','+r); }
+  }
+  return out;
+}
 /* На картах с несколькими входами перед волной видно, сколько врагов пойдёт с каждой
    стороны. Игрок решает, какой вход укреплять сильнее. */
 function drawEntrances(){
@@ -3152,11 +3335,11 @@ function drawObstacleTop(){
     if(!d.clear) continue;
     const x=tx(d.c), y=ty(d.r);
     if(d.cut>0){
-      const k=1-d.cut/CLEAR_T, w=TS-10;
+      const k=1-d.cut/(d.ct||CLEAR_T), w=TS-10;
       ctx.fillStyle='rgba(8,16,22,.8)'; rr(x-w/2,y+TS/2-11,w,7,3); ctx.fill();
       ctx.fillStyle='#e7b74e'; rr(x-w/2,y+TS/2-11,w*k,7,3); ctx.fill();
       txt(Math.ceil(d.cut)+'s',x,y-TS/2+2,12,'#f3e2b0','center',true);
-    } else {
+    } else if(d.key || game.selRock===d){         // кирку постоянно показываем только на ключевых местах
       const bx=x+TS/2-9, by=y-TS/2+9;
       ctx.fillStyle='rgba(10,20,27,.82)'; ctx.beginPath(); ctx.arc(bx,by,9,0,7); ctx.fill();
       ctx.strokeStyle='#e7b74e'; ctx.lineWidth=1.4; ctx.stroke();
@@ -3168,7 +3351,7 @@ function drawDecor(){
   const th=game.theme;
   for(const d of game.decor){
     const x=tx(d.c)+(d.cut>0? Math.sin(performance.now()/40)*1.6 : 0), y=ty(d.r)+10, sc=d.s;
-    if(d.clear) drawObstacleMark(d);
+    if(d.key || game.selRock===d) drawObstacleMark(d);
     ctx.save(); ctx.translate(x,y); ctx.scale(sc,sc);
     shadow(2,2,16,6);
     if(sprite('deco_'+game.L.theme+'_'+d.kind+'_'+d.v, 0, 10, d.kind==='tree'?64:38, TS*1.3)){ ctx.restore(); continue; }
@@ -3402,18 +3585,40 @@ function drawTowers(){
 /* Спрайты башен статичны (восемь направлений в паке — восемь РАЗНЫХ построек,
    их нельзя крутить). Поэтому подвижную часть — лук, копьё, рычаг — рисуем сверху
    и наводим точно на цель, с отдачей в момент выстрела. */
+/* Иконки интерфейса художника: один лист assets/icons/hud.webp, клетки по 96 px.
+   Пока лист не загрузился (или его нет), рисуем прежние векторные значки. */
+const HUDI={img:null, ok:false, names:['heart','coin','restart','pause','ff','vibe','sound','home'],
+  draw(n,x,y,s){ if(!this.ok) return false; const i=this.names.indexOf(n); if(i<0) return false;
+    ctx.drawImage(this.img,i*96,0,96,96,x-s/2,y-s/2,s,s); return true; } };
+const GATEF={img:null, ok:false};
+if(typeof Image!=='undefined'){
+  const a=new Image(); a.onload=()=>{ HUDI.img=a; HUDI.ok=true; }; a.src='assets/icons/hud.webp';
+  const b=new Image(); b.onload=()=>{ GATEF.img=b; GATEF.ok=true; }; b.src='assets/icons/gate_front.webp';
+}
+function slash(x,y,r){                         // «выключено»: красная черта поверх значка
+  ctx.save(); ctx.lineCap='round';
+  ctx.strokeStyle='#1a0c08'; ctx.lineWidth=5; ctx.beginPath(); ctx.moveTo(x-r,y-r); ctx.lineTo(x+r,y+r); ctx.stroke();
+  ctx.strokeStyle='#d6584f'; ctx.lineWidth=2.6; ctx.stroke(); ctx.restore();
+}
 function glyphRestart(x,y){
+  if(HUDI.draw('restart',x,y,28)) return;
   ctx.strokeStyle='#e9f0f4'; ctx.lineWidth=3; ctx.lineCap='round';
   ctx.beginPath(); ctx.arc(x,y,8.5,0.6,5.4); ctx.stroke();
   ctx.fillStyle='#e9f0f4';
   ctx.beginPath(); ctx.moveTo(x+9,y-11); ctx.lineTo(x+11,y-2); ctx.lineTo(x+2,y-5); ctx.closePath(); ctx.fill();
 }
 function glyphPause(x,y,paused){
+  if(!paused && HUDI.draw('pause',x,y,26)) return;
+  if(paused && HUDI.ok){                        // «играть» в том же стиле: кость с тёмным контуром
+    ctx.fillStyle='#e8d6b0'; ctx.beginPath(); ctx.moveTo(x-7,y-11); ctx.lineTo(x+11,y); ctx.lineTo(x-7,y+11); ctx.closePath(); ctx.fill();
+    ol(2.4,'#2a1a0e'); return;
+  }
   ctx.fillStyle='#e9f0f4';
   if(paused){ ctx.beginPath(); ctx.moveTo(x-6,y-9); ctx.lineTo(x+9,y); ctx.lineTo(x-6,y+9); ctx.closePath(); ctx.fill(); }
   else { rr(x-7,y-9,5,18,2); ctx.fill(); rr(x+2,y-9,5,18,2); ctx.fill(); }
 }
 function glyphVibe(x,y,on){                   // телефон с волнами по бокам
+  if(HUDI.ok){ ctx.save(); if(!on) ctx.globalAlpha=0.5; HUDI.draw('vibe',x,y,28); ctx.restore(); if(!on) slash(x,y,11); return; }
   ctx.save(); ctx.translate(x,y);
   ctx.strokeStyle=on?'#e9f0f4':'#6b7f8c'; ctx.lineWidth=2.2; ctx.lineCap='round';
   rr(-6,-10,12,20,3); ctx.stroke();
@@ -3428,6 +3633,7 @@ function glyphVibe(x,y,on){                   // телефон с волнам�
   ctx.restore();
 }
 function glyphSound(x,y,on){
+  if(HUDI.ok){ x+=3; ctx.save(); if(!on) ctx.globalAlpha=0.5; HUDI.draw('sound',x,y,28); ctx.restore(); if(!on) slash(x,y,11); return; }
   ctx.fillStyle='#e9f0f4';
   ctx.beginPath(); ctx.moveTo(x-8,y-4); ctx.lineTo(x-3,y-4); ctx.lineTo(x+2,y-10);
   ctx.lineTo(x+2,y+10); ctx.lineTo(x-3,y+4); ctx.lineTo(x-8,y+4); ctx.closePath(); ctx.fill();
@@ -3438,11 +3644,13 @@ function glyphSound(x,y,on){
          ctx.moveTo(x+13,y-6); ctx.lineTo(x+6,y+6); ctx.stroke(); }
 }
 function glyphHome(x,y){
+  if(HUDI.draw('home',x,y,28)) return;
   ctx.fillStyle='#e9f0f4';
   ctx.beginPath(); ctx.moveTo(x,y-10); ctx.lineTo(x+10,y-1); ctx.lineTo(x+7,y-1);
   ctx.lineTo(x+7,y+9); ctx.lineTo(x-7,y+9); ctx.lineTo(x-7,y-1); ctx.lineTo(x-10,y-1); ctx.closePath(); ctx.fill();
 }
-function drawAxes(x,y){                       // скрещённые топоры — жизни деревни
+function drawAxes(x,y){                       // жизни деревни: сердце художника, иначе скрещённые топоры
+  if(HUDI.draw('heart',x,y,27)) return;
   ctx.save(); ctx.translate(x,y);
   for(const d of [-1,1]){
     ctx.save(); ctx.rotate(d*0.62);
@@ -3470,6 +3678,7 @@ function drawLock(x,y,sc){                      // маленький аккур
   ctx.restore();
 }
 function drawCoin(x,y){
+  if(HUDI.draw('coin',x,y,25)) return;
   ctx.fillStyle='#b78d28'; ctx.beginPath(); ctx.arc(x,y+1,10,0,7); ctx.fill();
   ctx.fillStyle='#e7b74e'; ctx.beginPath(); ctx.arc(x,y,10,0,7); ctx.fill(); ol(1.8);
   ctx.strokeStyle='#8c6a18'; ctx.lineWidth=2;                     // руна на монете
@@ -3834,10 +4043,11 @@ function drawRockPopup(d){
   const fs=PORTRAIT?15:13;
   if(d.cut>0) btn('clear',x,y,bw,bh,'Clearing… '+Math.ceil(d.cut)+'s',{fs,c1:'#4a5566',c2:'#333e4c',on:false});
   else{
-    btn('clear',x,y,bw,bh,'',{fs,c1:'#f0c766',c2:'#cf9a2f',on:game.gold>=CLEAR_COST});
-    ctx.save(); if(game.gold<CLEAR_COST) ctx.globalAlpha=0.42;
+    const cost=d.cost||CLEAR_COST, ct=d.ct||CLEAR_T;
+    btn('clear',x,y,bw,bh,'',{fs,c1:'#f0c766',c2:'#cf9a2f',on:game.gold>=cost});
+    ctx.save(); if(game.gold<cost) ctx.globalAlpha=0.42;
     drawPickaxe(x+20,y+bh/2+1,PORTRAIT?1.25:1,'#241708');
-    txt('Pickaxe '+CLEAR_COST+' gold · '+CLEAR_T+'s',x+bw/2+10,y+bh/2+1,fs,'#241708','center',true);
+    txt('Pickaxe '+cost+' gold · '+ct+'s',x+bw/2+10,y+bh/2+1,fs,'#241708','center',true);
     ctx.restore();
   }
 }
@@ -3857,32 +4067,43 @@ function drawTowerPopup(t){
   btn('sell',x+bw+gap,y,bw,bh,(t.cancelable()? (t.upPaid?'Cancel +':'Cancel +') : 'Sell +')+t.sellValue(),{fs:PORTRAIT?15:13,c1:'#6a4750',c2:'#4a2f36'});
 }
 function b2c(x,y){             // из координат поля в координаты холста
-  return PORTRAIT ? {x: BV.x + x*BV.s, y: BV.y + (y-BY)*BV.s} : {x,y};
+  return {x: BV.x + x*BV.s, y: BV.y + (y-BY)*BV.s};
 }
 function drawTopBar(g){
   const TB = PORTRAIT ? PORT_BOARD_Y : BY;
   const TW = STRIP ? W : CW;
   ctx.fillStyle='#0e1c25'; ctx.fillRect(0,0,TW,TB);
   ctx.fillStyle='#2b4353'; ctx.fillRect(0,TB-2,TW,2);
-  txt(g.L.n,16,PORTRAIT?24:26,PORTRAIT?20:19,'#e9f0f4','left',true);
-  txt('Wave '+Math.min(g.wave+1,g.waves.length)+' / '+g.waves.length,16,PORTRAIT?46:44,13,'#8ea6b5');
-  const iy = PORTRAIT ? 74 : 27;
+  const wtx='Wave '+Math.min(g.wave+1,g.waves.length)+' / '+g.waves.length;
+  if(PORTRAIT){                                   // две строки: название и кнопки, ниже жизни, золото и волна
+    txt(g.L.n,14,26,19,'#e9f0f4','left',true);
+    txt(wtx,CW-14,64,16,'#8ea6b5','right',true);
+  } else {
+    txt(g.L.n,16,26,19,'#e9f0f4','left',true);
+    txt(wtx,16,44,13,'#8ea6b5');
+  }
+  const iy = PORTRAIT ? 64 : 27;
   const ix = PORTRAIT ? 24 : 268;
   drawAxes(ix,iy); txt(g.lives,ix+18,iy,20,'#e9f0f4','left',true);
-  const gx = PORTRAIT ? 150 : 360;
+  const gx = PORTRAIT ? 120 : 360;
   drawCoin(gx,iy);  txt(Math.floor(g.gold),gx+18,iy,20,'#e9f0f4','left',true);
-  const bw=PORTRAIT?48:(STRIP?46:58), bh=PORTRAIT?40:(STRIP?40:40), by=PORTRAIT?50:8, gap=6;
+  const bw=PORTRAIT?46:(STRIP?46:58), bh=PORTRAIT?40:(STRIP?40:40), by=PORTRAIT?6:8, gap=6;
   let bx=(STRIP?W:CW)-8-bw;
-  btn('exit',bx,by,bw,bh,'',{}); glyphHome(bx+bw/2,by+bh/2); bx-=bw+gap;
-  btn('sound',bx,by,bw,bh,'',{}); glyphSound(bx+bw/2-3,by+bh/2,save.sound); bx-=bw+gap;
+  btn('exit',bx,by,bw,bh,'',{stone:1}); glyphHome(bx+bw/2,by+bh/2); bx-=bw+gap;
+  btn('sound',bx,by,bw,bh,'',{stone:1}); glyphSound(bx+bw/2-3,by+bh/2,save.sound); bx-=bw+gap;
   if(TOUCH){
     const vOn = VIBE_OK && save.vibe!==false;
-    btn('vibe',bx,by,bw,bh,'',{c1:vOn?'#3a5766':'#2b3b46',c2:vOn?'#24404e':'#1d2a33'});
+    btn('vibe',bx,by,bw,bh,'',{stone:1});
     glyphVibe(bx+bw/2,by+bh/2,vOn); bx-=bw+gap;
   }
-  btn('speed',bx,by,bw,bh,g.speed===1?'1x':'2x',{fs:17,c1:g.speed===2?'#4a7a52':'#3a5766',c2:g.speed===2?'#2f5a37':'#24404e'}); bx-=bw+gap;
-  btn('pause',bx,by,bw,bh,'',{}); glyphPause(bx+bw/2,by+bh/2,g.paused); bx-=bw+gap;
-  btn('restart',bx,by,bw,bh,'',{c1:g.askRestart?'#8a4a44':'#3a5766',c2:g.askRestart?'#5d2f2b':'#24404e'});
+  if(HUDI.ok){                                    // скорость: значок перемотки и подпись x1 / x2
+    btn('speed',bx,by,bw,bh,'',{stone:1,c1:g.speed===2?'#3f6b45':undefined,c2:g.speed===2?'#24402a':undefined});
+    HUDI.draw('ff',bx+bw/2,by+bh/2-5,24);
+    txt(g.speed===1?'x1':'x2',bx+bw/2,by+bh-9,11,g.speed===2?'#bff0c6':'#e8d6b0','center',true);
+  } else btn('speed',bx,by,bw,bh,g.speed===1?'1x':'2x',{fs:17,stone:1,c1:g.speed===2?'#3f6b45':undefined,c2:g.speed===2?'#24402a':undefined});
+  bx-=bw+gap;
+  btn('pause',bx,by,bw,bh,'',{stone:1}); glyphPause(bx+bw/2,by+bh/2,g.paused); bx-=bw+gap;
+  btn('restart',bx,by,bw,bh,'',{stone:1,c1:g.askRestart?'#8a4a44':undefined,c2:g.askRestart?'#5d2f2b':undefined});
   glyphRestart(bx+bw/2,by+bh/2);
   if(g.askRestart) txt('again?',bx+bw/2,by+bh+10,11,'#e59a95','center',true);
 }
@@ -3891,7 +4112,7 @@ function drawHud(){
   drawTopBar(g);
 
   if(g.alarm && g.alarm.on){                       // предупреждение перед тяжёлой волной
-    const pulse=0.55+Math.sin(g.time*6)*0.25, bw=Math.min(360,CW-40), bx=CW/2-bw/2, by=BY+6;
+    const pulse=0.55+Math.sin(g.time*6)*0.25, bw=Math.min(360,CW-40), bx=CW/2-bw/2, by=(PORTRAIT?PORT_BOARD_Y:BY)+6;
     ctx.save(); ctx.globalAlpha=pulse;
     ctx.fillStyle='rgba(120,30,24,.9)'; rr(bx,by,bw,30,7); ctx.fill();
     ctx.strokeStyle='#e0703c'; ctx.lineWidth=2; rr(bx,by,bw,30,7); ctx.stroke();
@@ -3916,19 +4137,20 @@ function drawHud(){
 
   const PANY = PORTRAIT ? (PORT_BOARD_Y+PORT_BOARD_H+30) : PY;
   if(STRIP){                                        // панель сбоку: вертикальная полоса справа
-    ctx.fillStyle='#0e1c25'; ctx.fillRect(W,0,STRIP_W,H);
-    ctx.fillStyle='#2b4353'; ctx.fillRect(W,0,2,H);
+    ctx.fillStyle='#0e1c25'; ctx.fillRect(W,0,STRIP_W,FH);
+    ctx.fillStyle='#2b4353'; ctx.fillRect(W,0,2,FH);
   } else {
     ctx.fillStyle='#0e1c25'; ctx.fillRect(0,PANY,CW,H-PANY);
     ctx.fillStyle='#2b4353'; ctx.fillRect(0,PANY,CW,2);
   }
   const gap=STRIP?6:(PORTRAIT?6:(TOUCH?8:4));
-  const cols=STRIP?2:(PORTRAIT?4:(TOUCH?4:7)),
-        cw=STRIP?Math.floor((STRIP_W-12-gap)/2):(PORTRAIT?Math.floor((CW-12-3*gap)/4):(TOUCH?132:84)),
+  const cols=STRIP?2:(PORTRAIT?7:(TOUCH?4:7)),
+        cw=STRIP?Math.floor((STRIP_W-12-gap)/2):(PORTRAIT?Math.floor((CW-12-6*gap)/7):(TOUCH?132:84)),
         ch=STRIP?96:(PORTRAIT?PORT_CARD_H:(TOUCH?92:88));
   const BIG = PORTRAIT||TOUCH;
   const CARD_BIG = PORTRAIT||STRIP;
-  TKEYS.forEach((k,i)=>{
+  const statsBig = PORTRAIT && !!g.selTower;        // в вертикали выбранная башня занимает всю нижнюю панель
+  if(!statsBig) TKEYS.forEach((k,i)=>{
     const t=TOWERS[k];
     const x=(STRIP?W+6:6)+(i%cols)*(cw+gap),
           y=(STRIP?6:PANY+8)+Math.floor(i/cols)*(ch+(STRIP?gap:8)), w=cw, h=ch, cost=towerCost(k);
@@ -3961,8 +4183,8 @@ function drawHud(){
   const rows=Math.ceil(TKEYS.length/cols);
   const px = STRIP ? (W+6) : (PORTRAIT ? 6 : 630);
   const pw = STRIP ? (STRIP_W-12) : (PORTRAIT ? (CW-12) : (W-px-8));
-  const pyy = STRIP ? (6+rows*(ch+gap)) : (PORTRAIT ? (PANY+8+rows*(ch+gap)) : (PANY+8));
-  const ph = STRIP ? (H-pyy-6) : (PORTRAIT ? PORT_ACT_H : 88);
+  const pyy = STRIP ? (6+rows*(ch+gap)) : (PORTRAIT ? (PANY+8+(statsBig?0:rows*(ch+gap))) : (PANY+8));
+  const ph = STRIP ? (H-pyy-6) : (PORTRAIT ? (statsBig ? rows*(ch+gap)+PORT_ACT_H : PORT_ACT_H) : 88);
   if(!PORTRAIT && !STRIP){
     ctx.fillStyle='#162833'; rr(px,pyy,pw,ph,7); ctx.fill();
     ctx.strokeStyle='#2f4a5a'; ctx.lineWidth=2; rr(px,pyy,pw,ph,7); ctx.stroke();
@@ -4003,9 +4225,9 @@ function drawHud(){
         ctx.fillStyle='#23394a'; rr(px+16,pyy+h3*0.74,pw-32,11,6); ctx.fill();
         ctx.fillStyle='#e7b74e'; rr(px+16,pyy+h3*0.74,(pw-32)*clamp(1-left/tot,0,1),11,6); ctx.fill();
       }
-      btn('adgold',px,pyy+h3+gap,pw,h3,'',{c1:'#5fbf72',c2:'#2f8a48',on:g.adGold});
-      txt(g.adGold?'Watch ad':'Ad used',px+pw/2,pyy+h3+gap+h3*(g.adGold?0.36:0.52),15,'#062211','center',true);
-      if(g.adGold) txt('+50 gold',px+pw/2,pyy+h3+gap+h3*0.64,16,'#062211','center',true);
+      btn('adgold',px,pyy+h3+gap,pw,h3,'',{c1:'#5fbf72',c2:'#2f8a48',on:!(g.adCd>0)});
+      txt(adLabel(),px+pw/2,pyy+h3+gap+h3*0.36,15,'#062211','center',true);
+      txt('+'+adGoldAmt()+' gold',px+pw/2,pyy+h3+gap+h3*0.64,16,'#062211','center',true);
     } else if(PORTRAIT){                           // широкая строка: волна слева, реклама справа
       const bw3=Math.floor((pw-gap)/2), h3=ph;
       if(g.waveState==='idle'){
@@ -4025,9 +4247,9 @@ function drawHud(){
         ctx.fillStyle='#e7b74e'; rr(px+22,pyy+h3*0.72,(bw3-44)*clamp(1-left/tot,0,1),14,7); ctx.fill();
       }
       const ax=px+bw3+gap;
-      btn('adgold',ax,pyy,bw3,h3,'',{c1:'#5fbf72',c2:'#2f8a48',on:g.adGold});
-      txt(g.adGold?'Watch ad':'Ad used',ax+bw3/2,pyy+h3*(g.adGold?0.36:0.5),19,'#062211','center',true);
-      if(g.adGold) txt('+50 gold',ax+bw3/2,pyy+h3*0.62,20,'#062211','center',true);
+      btn('adgold',ax,pyy,bw3,h3,'',{c1:'#5fbf72',c2:'#2f8a48',on:!(g.adCd>0)});
+      txt(adLabel(),ax+bw3/2,pyy+h3*0.36,19,'#062211','center',true);
+      txt('+'+adGoldAmt()+' gold',ax+bw3/2,pyy+h3*0.66,20,'#062211','center',true);
     } else if(g.waveState==='idle'){
       txt('Next wave in '+Math.ceil(g.waveTimer)+'s',px+12,pyy+(BIG?20:12),BIG?15:12.5,'#cfe0ea','left',true);
       btn('early',px+12,pyy+(BIG?30:18),pw-24,bH,'Call wave early  +'+Math.round(Math.ceil(g.waveTimer)*(2+g.wave*0.35)*goldMul())+' gold',
@@ -4040,8 +4262,8 @@ function drawHud(){
       ctx.fillStyle='#23394a'; rr(px+12,pyy+(BIG?42:28),pw-24,BIG?14:9,5); ctx.fill();
       ctx.fillStyle='#e7b74e'; rr(px+12,pyy+(BIG?42:28),(pw-24)*clamp(1-left/tot,0,1),BIG?14:9,5); ctx.fill();
     }
-    if(!PORTRAIT && !STRIP) btn('adgold',px+12,pyy+ph-adH-8,pw-24,adH,g.adGold?'Watch ad  +50 gold':'Ad already used',
-        {c1:'#5fbf72',c2:'#2f8a48',tc:'#062211',fs:BIG?16:15,on:g.adGold});
+    if(!PORTRAIT && !STRIP) btn('adgold',px+12,pyy+ph-adH-8,pw-24,adH,adLabel()+'  +'+adGoldAmt()+' gold',
+        {c1:'#5fbf72',c2:'#2f8a48',tc:'#062211',fs:BIG?16:15,on:!(g.adCd>0)});
   }
   if(g.paused){
     const by0=PORTRAIT?PORT_BOARD_Y:BY, bh0=PORTRAIT?PORT_BOARD_H:(PY-BY);
@@ -4118,12 +4340,24 @@ function inBattle(){
   return ![...document.querySelectorAll('.screen')].some(el=>el.classList.contains('on') && el.id!=='adOv');
 }
 function syncRot(){
-  const need = VERT && TOUCH && !rotSkip && inBattle();
+  /* Просьба повернуть нужна только если телефон повернули посреди боя, когда на поле уже
+     стоят башни и карту перестроить нельзя. Тогда предлагаем вернуть прежнюю ориентацию. */
+  const need = TOUCH && !rotSkip && !!game && inBattle() && (!!game.tp !== VERT);
   const el=(typeof document!=='undefined') && document.getElementById('rot');
   if(el){
+    const h=el.querySelector('h2'), p=el.querySelector('p'), b=document.getElementById('rotok');
+    if(need && game.tp){
+      if(h) h.textContent='Turn your phone upright';
+      if(p) p.textContent='This fjord was started in portrait. Turn the phone back to keep the board large.';
+      if(b) b.textContent='Keep playing like this';
+    } else if(need){
+      if(h) h.textContent='Turn your phone sideways';
+      if(p) p.textContent='This fjord was started in landscape. Turn the phone back to keep the board large.';
+      if(b) b.textContent='Keep playing like this';
+    }
     el.classList.toggle('on', need);
     if(need){ clearTimeout(rotLateT); el.classList.remove('late');
-      rotLateT=setTimeout(()=>el.classList.add('late'),2200); }   // сначала прочти, потом пропускай
+      rotLateT=setTimeout(()=>el.classList.add('late'),1200); }
   }
   if(game) game.rotAsk = need;
 }
@@ -4134,71 +4368,77 @@ if(typeof document!=='undefined'){
   const rb=document.getElementById('rotok');
   if(rb) rb.onclick=()=>{ rotSkip=true; syncRot(); try{ buzz(10); }catch(e){} };
 }
+/* Раскладка под любые пропорции экрана без чёрных полей.
+   Горизонтально: макет 960×640 (или 1222×536 с боковой панелью на телефоне), а лишнее место
+   по бокам занимает продолжение местности, снизу — продолжение панели.
+   Вертикально: поле 10×20 во всю высоту, сверху строка состояния, снизу ряд башен и кнопки. */
 function setLayout(touch, portrait){
   TOUCH=!!touch;
-  VERT = !!portrait;
-  PORTRAIT = false;
-  STRIP=false;
-  if(PORTRAIT){
-    CW=720;
-    const vw=window.innerWidth||390, vh=window.innerHeight||844;
-    BV.zoom = 1;                                        // вся карта видна сразу, приближать не нужно
-    PORT_BOARD_H = Math.round(ROWS*TS*(CW/W)) + 16;      // ровно под поле целиком
-    const want = Math.round(CW*vh/vw);                   // сколько влезает по пропорциям экрана
-    let rest = want - PORT_BOARD_Y - PORT_BOARD_H - 30 - 66;
-    PORT_CARD_H = clamp(Math.round((rest-120)/2), 118, 152);   // компактные карточки
-    PORT_ACT_H  = clamp(rest - 2*(PORT_CARD_H+8) - 8, 92, 124);
-    H = PORT_BOARD_Y + PORT_BOARD_H + 30 + 2*(PORT_CARD_H+8) + 8 + PORT_ACT_H + 52;
-  }
-  else if(TOUCH){                                    // телефон лёжа: панель сбоку, поле во всю высоту
-    STRIP=true; CW=W+STRIP_W; H=BY+ROWS*TS;
-  }
-  else { CW=960; H=640; }
-  const cv2=document.getElementById('cv'), st=document.getElementById('stage');
-  if(cv2){ cv2.width=CW; cv2.height=H; cv2.style.width=CW+'px'; cv2.style.height=H+'px'; }
-  if(st){ st.style.width=CW+'px'; st.style.height=H+'px'; }
-  updateBoardView();
-  fit();
+  VERT=!!portrait;
+  PORTRAIT = game ? !!game.tp : VERT;
+  STRIP = !PORTRAIT && TOUCH;
+  fit(true);
   syncRot();
 }
-function updateBoardView(){
+function screenWH(){
+  const vv = window.visualViewport;
+  return [Math.max(1,Math.round(vv? vv.width : window.innerWidth)), Math.max(1,Math.round(vv? vv.height : window.innerHeight))];
+}
+function computeLayout(vw,vh){
+  const a=vh/vw;
   if(PORTRAIT){
-    BV.s = (CW/W) * BV.zoom;                     // по умолчанию поле ровно по ширине экрана
-    const bw=W*BV.s, bh=ROWS*TS*BV.s;
-    const areaH = PORT_BOARD_H;
-    BV.x = (bw<=CW) ? (CW-bw)/2 : clamp(BV.panX, CW-bw, 0);
-    BV.y = PORT_BOARD_Y + ((bh<=areaH) ? (areaH-bh)/2 : clamp(BV.panY, areaH-bh, 0));
+    PORT_BOARD_Y=84; PORT_CARD_H=100; PORT_ACT_H=76;
+    const F = PORT_BOARD_Y + 30 + 8 + PORT_CARD_H + 6 + PORT_ACT_H + 10;
+    CW = Math.max(540, Math.round((ROWS*TS + F)/a));
+    H  = Math.round(CW*a);
+    PORT_BOARD_H = H - F;
+    FW=CW; FH=H; OX=0;
   } else {
-    BV.s=1; BV.x=0; BV.y=BY; BV.zoom=1; BV.panX=0; BV.panY=0;
+    if(STRIP){ CW=960+STRIP_W; H=BY+480; } else { CW=960; H=640; }
+    if(vw/vh > CW/H){ FW=Math.round(H*vw/vh); FH=H; }
+    else { FW=CW; FH=Math.round(CW*a); }
+    OX=Math.round((FW-CW)/2);
   }
 }
-const PORT_BOARD_Y=96;
-let PORT_BOARD_H=500, PORT_CARD_H=112, PORT_ACT_H=140;   // считаются под пропорции конкретного экрана
-function fit(){
-  const vv = window.visualViewport;
-  const vw = Math.round(vv? vv.width : window.innerWidth);
-  const vh = Math.round(vv? vv.height : window.innerHeight);
-  const s = Math.min(vw/CW, vh/H);
-  VIEW={s, rot:0, vw, vh};
-  const st=document.getElementById('stage');
-  st.style.transformOrigin='0 0';
-  st.style.transform='translate('+(vw/2)+'px,'+(vh/2)+'px) scale('+s+') translate('+(-CW/2)+'px,'+(-H/2)+'px)';
+function updateBoardView(){
+  BV.zoom=1; BV.panX=0; BV.panY=0; BV.s=1;
+  if(PORTRAIT){
+    BV.x = Math.round((CW-W)/2);
+    BV.y = PORT_BOARD_Y + Math.max(0,Math.round((PORT_BOARD_H-ROWS*TS)/2));
+  } else { BV.x=0; BV.y=BY; }
 }
-window.addEventListener('resize',fit);
-window.addEventListener('orientationchange',()=>setTimeout(fit,250));
-if(window.visualViewport){ visualViewport.addEventListener('resize',fit); }
+let PORT_BOARD_Y=84;
+let PORT_BOARD_H=960, PORT_CARD_H=100, PORT_ACT_H=76;   // считаются под пропорции конкретного экрана
+function fit(force){
+  const [vw,vh]=screenWH();
+  const old=FW+'x'+FH+'/'+CW+'x'+H;
+  computeLayout(vw,vh);
+  const cv2=document.getElementById('cv'), st=document.getElementById('stage');
+  if(force || old!==FW+'x'+FH+'/'+CW+'x'+H){
+    if(cv2){ cv2.width=FW; cv2.height=FH; cv2.style.width=FW+'px'; cv2.style.height=FH+'px'; }
+    if(st){ st.style.width=FW+'px'; st.style.height=FH+'px'; }
+  }
+  updateBoardView();
+  const s = Math.min(vw/FW, vh/FH);
+  VIEW={s, rot:0, vw, vh};
+  st.style.transformOrigin='0 0';
+  st.style.transform='translate('+(vw/2)+'px,'+(vh/2)+'px) scale('+s+') translate('+(-FW/2)+'px,'+(-FH/2)+'px)';
+  if(game && typeof draw==='function'){ try{ draw(); }catch(e){} }
+}
+window.addEventListener('resize',()=>fit());
+window.addEventListener('orientationchange',()=>setTimeout(()=>fit(),250));
+if(window.visualViewport){ visualViewport.addEventListener('resize',()=>fit()); }
 
-function toGame(ev){            // координаты холста
+function toGame(ev){            // координаты макета (без боковых полей)
   const cx=(ev.touches? ev.touches[0].clientX : ev.clientX);
   const cy=(ev.touches? ev.touches[0].clientY : ev.clientY);
-  return { x: (cx-VIEW.vw/2)/VIEW.s + CW/2, y: (cy-VIEW.vh/2)/VIEW.s + H/2 };
+  return { x: (cx-VIEW.vw/2)/VIEW.s + FW/2 - OX, y: (cy-VIEW.vh/2)/VIEW.s + FH/2 };
 }
 function toBoard(p){           // координаты поля с учётом масштаба и сдвига
   return { x:(p.x-BV.x)/BV.s, y:(p.y-BV.y)/BV.s + BY };
 }
 function onBoard(p){
-  if(!PORTRAIT) return p.y>=BY && p.y<PY;
-  return p.y>=PORT_BOARD_Y && p.y<PORT_BOARD_Y+PORT_BOARD_H;
+  return p.x>=BV.x && p.x<BV.x+W*BV.s && p.y>=BV.y && p.y<BV.y+ROWS*TS*BV.s;
 }
 /* Вибрация есть в Chrome на Android; в Safari на iPhone Vibration API отсутствует
    в принципе, поэтому там кнопка помечается как недоступная. */
@@ -4288,7 +4528,7 @@ cv.addEventListener('pointerdown',e=>{
   if(e.pointerType==='touch'){
     game.touch=true;
     touches.set(e.pointerId,p);
-    if(touches.size===2 && PORTRAIT){                  // два пальца — масштабируем поле
+    if(touches.size===2 && PORTRAIT && BV_ZOOM){                  // два пальца — масштабируем поле
       const [a,b]=[...touches.values()];
       pinch={ d:Math.hypot(a.x-b.x,a.y-b.y), zoom:BV.zoom,
               cx:(a.x+b.x)/2, cy:(a.y+b.y)/2 };
@@ -4338,7 +4578,7 @@ cv.addEventListener('pointermove',e=>{
   if(!drag) return;
   const p=toGame(e), dx=p.x-drag.p.x, dy=p.y-drag.p.y;
   if(Math.abs(dx)>12 || Math.abs(dy)>12) drag.moved=true;
-  if(drag.moved && PORTRAIT && onBoard(drag.p)){
+  if(drag.moved && PORTRAIT && BV_ZOOM && onBoard(drag.p)){
     BV.panX=drag.panX+dx; BV.panY=drag.panY+dy; updateBoardView();
   }
 });
@@ -4404,8 +4644,9 @@ async function onButton(id){
     g.abOpen=!g.abOpen; if(g.abOpen){ g.sel=null; g.selTower=null; g.selRock=null; } return; }
   if(id.startsWith('ab_')){ g.abOpen=false; armAbility(id.slice(3)); return; }
   if(id==='clear'){ const d=g.selRock; if(!d || d.cut>0) return;
-    if(g.gold<CLEAR_COST){ SFX.no(); floatText(tx(d.c),ty(d.r)-10,'not enough gold','#d6584f'); return; }
-    g.gold-=CLEAR_COST; d.cut=CLEAR_T; d.chip=0; SFX.build(); buzz(20); g.selRock=null; return; }
+    const cost=d.cost||CLEAR_COST;
+    if(g.gold<cost){ SFX.no(); floatText(tx(d.c),ty(d.r)-10,'not enough gold','#d6584f'); return; }
+    g.gold-=cost; d.cut=d.ct||CLEAR_T; d.chip=0; SFX.build(); buzz(20); g.selRock=null; return; }
   if(id==='up'){ const t=g.selTower, c=t.upCost();
     if(t.bt>0){ SFX.no(); buzz([18,40,18]); floatText(t.x,t.y-30,'still building','#e0a0a0'); return; }
     if(g.gold>=c && t.canUp()){ g.gold-=c; t.spent+=c; t.lvl++; SFX.build();
@@ -4418,12 +4659,13 @@ async function onButton(id){
     }
     game.towers=game.towers.filter(x=>x!==t); g.selTower=null; SFX.sell(); return; }
   if(id==='adgold'){
-    if(!g.adGold) return;
+    if(g.adCd>0) return;
+    const amt=adGoldAmt();
     adPaused=true;                                   // своя пауза, не пауза игрока
     let ok=false;
-    try{ ok=await Ads.rewarded('gold-50-ingame','Ad for 50 gold'); }
+    try{ ok=await Ads.rewarded('gold-ingame','Ad for '+amt+' gold'); }
     finally{ adPaused=false; }
-    if(ok){ g.adGold=false; g.gold+=50; floatText(480,BY+40,'+50 gold','#e7b74e'); }
+    if(ok && game===g){ g.adCd=AD_CD; g.gold+=amt; floatText(W/2,BY+40,'+'+amt+' gold','#e7b74e'); SFX.coin && SFX.coin(); }
     return;
   }
   if(id.startsWith('sp_')){
@@ -4433,7 +4675,7 @@ async function onButton(id){
   }
   if(id.startsWith('t_')){ const k=id.slice(2);
     if(!towerUnlocked(k)){ SFX.no(); g.sel=k; g.selTower=null;
-      floatText(480,BY+40,TOWERS[k].name+' — buy rank I in Upgrades','#8ea6b5'); return; }
+      floatText(W/2,BY+40,TOWERS[k].name+' — buy rank I in Upgrades','#8ea6b5'); return; }
     g.sel = g.sel===k? null : k; g.selTower=null; g.selRock=null; g.armed=null; g.line=null; if(TOUCH){ g.hoverC=-1; g.hoverR=-1; } return; }
 }
 
@@ -4957,6 +5199,34 @@ function renderPrep(){
    жизни, серебро (включая припасы) и звёзды этого фьорда. Отменяется результат целиком,
    иначе повтором можно было бы копить серебро. */
 let runSnap=null;
+/* Ежедневная дань: серебро за вход раз в сутки, семь дней подряд — всё больше.
+   Пропустил день — серия начинается заново. Показываем, только когда игрок уже прошёл
+   хотя бы один фьорд, чтобы не мешать первому знакомству с игрой. */
+const DAILY=[25,35,45,60,75,90,120];
+function dayKey(d){ d=d||new Date(); return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate(); }
+function maybeDaily(){
+  try{
+    if(!Object.keys(P().stars||{}).length) return;
+    const today=dayKey(), dl=save.daily||{};
+    if(dl.day===today) return;
+    const y=new Date(); y.setDate(y.getDate()-1);
+    const streak = dl.day===dayKey(y) ? (dl.streak||0)+1 : 1;
+    const idx=(streak-1)%7, amt=DAILY[idx];
+    const box=$('#dailyDays'); box.innerHTML='';
+    DAILY.forEach((v,i)=>{ const d=document.createElement('div');
+      d.className='day'+(i<idx?' got':'')+(i===idx?' now':''); d.innerHTML='Day '+(i+1)+'<b>'+v+'</b>'; box.appendChild(d); });
+    $('#dailySub').textContent = streak>1 ? ('Day '+streak+' in a row. Come back tomorrow for more silver.')
+                                          : 'Come back every day: the tribute grows for seven days in a row.';
+    const ov=$('#dailyOv'); ov.classList.add('on');
+    const give=n=>{ P().silver+=n; save.daily={day:today, streak}; flushSave(); ov.classList.remove('on');
+      document.querySelectorAll('#silv1,#silv2,#silv3,.silvv').forEach(el=>el.textContent=P().silver);
+      try{ SFX.up(); }catch(e){} };
+    $('#dailyTake').textContent='Take '+amt+' silver';
+    $('#dailyTake').onclick=()=>give(amt);
+    $('#dailyAd').textContent='Watch ad: '+(amt*2)+' silver';
+    $('#dailyAd').onclick=async()=>{ const ok=await Ads.rewarded('daily','Double tribute'); give(ok?amt*2:amt); };
+  }catch(e){ console.warn('daily',e); }
+}
 /* Кнопка улучшений на экране итогов: серебро в плашке, плашка светится, когда есть что купить.
    Так подпись помещается в половину ширины даже на узком телефоне. */
 function upgLabel(){
@@ -5167,10 +5437,11 @@ function loop(now){
     }catch(e){ console.warn('music', e); }
   }
   if(game && game.running && !game.paused && !game.rotAsk && !platformPaused && !adPaused){
+    if(game.adCd>0) game.adCd=Math.max(0,game.adCd-dt);   // перезарядка рекламы — в реальном времени
     const steps=game.speed;
     for(let i=0;i<steps;i++) update(dt);
   }
-  if(game) draw(); else ctx.clearRect(0,0,W,H);
+  if(game) draw(); else ctx.clearRect(0,0,FW,FH);
   requestAnimationFrame(loop);
 }
 
@@ -5194,7 +5465,11 @@ function loop(now){
   setLayout(touch, window.innerHeight > window.innerWidth*1.04);
   window.addEventListener('resize',()=>{
     const port = window.innerHeight > window.innerWidth*1.04;
-    if(port!==VERT){ if(!port) rotSkip=false; setLayout(TOUCH, port); syncRot(); }
+    if(port!==VERT){
+      rotSkip=false;
+      if(game && freshGame() && !!game.tp!==port){ VERT=port; transposeGame(); }   // пока поле пустое — просто перестраиваем карту
+      setLayout(TOUCH, port);
+    }
   });
   screen('scMenu'); renderLevels();
   requestAnimationFrame(loop);
@@ -5248,6 +5523,7 @@ function loop(now){
     await new Promise(r=>setTimeout(r,180));
   }
   if(boot){ boot.classList.add('gone'); setTimeout(()=>boot.remove(),600); }
+  setTimeout(maybeDaily, 900);
   // Bridge может добавить отступы под «чёлку» уже после первой раскладки — пересчитываем.
   fit();                                           // Bridge мог добавить отступы под «чёлку» — пересчитываем раскладку
   bindAudioUnlock();

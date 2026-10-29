@@ -61,27 +61,42 @@
   .btn[disabled]{filter:grayscale(.8) brightness(.7);pointer-events:none}
   .row{display:flex;flex-wrap:wrap;justify-content:center;align-items:center}
   .levels{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;width:100%;max-width:680px;margin:16px 0 10px}
-  .lv{position:relative;height:96px;border-radius:9px;cursor:pointer;border:2px solid #2f4a5a;
-      background:linear-gradient(180deg,#223a48,#162833);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px}
-  .lv:hover{border-color:var(--rune)}
-  .lv b{font-size:26px}
-  .lv span{font-size:11px;color:#8ea6b5;letter-spacing:.06em}
-  .lv .st{font-size:13px;color:var(--rune);letter-spacing:2px;height:14px}
-  .lv.lock{opacity:.42;cursor:not-allowed;border-color:#2a3a45}
-  .lv.lock:hover{border-color:#2a3a45}
+  /* Карточка фьорда — миниатюра самой карты с дорогой, сверху затемнение под текст. */
+  .lv{position:relative;height:96px;border-radius:10px;cursor:pointer;border:2px solid #3a5566;overflow:hidden;
+      background:#162833 center/cover no-repeat;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:2px;
+      padding-bottom:7px;box-shadow:0 4px 10px rgba(0,0,0,.45);transition:transform .08s,border-color .15s}
+  .lv::before{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(8,16,22,.05) 0%,rgba(8,16,22,.35) 40%,rgba(8,16,22,.88) 100%);pointer-events:none}
+  .lv > *{position:relative}
+  .lv:hover{border-color:var(--rune);transform:translateY(-2px)}
+  .lv b{font-size:26px;line-height:1;text-shadow:0 2px 4px #000,0 0 10px rgba(0,0,0,.6)}
+  .lv span{font-size:11px;color:#dbe6ec;letter-spacing:.04em;text-shadow:0 1px 3px #000;line-height:1.15;padding:0 3px}
+  .lv .st{font-size:13px;color:var(--rune);letter-spacing:2px;height:14px;text-shadow:0 1px 3px #000}
+  .lv.next{border-color:var(--rune);box-shadow:0 0 0 3px rgba(231,183,78,.28),0 4px 10px rgba(0,0,0,.45)}
+  .lv.lock{cursor:not-allowed;border-color:#2a3a45;filter:grayscale(.85) brightness(.55)}
+  .lv.lock:hover{border-color:#2a3a45;transform:none}
+  @media (max-width:480px){ .levels{gap:7px} .lv{height:auto;min-height:92px;padding-top:20px} .lv b{font-size:22px} .lv span{font-size:9.5px;letter-spacing:0} .lv .st{font-size:11.5px;letter-spacing:1px} }
+  /* Общий фон экранов меню: картинка игры, притемнённая сверху и по краям. */
+  #mbg{position:fixed;inset:0;display:none;background:#0a141b center/cover no-repeat;pointer-events:none}
+  #mbg.on{display:block}
+  #mbg::after{content:"";position:absolute;inset:0;
+     background:radial-gradient(120% 90% at 50% 40%,rgba(8,16,22,.35) 0%,rgba(8,16,22,.78) 75%,rgba(6,12,16,.92) 100%),
+                linear-gradient(180deg,rgba(8,16,22,.55),rgba(8,16,22,.25) 30%,rgba(8,16,22,.6))}
+  #mbg.dim::after{background:radial-gradient(120% 90% at 50% 40%,rgba(8,16,22,.6) 0%,rgba(8,16,22,.86) 75%,rgba(6,12,16,.95) 100%)}
+  .screen.scroll{background:none}
   .perks{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;width:100%;max-width:700px;margin:14px 0}
-  .perk{background:#162833;border:2px solid #2f4a5a;border-radius:9px;padding:12px 14px;text-align:left}
+  .perk{background:rgba(20,38,49,.94);border:2px solid #2f4a5a;border-radius:9px;padding:12px 14px;text-align:left;box-shadow:0 4px 12px rgba(0,0,0,.4)}
   /* Шапка прилипает к самому верху и полностью непрозрачна во всю ширину экрана:
      раньше над ней просвечивали кнопки прокрученных карточек. */
   .screen.scroll{padding-top:0}
   .hdr{position:sticky;top:0;z-index:6;display:flex;justify-content:space-between;align-items:center;
         width:calc(100% + 52px);margin:0 -26px 6px;padding:14px 26px 12px;
-        background:#0a161e;box-shadow:0 8px 14px -6px rgba(0,0,0,.55)}
+        background:rgba(9,19,26,.92);box-shadow:0 8px 14px -6px rgba(0,0,0,.55);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
   .hdr .btn{min-width:0;min-height:44px;padding:10px 20px;font-size:15px;margin:0}
   .perk{display:flex;flex-direction:column}
   .perk .top{display:flex;align-items:center;gap:10px;margin-bottom:6px}
   .perk .top img,.perk .top svg{width:42px;height:42px;flex:0 0 42px;filter:drop-shadow(0 2px 3px rgba(0,0,0,.5))}
-  .perk h3{margin:0;font-size:17px}
+  .perk h3{margin:0;font-size:17px;overflow-wrap:normal;word-break:normal;hyphens:manual;line-height:1.15}
+  @media (max-width:480px){ .perks{gap:8px} .perk{padding:10px 10px} .perk h3{font-size:14.5px} .perk .top{gap:7px} .perk .top img,.perk .top svg{width:34px;height:34px;flex:0 0 34px} }
   .perk p{margin:0 0 10px;font-size:13px;color:#93a8b6;line-height:1.35;min-height:34px}
   .cnt{display:flex;justify-content:space-between;align-items:baseline;margin:2px 0 8px}
   .cnt .num{font-size:22px;font-weight:bold;color:var(--rune)}
@@ -265,7 +280,7 @@
   .vol b{font-size:13px;color:#e9f0f4;min-width:34px;text-align:right;font-variant-numeric:tabular-nums}
   .vol input{flex:1;min-width:0;height:28px;accent-color:#e7b74e;cursor:pointer}
   /* Лидерборд: непрозрачный фон (раньше сквозь него просвечивал бой), всё по центру */
-  #scBoard{background:#0a161e}
+  #scBoard{background:none}
   .bwrap{width:100%;max-width:820px;display:flex;flex-direction:column;align-items:center;gap:14px;margin:0 auto 30px}
   .bwrap h2{margin:4px 0 0}
   .bsum{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;width:100%}
@@ -349,6 +364,7 @@
   <canvas id="cv" width="960" height="640"></canvas>
 </div></div>
 <div id="ui">
+<div id="mbg"></div>
 <div id="lvload"><div class="rotin">
   <div class="lvspin"></div><h2>Preparing the fjord</h2>
   <p class="sub">Painting the terrain, this takes a moment on first entry.</p>
@@ -411,7 +427,7 @@
       <button class="btn sec" id="bHelp">How to play</button>
     </div>
     <div class="bar"><div class="silver"><img src="assets/icons/icon_silver.png" alt=""><b id="silv1">0</b></div></div>
-    <div class="build">build 29.10 · 3</div>
+    <div class="build">build 29.10 · 5</div>
   </div>
 
   <!-- ВЫБОР УРОВНЯ -->
@@ -4686,6 +4702,7 @@ function screen(id){
   if(id && id!=='scResult') game=null;     // ни один уровень не работает за открытым меню
   document.querySelectorAll('.screen').forEach(s=>{ if(s.id!=='adOv') s.classList.remove('on'); });
   if(id) $('#'+id).classList.add('on');
+  setMenuBg(id);
   document.querySelectorAll('#silv1,#silv2,#silv3,.silvv').forEach(el=>{ el.textContent=P().silver; });
 }
 document.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>screen(b.dataset.go));
@@ -5014,7 +5031,11 @@ function renderLevels(){
     // на закрытой карте пишем не «locked», а сколько звёзд не хватает
     const lackStars = lock && have<need;
     const d=document.createElement('div');
-    d.className='lv'+(lock?' lock':'');
+    const isNext = !lock && !st && (i===0 || unlocked(i));
+    d.className='lv'+(lock?' lock':'')+(isNext && !grid.querySelector('.next')?' next':'');
+    d.style.backgroundImage='url("assets/bg/thumbs.webp")';     // все миниатюры одним листом 5×3
+    d.style.backgroundSize='500% 300%';
+    d.style.backgroundPosition=((i%5)*25)+'% '+(Math.floor(i/5)*50)+'%';
     d.innerHTML='<b>'+(i+1)+'</b><span>'+L.n+'</span><div class="st">'+
       (lock ? (lackStars ? ('★ '+have+'/'+need) : 'locked')
             : '★★★'.slice(0,st)+'☆☆☆'.slice(0,3-st))+'</div>';
@@ -5199,6 +5220,18 @@ function renderPrep(){
    жизни, серебро (включая припасы) и звёзды этого фьорда. Отменяется результат целиком,
    иначе повтором можно было бы копить серебро. */
 let runSnap=null;
+/* Фон экранов меню. Выбор фьорда — пейзаж заставки; подготовка — карта того самого
+   фьорда, куда идём; кузница, рекорды и правила — разные карты, чтобы экраны отличались. */
+const MENU_BG={ scLevels:'assets/splash_soft.webp', scPerks:'assets/bg/bg_level_07.webp',
+                scBoard:'assets/splash_soft.webp', scHelp:'assets/splash_soft.webp' };
+function setMenuBg(id){
+  const el=document.getElementById('mbg'); if(!el) return;
+  let url = MENU_BG[id] || null;
+  if(id==='scPrep'){ let pl=0; try{ pl=prepLevel||0; }catch(e){} url='assets/bg/bg_level_'+String(pl+1).padStart(2,'0')+'.webp'; }
+  el.classList.toggle('on', !!url);
+  el.classList.toggle('dim', id==='scPrep' || id==='scPerks');
+  if(url && el.dataset.u!==url){ el.dataset.u=url; el.style.backgroundImage='url("'+url+'")'; }
+}
 /* Ежедневная дань: серебро за вход раз в сутки, семь дней подряд — всё больше.
    Пропустил день — серия начинается заново. Показываем, только когда игрок уже прошёл
    хотя бы один фьорд, чтобы не мешать первому знакомству с игрой. */
